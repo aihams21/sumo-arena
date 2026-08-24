@@ -126,6 +126,9 @@
             border-radius: 20px;
             font-size: clamp(10px, 3vw, 13px);
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .btn-exit {
             pointer-events: auto;
@@ -137,6 +140,26 @@
             cursor: pointer;
             font-size: 11px;
             font-weight: bold;
+        }
+
+        .mic-btn {
+            pointer-events: auto;
+            background: #1c2030;
+            border: 1px solid #00e5ff;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .mic-btn.active {
+            background: #00e5ff;
+            color: #000;
+            box-shadow: 0 0 10px #00e5ff;
         }
 
         #stage-grid {
@@ -236,6 +259,7 @@
     <div id="banner-ad" onclick="openDirectReward('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
+        <audio id="remote-audio" autoplay></audio>
         
         <div id="touch-controller">
             <div id="stick"></div>
@@ -244,7 +268,10 @@
         <div id="hud" class="hidden">
             <div class="hud-card" id="hud-left">STAGE: 1</div>
             <div class="hud-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
-            <div class="hud-card" id="hud-right"><button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button></div>
+            <div class="hud-card" id="hud-right">
+                <button id="mic-toggle" class="mic-btn hidden" onclick="toggleMic()">🎤</button>
+                <button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button>
+            </div>
         </div>
 
         <div id="menu-main" class="overlay">
@@ -252,7 +279,7 @@
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
-            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (Voice Chat 🎙️)</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -274,7 +301,7 @@
                 <div class="shop-card">
                     <div style="text-align:left;">
                         <div style="font-size:13px; font-weight:bold;">🏋️ Weight (الوزن)</div>
-                        <div style="font-size:10px; color:#aaa;">يكبر حجمك ويثبتك</div>
+                        <div style="font-size:10px; color:#aaa;">يكبر حجمك ويزيدك ثباتاً</div>
                     </div>
                     <button class="shop-btn" id="buy-weight" onclick="buyUpgrade('weight')">Buy</button>
                 </div>
@@ -282,7 +309,7 @@
                 <div class="shop-card">
                     <div style="text-align:left;">
                         <div style="font-size:13px; font-weight:bold;">💥 Power (القوة)</div>
-                        <div style="font-size:10px; color:#aaa;">يزيد قوة الدفع</div>
+                        <div style="font-size:10px; color:#aaa;">يزيد قوة الدفع والصد</div>
                     </div>
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
@@ -294,7 +321,7 @@
         </div>
 
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (SERVERLESS)</h2>
+            <h2>ONLINE 1v1 (VOICE CHAT 🎙️)</h2>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
             <input type="text" id="room-input" placeholder="ROOM CODE">
@@ -335,7 +362,6 @@
 
         function openDirectReward(type) {
             window.open(SMARTLINK_URL, '_blank');
-            
             if (type === 'revive') {
                 reviveOffline();
             } else if (type === 'double') {
@@ -353,6 +379,8 @@
         const ctx = canvas.getContext('2d', { alpha: false });
         const touchBox = document.getElementById('touch-controller');
         const stick = document.getElementById('stick');
+        const micBtn = document.getElementById('mic-toggle');
+        const remoteAudio = document.getElementById('remote-audio');
 
         let touchVec = { x: 0, y: 0 };
         let activeTouchId = null;
@@ -433,8 +461,11 @@
         let keys = {};
         let stageEnded = false;
 
+        // P2P Networking & Audio Voice
         let peer = null;
         let conn = null;
+        let localStream = null;
+        let isMicActive = false;
         let isHost = false;
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         let p2pPlayers = {
@@ -450,11 +481,13 @@
             document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
             document.getElementById('hud').classList.add('hidden');
             touchBox.style.display = 'none';
+            micBtn.classList.add('hidden');
         }
 
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
+            closeVoiceStream();
             if (peer) { peer.destroy(); peer = null; }
             updateCoinDisplays();
             document.getElementById('menu-main').classList.remove('hidden');
@@ -521,6 +554,45 @@
             showMainMenu();
         }
 
+        // ================= Voice & WebRTC P2P =================
+        async function initVoiceStream() {
+            try {
+                if (!localStream) {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    localStream.getAudioTracks().forEach(t => t.enabled = false);
+                }
+            } catch(e) {
+                console.warn("Microphone access denied or unavailable", e);
+            }
+        }
+
+        function closeVoiceStream() {
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            isMicActive = false;
+            micBtn.classList.remove('active');
+            micBtn.innerText = '🎤';
+        }
+
+        async function toggleMic() {
+            if (!localStream) {
+                await initVoiceStream();
+            }
+            if (localStream && localStream.getAudioTracks().length > 0) {
+                isMicActive = !isMicActive;
+                localStream.getAudioTracks()[0].enabled = isMicActive;
+                if (isMicActive) {
+                    micBtn.classList.add('active');
+                    micBtn.innerText = '🎙️';
+                } else {
+                    micBtn.classList.remove('active');
+                    micBtn.innerText = '🎤';
+                }
+            }
+        }
+
         function createP2PRoom() {
             hideAllMenus();
             isHost = true;
@@ -537,6 +609,12 @@
                 setupP2PConnection();
             });
 
+            peer.on('call', async call => {
+                if (!localStream) await initVoiceStream();
+                call.answer(localStream);
+                call.on('stream', stream => { remoteAudio.srcObject = stream; });
+            });
+
             peer.on('error', err => alert('Connection error: ' + err.type));
         }
 
@@ -547,9 +625,12 @@
 
             isHost = false;
             peer = new Peer();
-            peer.on('open', () => {
+            peer.on('open', async () => {
                 conn = peer.connect(code);
                 setupP2PConnection();
+                if (!localStream) await initVoiceStream();
+                let call = peer.call(code, localStream);
+                call.on('stream', stream => { remoteAudio.srcObject = stream; });
             });
 
             peer.on('error', err => alert('Room not found or connection failed!'));
@@ -560,6 +641,7 @@
                 gameMode = 'p2p';
                 hideAllMenus();
                 document.getElementById('hud').classList.remove('hidden');
+                micBtn.classList.remove('hidden');
                 touchBox.style.display = 'block';
                 if (isHost) startP2PRound();
             });
@@ -588,6 +670,7 @@
                 } else if (data.type === 'start_round') {
                     hideAllMenus();
                     document.getElementById('hud').classList.remove('hidden');
+                    micBtn.classList.remove('hidden');
                     touchBox.style.display = 'block';
                 }
             });
@@ -609,6 +692,7 @@
             }
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
+            micBtn.classList.remove('hidden');
             touchBox.style.display = 'block';
             updateP2PHud();
         }
@@ -627,6 +711,7 @@
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
+        // ================= Offline Stages & AI =================
         function startOfflineStage(lvl) {
             gameMode = 'offline';
             currentPlayingStage = lvl;
@@ -648,21 +733,25 @@
 
             bots = [];
             let isBossLevel = (lvl % 5 === 0);
-            let stageBaseMass = 0.5 + (lvl * 0.08);
-            let stageBasePower = 3.0 + (lvl * 0.35);
+            
+            // Balanced progression
+            let stageBaseMass = 0.65 + (lvl * 0.05);
+            let stageBasePower = 3.5 + Math.min(12, lvl * 0.45);
 
             if (isBossLevel) {
                 bots.push({
                     x: 400,
                     y: 160,
                     vx: 0, vy: 0,
-                    radius: 30 + (lvl * 0.4),
-                    mass: stageBaseMass * 1.8,
-                    speed: 0.28,
-                    power: stageBasePower * 1.4,
+                    radius: 30 + Math.min(18, lvl * 0.35),
+                    mass: stageBaseMass * 1.6,
+                    speed: 0.32,
+                    power: stageBasePower * 1.35,
                     color: '#ff0055',
                     isBoss: true,
-                    alive: true
+                    alive: true,
+                    dashCooldown: 0,
+                    feintTimer: 0
                 });
             } else {
                 let botCount = Math.min(1 + Math.floor(lvl / 3), 3);
@@ -674,13 +763,15 @@
                         x: 400 + Math.cos(ang) * spawnDist,
                         y: 300 + Math.sin(ang) * spawnDist,
                         vx: 0, vy: 0,
-                        radius: 18 + (lvl * 0.3),
+                        radius: 19 + Math.min(14, lvl * 0.25),
                         mass: stageBaseMass,
-                        speed: 0.24 + Math.min(0.2, lvl * 0.01),
+                        speed: 0.28 + Math.min(0.22, lvl * 0.015),
                         power: stageBasePower,
                         color: lvl >= 6 ? '#ff6600' : '#ffaa00',
                         isBoss: false,
-                        alive: true
+                        alive: true,
+                        dashCooldown: Math.floor(Math.random() * 60),
+                        feintTimer: Math.floor(Math.random() * 80)
                     });
                 }
             }
@@ -702,6 +793,7 @@
             startOfflineStage(currentPlayingStage + 1);
         }
 
+        // ================= Physics Loop =================
         function updatePhysics() {
             if (gameMode === 'none') return;
 
@@ -716,6 +808,10 @@
                 dy = touchVec.y;
             }
 
+            // Smooth natural movement
+            let mag = Math.hypot(dx, dy);
+            if (mag > 1) { dx /= mag; dy /= mag; }
+
             if (gameMode === 'p2p') {
                 if (isHost) {
                     p2pPlayers.host.input = { dx, dy };
@@ -724,10 +820,11 @@
                         for (let key of ['host', 'guest']) {
                             let p = p2pPlayers[key];
                             if (!p.alive) continue;
-                            p.vx += p.input.dx * 0.75;
-                            p.vy += p.input.dy * 0.75;
-                            p.vx *= 0.92;
-                            p.vy *= 0.92;
+                            let pSpeed = 1.1;
+                            p.vx += p.input.dx * pSpeed;
+                            p.vy += p.input.dy * pSpeed;
+                            p.vx *= 0.89;
+                            p.vy *= 0.89;
                             p.x += p.vx;
                             p.y += p.vy;
 
@@ -753,7 +850,7 @@
                                 p2.x += Math.cos(ang) * (overlap * 0.5);
                                 p2.y += Math.sin(ang) * (overlap * 0.5);
 
-                                let push = 10;
+                                let push = 11;
                                 p1.vx -= Math.cos(ang) * push;
                                 p1.vy -= Math.sin(ang) * push;
                                 p2.vx += Math.cos(ang) * push;
@@ -787,12 +884,12 @@
                     }
                 }
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
-                let moveForce = 0.72;
+                let moveForce = 1.15;
                 player.vx += dx * moveForce;
                 player.vy += dy * moveForce;
 
-                player.vx *= 0.92;
-                player.vy *= 0.92;
+                player.vx *= 0.89;
+                player.vy *= 0.89;
 
                 player.x += player.vx;
                 player.y += player.vy;
@@ -813,11 +910,30 @@
                 for (let b of activeBots) {
                     let angToPlayer = Math.atan2(player.y - b.y, player.x - b.x);
                     
-                    b.vx += Math.cos(angToPlayer) * b.speed;
-                    b.vy += Math.sin(angToPlayer) * b.speed;
+                    // Bot AI: Taunt & Multi-Hit Rush
+                    b.dashCooldown = (b.dashCooldown || 0) + 1;
+                    b.feintTimer = (b.feintTimer || 0) + 1;
 
-                    b.vx *= 0.93;
-                    b.vy *= 0.93;
+                    let currentBotSpeed = b.speed;
+                    
+                    // Medium & Boss difficulty: Frequent dash attacks
+                    if (currentPlayingStage >= 4 && b.dashCooldown > 80) {
+                        currentBotSpeed *= 2.2; // Quick Rush
+                        if (b.dashCooldown > 105) b.dashCooldown = 0;
+                    }
+
+                    // Flanking feint movement
+                    if (b.feintTimer > 120 && b.feintTimer < 150) {
+                        angToPlayer += Math.PI / 3;
+                    } else if (b.feintTimer >= 150) {
+                        b.feintTimer = 0;
+                    }
+
+                    b.vx += Math.cos(angToPlayer) * currentBotSpeed;
+                    b.vy += Math.sin(angToPlayer) * currentBotSpeed;
+
+                    b.vx *= 0.90;
+                    b.vy *= 0.90;
                     b.x += b.vx;
                     b.y += b.vy;
 
@@ -839,10 +955,10 @@
                         b.y += Math.sin(cang) * (overlap * 0.6);
 
                         let playerMass = 1.0 + (upgrades.weight * 0.35);
-                        let playerHitPower = 6.0 + (upgrades.power * 1.8);
+                        let playerHitPower = 6.5 + (upgrades.power * 2.0);
 
                         let playerSpeedMag = Math.hypot(player.vx, player.vy);
-                        let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.25);
+                        let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.3);
 
                         player.vx -= Math.cos(cang) * (b.power / playerMass);
                         player.vy -= Math.sin(cang) * (b.power / playerMass);
