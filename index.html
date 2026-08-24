@@ -142,29 +142,6 @@
             font-weight: bold;
         }
 
-        .mic-btn {
-            pointer-events: auto;
-            background: #171b2a;
-            border: 2px solid #00e5ff;
-            color: #fff;
-            padding: 8px 14px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
-            transition: 0.2s;
-            z-index: 20;
-        }
-        .mic-btn.active {
-            background: #00ff66;
-            color: #000;
-            box-shadow: 0 0 15px rgba(0, 255, 102, 0.7);
-            border-color: #fff;
-        }
-
         #stage-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
@@ -263,7 +240,6 @@
     <div id="banner-ad" onclick="triggerSmartlinkDirect('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
-        <audio id="remote-audio" autoplay playsinline></audio>
         
         <div id="touch-controller">
             <div id="stick"></div>
@@ -273,7 +249,6 @@
             <div class="hud-card" id="hud-left">STAGE: 1</div>
             <div class="hud-card" id="hud-coins-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
             <div class="hud-card" id="hud-right">
-                <button id="mic-toggle" class="mic-btn hidden" onclick="toggleVoiceMic()">🎤 Mic: OFF</button>
                 <button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button>
             </div>
         </div>
@@ -283,7 +258,7 @@
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
-            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (No Ads 🎙️)</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -329,8 +304,8 @@
             <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Ad-Free Match</p>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="ROOM CODE">
-            <button class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
+            <input type="text" id="room-input" placeholder="ROOM CODE (e.g. 5421)">
+            <button id="btn-join" class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
@@ -340,7 +315,6 @@
             <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
         </div>
 
-        <!-- 100% Ad-Free Online Round Modal -->
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
@@ -366,7 +340,6 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        // Strict 5-Clicks Counter for Stage & Shop Rewards only
         const clickCounters = {
             free_coins: 0,
             revive: 0,
@@ -407,8 +380,6 @@
         const ctx = canvas.getContext('2d', { alpha: false });
         const touchBox = document.getElementById('touch-controller');
         const stick = document.getElementById('stick');
-        const micBtn = document.getElementById('mic-toggle');
-        const remoteAudio = document.getElementById('remote-audio');
         const bannerAd = document.getElementById('banner-ad');
         const hudCoinsCard = document.getElementById('hud-coins-card');
 
@@ -497,12 +468,8 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // WebRTC Voice & P2P Stream Architecture
         let peer = null;
         let conn = null;
-        let currentMediaCall = null;
-        let localStream = null;
-        let isMicEnabled = false;
         let isHost = false;
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         let p2pPlayers = {
@@ -518,7 +485,6 @@
             document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
             document.getElementById('hud').classList.add('hidden');
             touchBox.style.display = 'none';
-            micBtn.classList.add('hidden');
             bannerAd.style.display = 'flex';
             hudCoinsCard.style.display = 'block';
         }
@@ -526,7 +492,7 @@
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
-            closeVoiceStream();
+            if (conn) { conn.close(); conn = null; }
             if (peer) { peer.destroy(); peer = null; }
             updateCoinDisplays();
             document.getElementById('menu-main').classList.remove('hidden');
@@ -587,7 +553,7 @@
 
         function showMultiMenu() {
             hideAllMenus();
-            bannerAd.style.display = 'none'; // No Ads on Online section
+            bannerAd.style.display = 'none';
             document.getElementById('menu-multi').classList.remove('hidden');
         }
 
@@ -595,71 +561,17 @@
             showMainMenu();
         }
 
-        // ================= Optimized Mobile & PC Voice Engine =================
-        async function getOrCreateAudioStream() {
-            if (!localStream) {
-                try {
-                    localStream = await navigator.mediaDevices.getUserMedia({
-                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                        video: false
-                    });
-                    localStream.getAudioTracks().forEach(t => t.enabled = isMicEnabled);
-                } catch(e) {
-                    alert("Please allow Microphone access in your browser to speak!");
-                }
-            }
-            return localStream;
-        }
-
-        function closeVoiceStream() {
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-                localStream = null;
-            }
-            if (currentMediaCall) {
-                currentMediaCall.close();
-                currentMediaCall = null;
-            }
-            isMicEnabled = false;
-            micBtn.classList.remove('active');
-            micBtn.innerText = '🎤 Mic: OFF';
-        }
-
-        async function toggleVoiceMic() {
-            let stream = await getOrCreateAudioStream();
-            if (stream && stream.getAudioTracks().length > 0) {
-                isMicEnabled = !isMicEnabled;
-                stream.getAudioTracks().forEach(t => t.enabled = isMicEnabled);
-                
-                if (isMicEnabled) {
-                    micBtn.classList.add('active');
-                    micBtn.innerText = '🎙️ Mic: ON';
-                } else {
-                    micBtn.classList.remove('active');
-                    micBtn.innerText = '🎤 Mic: OFF';
-                }
-            }
-        }
-
-        function attachRemoteAudio(stream) {
-            remoteAudio.srcObject = stream;
-            remoteAudio.muted = false;
-            remoteAudio.play().catch(e => {
-                // Auto-play unlock on Mobile touch
-                window.addEventListener('touchstart', () => remoteAudio.play(), { once: true });
-                window.addEventListener('click', () => remoteAudio.play(), { once: true });
-            });
-        }
-
+        // ================= Pure P2P Data Network =================
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
             isHost = true;
             let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
             
+            if (peer) peer.destroy();
             peer = new Peer(roomCode);
             peer.on('open', id => {
-                document.getElementById('lobby-code').innerText = id;
+                document.getElementById('lobby-code').innerText = id.replace('SUMO-', '');
                 document.getElementById('menu-lobby').classList.remove('hidden');
             });
 
@@ -668,43 +580,47 @@
                 setupP2PConnection();
             });
 
-            peer.on('call', async call => {
-                currentMediaCall = call;
-                let stream = await getOrCreateAudioStream();
-                call.answer(stream);
-                call.on('stream', remStream => attachRemoteAudio(remStream));
+            peer.on('error', err => {
+                alert('Connection error: ' + err.type);
+                showMultiMenu();
             });
-
-            peer.on('error', err => alert('Connection error: ' + err.type));
         }
 
         function joinP2PRoom() {
-            let code = document.getElementById('room-input').value.trim();
-            if (!code) return alert("Enter Room Code!");
-            if (!code.startsWith('SUMO-')) code = 'SUMO-' + code;
+            let rawCode = document.getElementById('room-input').value.trim();
+            if (!rawCode) return alert("Please enter the room code!");
+            
+            let targetCode = rawCode.startsWith('SUMO-') ? rawCode : 'SUMO-' + rawCode;
+            let joinBtn = document.getElementById('btn-join');
+            joinBtn.innerText = "Connecting...";
 
             isHost = false;
             bannerAd.style.display = 'none';
+
+            if (peer) peer.destroy();
             peer = new Peer();
-            peer.on('open', async () => {
-                conn = peer.connect(code);
+            
+            peer.on('open', () => {
+                conn = peer.connect(targetCode, { reliable: true });
                 setupP2PConnection();
-                let stream = await getOrCreateAudioStream();
-                currentMediaCall = peer.call(code, stream);
-                currentMediaCall.on('stream', remStream => attachRemoteAudio(remStream));
             });
 
-            peer.on('error', err => alert('Room not found or connection failed!'));
+            peer.on('error', err => {
+                joinBtn.innerText = "🚀 Join Room";
+                alert('Could not join room. Check the code and try again.');
+            });
         }
 
         function setupP2PConnection() {
             conn.on('open', () => {
+                let joinBtn = document.getElementById('btn-join');
+                if (joinBtn) joinBtn.innerText = "🚀 Join Room";
+
                 gameMode = 'p2p';
                 hideAllMenus();
                 bannerAd.style.display = 'none';
-                hudCoinsCard.style.display = 'none'; // Clean HUD for 1v1
+                hudCoinsCard.style.display = 'none';
                 document.getElementById('hud').classList.remove('hidden');
-                micBtn.classList.remove('hidden');
                 touchBox.style.display = 'block';
                 if (isHost) startP2PRound();
             });
@@ -736,7 +652,6 @@
                     bannerAd.style.display = 'none';
                     hudCoinsCard.style.display = 'none';
                     document.getElementById('hud').classList.remove('hidden');
-                    micBtn.classList.remove('hidden');
                     touchBox.style.display = 'block';
                 }
             });
@@ -760,7 +675,6 @@
             bannerAd.style.display = 'none';
             hudCoinsCard.style.display = 'none';
             document.getElementById('hud').classList.remove('hidden');
-            micBtn.classList.remove('hidden');
             touchBox.style.display = 'block';
             updateP2PHud();
         }
