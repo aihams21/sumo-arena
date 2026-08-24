@@ -6,17 +6,17 @@
     <title>Neon Sumo Arena</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-        body {
+        html, body {
+            width: 100%;
+            height: 100%;
             background: #08090f;
             color: #fff;
-            font-family: 'Segoe UI', Tahoma, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
         }
         #banner-ad {
             width: 100%;
@@ -35,7 +35,7 @@
             position: relative;
             flex: 1;
             width: 100%;
-            height: calc(100vh - 35px);
+            height: calc(100% - 35px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -43,8 +43,10 @@
         }
         canvas {
             display: block;
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 600px;
             aspect-ratio: 4 / 3;
             object-fit: contain;
         }
@@ -52,7 +54,7 @@
         .overlay {
             position: absolute;
             inset: 0;
-            background: rgba(6, 7, 12, 0.94);
+            background: rgba(6, 7, 12, 0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -64,11 +66,11 @@
         }
         .hidden { display: none !important; }
 
-        h1 { font-size: clamp(22px, 5vw, 36px); margin-bottom: 10px; color: #00e5ff; text-shadow: 0 0 15px rgba(0,229,255,0.4); }
-        h2 { font-size: clamp(16px, 4vw, 22px); margin-bottom: 12px; }
+        h1 { font-size: clamp(22px, 5vw, 34px); margin-bottom: 8px; color: #00e5ff; text-shadow: 0 0 15px rgba(0,229,255,0.4); }
+        h2 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 12px; }
 
         .btn {
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: clamp(13px, 3.5vw, 15px);
             font-weight: bold;
             border: none;
@@ -84,6 +86,21 @@
         .btn-magenta { background: #ff3366; color: #fff; }
         .btn-gray { background: #1c2030; color: #aaa; }
 
+        input {
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 2px solid #00e5ff;
+            background: #111420;
+            color: #fff;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 8px 0;
+            outline: none;
+            width: 220px;
+        }
+
         #hud {
             position: absolute;
             top: 10px;
@@ -98,7 +115,7 @@
         .hud-card {
             background: rgba(15, 18, 30, 0.85);
             border: 1px solid rgba(255,255,255,0.1);
-            padding: 5px 12px;
+            padding: 6px 12px;
             border-radius: 20px;
             font-size: clamp(10px, 3vw, 13px);
             font-weight: bold;
@@ -174,33 +191,32 @@
             color: #000;
             font-weight: bold;
             border: none;
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 12px;
             cursor: pointer;
         }
 
-        /* Virtual Mobile Joystick */
         #touch-controller {
             position: absolute;
-            bottom: 25px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 120px;
-            height: 120px;
+            width: 110px;
+            height: 110px;
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(0, 229, 255, 0.3);
             border-radius: 50%;
-            display: none;
             touch-action: none;
             z-index: 8;
+            display: none;
         }
         #stick {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             background: #00e5ff;
             border-radius: 50%;
             transform: translate(-50%, -50%);
@@ -208,7 +224,6 @@
             box-shadow: 0 0 10px #00e5ff;
         }
     </style>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <div id="banner-ad">[ ADVERTISEMENT SPACE: RESPONSIVE BANNER ]</div>
@@ -228,8 +243,9 @@
         <div id="menu-main" class="overlay">
             <h1>NEON SUMO ARENA</h1>
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
-            <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map</button>
-            <button class="btn btn-gold" onclick="showShop()">⚙️ Upgrades</button>
+            <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
+            <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 Rooms</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -268,6 +284,28 @@
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
+        <div id="menu-multi" class="overlay hidden">
+            <h2>ONLINE MULTIPLAYER</h2>
+            <button class="btn btn-cyan" onclick="createRoom()">➕ Create Room</button>
+            <p style="margin: 8px 0; color: #888;">--- OR ---</p>
+            <input type="text" id="room-input" placeholder="CODE" maxlength="5">
+            <button class="btn btn-magenta" onclick="joinRoom()">🚀 Join Room</button>
+            <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
+        </div>
+
+        <div id="menu-lobby" class="overlay hidden">
+            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">-----</span></h2>
+            <p style="color:#aaa; margin: 15px 0;">Share code with a friend to play...</p>
+            <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
+        </div>
+
+        <div id="modal-round" class="overlay hidden">
+            <h1 id="round-title">ROUND FINISHED</h1>
+            <h2 id="round-score">0 - 0</h2>
+            <button class="btn btn-cyan" onclick="reqNextRound()">Next Round ➔</button>
+            <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
+        </div>
+
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
             <button class="btn btn-cyan" onclick="reviveOffline()">📺 Retry Stage</button>
@@ -282,58 +320,67 @@
         </div>
     </div>
 
+    <!-- Safe Dynamic Socket.IO Loader -->
+    <script>
+        let socket = null;
+        if (typeof io !== 'undefined') {
+            socket = io();
+        } else {
+            let s = document.createElement('script');
+            s.src = '/socket.io/socket.io.js';
+            s.onload = () => { if (typeof io !== 'undefined') socket = io(); };
+            document.head.appendChild(s);
+        }
+    </script>
+
     <script>
         const canvas = document.getElementById('c');
         const ctx = canvas.getContext('2d');
         const touchBox = document.getElementById('touch-controller');
         const stick = document.getElementById('stick');
 
-        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         let touchVec = { x: 0, y: 0 };
+        let activeTouchId = null;
+        let startX = 0, startY = 0;
 
-        if (isTouch) {
-            let activeTouchId = null;
-            let startX = 0, startY = 0;
+        touchBox.addEventListener('touchstart', e => {
+            let t = e.changedTouches[0];
+            activeTouchId = t.identifier;
+            let rect = touchBox.getBoundingClientRect();
+            startX = rect.left + rect.width / 2;
+            startY = rect.top + rect.height / 2;
+        }, { passive: false });
 
-            touchBox.addEventListener('touchstart', e => {
-                let t = e.changedTouches[0];
-                activeTouchId = t.identifier;
-                let rect = touchBox.getBoundingClientRect();
-                startX = rect.left + rect.width / 2;
-                startY = rect.top + rect.height / 2;
-            }, { passive: false });
-
-            window.addEventListener('touchmove', e => {
-                if (activeTouchId === null) return;
-                for (let t of e.changedTouches) {
-                    if (t.identifier === activeTouchId) {
-                        let dx = t.clientX - startX;
-                        let dy = t.clientY - startY;
-                        let dist = Math.hypot(dx, dy);
-                        let maxDist = 45;
-                        if (dist > maxDist) {
-                            dx = (dx / dist) * maxDist;
-                            dy = (dy / dist) * maxDist;
-                        }
-                        stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                        touchVec.x = dx / maxDist;
-                        touchVec.y = dy / maxDist;
+        window.addEventListener('touchmove', e => {
+            if (activeTouchId === null) return;
+            for (let t of e.changedTouches) {
+                if (t.identifier === activeTouchId) {
+                    let dx = t.clientX - startX;
+                    let dy = t.clientY - startY;
+                    let dist = Math.hypot(dx, dy);
+                    let maxDist = 40;
+                    if (dist > maxDist) {
+                        dx = (dx / dist) * maxDist;
+                        dy = (dy / dist) * maxDist;
                     }
+                    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    touchVec.x = dx / maxDist;
+                    touchVec.y = dy / maxDist;
                 }
-            }, { passive: false });
+            }
+        }, { passive: false });
 
-            const resetTouch = e => {
-                for (let t of e.changedTouches) {
-                    if (t.identifier === activeTouchId) {
-                        activeTouchId = null;
-                        touchVec = { x: 0, y: 0 };
-                        stick.style.transform = `translate(-50%, -50%)`;
-                    }
+        const resetTouch = e => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === activeTouchId) {
+                    activeTouchId = null;
+                    touchVec = { x: 0, y: 0 };
+                    stick.style.transform = `translate(-50%, -50%)`;
                 }
-            };
-            window.addEventListener('touchend', resetTouch);
-            window.addEventListener('touchcancel', resetTouch);
-        }
+            }
+        };
+        window.addEventListener('touchend', resetTouch);
+        window.addEventListener('touchcancel', resetTouch);
 
         const CENTER_X = 400;
         const CENTER_Y = 300;
@@ -366,6 +413,11 @@
         updateCoinDisplays();
 
         let gameMode = 'none';
+        let myId = null;
+        let onlinePlayers = {};
+        let onlineRadius = BASE_ARENA_RADIUS;
+        let scores = {};
+
         let currentPlayingStage = 1;
         let offlineArenaRadius = BASE_ARENA_RADIUS;
         let player = { x: 400, y: 300, vx: 0, vy: 0, radius: 24, color: '#00e5ff', alive: true };
@@ -379,7 +431,7 @@
         function hideAllMenus() {
             document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
             document.getElementById('hud').classList.add('hidden');
-            if (touchBox) touchBox.style.display = 'none';
+            touchBox.style.display = 'none';
         }
 
         function showMainMenu() {
@@ -441,8 +493,95 @@
             }
         }
 
+        function showMultiMenu() {
+            if (!socket) {
+                alert("Online 1v1 requires local/tunneled Node.js server. Run 'node server.js' to play online.");
+                return;
+            }
+            hideAllMenus();
+            document.getElementById('menu-multi').classList.remove('hidden');
+        }
+
         function exitToMenu() {
+            if (gameMode === 'online' && socket) socket.emit('leaveRoom');
             showMainMenu();
+        }
+
+        function createRoom() { if (socket) socket.emit('createRoom'); }
+        function joinRoom() {
+            let code = document.getElementById('room-input').value.trim();
+            if (code && socket) socket.emit('joinRoom', code);
+        }
+        function reqNextRound() {
+            if (socket) socket.emit('nextRound');
+            hideAllMenus();
+            document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block';
+        }
+
+        // Socket Bindings if Available
+        setInterval(() => {
+            if (!socket || socket._configured) return;
+            socket._configured = true;
+
+            socket.on('roomJoined', data => {
+                myId = data.myId;
+                gameMode = 'online';
+                hideAllMenus();
+                document.getElementById('lobby-code').innerText = data.code;
+                document.getElementById('menu-lobby').classList.remove('hidden');
+            });
+
+            socket.on('roundStarted', data => {
+                hideAllMenus();
+                document.getElementById('hud').classList.remove('hidden');
+                touchBox.style.display = 'block';
+                scores = data.scores;
+                updateOnlineHud();
+            });
+
+            socket.on('onlineState', data => {
+                if (gameMode !== 'online') return;
+                onlinePlayers = data.players;
+                onlineRadius = data.arenaRadius;
+            });
+
+            socket.on('roundEnded', data => {
+                if (gameMode !== 'online') return;
+                scores = data.scores;
+                let title = document.getElementById('round-title');
+                if (data.winnerId === myId) {
+                    title.innerText = "ROUND WON! 🏆";
+                    title.style.color = "#00ff66";
+                } else {
+                    title.innerText = "ROUND LOST! 💀";
+                    title.style.color = "#ff3366";
+                }
+
+                let ids = Object.keys(scores);
+                let myScore = scores[myId] || 0;
+                let otherId = ids.find(id => id !== myId);
+                let oppScore = otherId ? (scores[otherId] || 0) : 0;
+                document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
+
+                hideAllMenus();
+                document.getElementById('modal-round').classList.remove('hidden');
+            });
+
+            socket.on('opponentLeft', () => {
+                alert("Opponent left the room.");
+                exitToMenu();
+            });
+
+            socket.on('errorMsg', msg => alert(msg));
+        }, 500);
+
+        function updateOnlineHud() {
+            let ids = Object.keys(scores);
+            let myScore = scores[myId] || 0;
+            let otherId = ids.find(id => id !== myId);
+            let oppScore = otherId ? (scores[otherId] || 0) : 0;
+            document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
         function startOfflineStage(lvl) {
@@ -450,7 +589,7 @@
             currentPlayingStage = lvl;
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
-            if (isTouch) touchBox.style.display = 'block';
+            touchBox.style.display = 'block';
             spawnOfflineStage(currentPlayingStage);
         }
 
@@ -509,19 +648,19 @@
         function reviveOffline() {
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
-            if (isTouch) touchBox.style.display = 'block';
+            touchBox.style.display = 'block';
             spawnOfflineStage(currentPlayingStage);
         }
 
         function nextStageOffline() {
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
-            if (isTouch) touchBox.style.display = 'block';
+            touchBox.style.display = 'block';
             startOfflineStage(currentPlayingStage + 1);
         }
 
         setInterval(() => {
-            if (gameMode !== 'offline' || stageEnded || !player.alive) return;
+            if (gameMode === 'none') return;
 
             let dx = 0, dy = 0;
             if (keys['arrowup'] || keys['w']) dy -= 1;
@@ -529,84 +668,88 @@
             if (keys['arrowleft'] || keys['a']) dx -= 1;
             if (keys['arrowright'] || keys['d']) dx += 1;
 
-            if (isTouch && (touchVec.x !== 0 || touchVec.y !== 0)) {
+            if (touchVec.x !== 0 || touchVec.y !== 0) {
                 dx = touchVec.x;
                 dy = touchVec.y;
             }
 
-            let moveForce = 0.72;
-            player.vx += dx * moveForce;
-            player.vy += dy * moveForce;
+            if (gameMode === 'online' && socket) {
+                socket.emit('input', { dx, dy, dash: false });
+            } else if (gameMode === 'offline' && player.alive && !stageEnded) {
+                let moveForce = 0.72;
+                player.vx += dx * moveForce;
+                player.vy += dy * moveForce;
 
-            player.vx *= 0.92;
-            player.vy *= 0.92;
+                player.vx *= 0.92;
+                player.vy *= 0.92;
 
-            player.x += player.vx;
-            player.y += player.vy;
+                player.x += player.vx;
+                player.y += player.vy;
 
-            if (offlineArenaRadius > BASE_ARENA_RADIUS * 0.65) {
-                offlineArenaRadius -= 0.015;
-            }
-
-            if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
-                player.alive = false;
-                stageEnded = true;
-                hideAllMenus();
-                document.getElementById('modal-death').classList.remove('hidden');
-                return;
-            }
-
-            let activeBots = bots.filter(b => b.alive);
-            for (let b of activeBots) {
-                let angToPlayer = Math.atan2(player.y - b.y, player.x - b.x);
-                
-                b.vx += Math.cos(angToPlayer) * b.speed;
-                b.vy += Math.sin(angToPlayer) * b.speed;
-
-                b.vx *= 0.93;
-                b.vy *= 0.93;
-                b.x += b.vx;
-                b.y += b.vy;
-
-                if (Math.hypot(b.x - 400, b.y - 300) > offlineArenaRadius) {
-                    b.alive = false;
+                if (offlineArenaRadius > BASE_ARENA_RADIUS * 0.65) {
+                    offlineArenaRadius -= 0.015;
                 }
 
-                let cdx = b.x - player.x;
-                let cdy = b.y - player.y;
-                let cdist = Math.hypot(cdx, cdy);
-
-                if (cdist < player.radius + b.radius) {
-                    let overlap = (player.radius + b.radius) - cdist;
-                    let cang = Math.atan2(cdy, cdx);
-
-                    player.x -= Math.cos(cang) * (overlap * 0.4);
-                    player.y -= Math.sin(cang) * (overlap * 0.4);
-                    b.x += Math.cos(cang) * (overlap * 0.6);
-                    b.y += Math.sin(cang) * (overlap * 0.6);
-
-                    let playerMass = 1.0 + (upgrades.weight * 0.35);
-                    let playerHitPower = 6.0 + (upgrades.power * 1.8);
-
-                    let playerSpeedMag = Math.hypot(player.vx, player.vy);
-                    let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.25);
-
-                    player.vx -= Math.cos(cang) * (b.power / playerMass);
-                    player.vy -= Math.sin(cang) * (b.power / playerMass);
-                    b.vx += Math.cos(cang) * (totalPlayerPush / b.mass);
-                    b.vy += Math.sin(cang) * (totalPlayerPush / b.mass);
+                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
+                    player.alive = false;
+                    stageEnded = true;
+                    hideAllMenus();
+                    document.getElementById('modal-death').classList.remove('hidden');
+                    return;
                 }
-            }
 
-            if (activeBots.length === 0 && !stageEnded) {
-                stageEnded = true;
-                coins += 5;
-                if (currentPlayingStage === maxUnlockedStage && maxUnlockedStage < 1000) {
-                    maxUnlockedStage++;
+                let activeBots = bots.filter(b => b.alive);
+                for (let b of activeBots) {
+                    let angToPlayer = Math.atan2(player.y - b.y, player.x - b.x);
+                    
+                    b.vx += Math.cos(angToPlayer) * b.speed;
+                    b.vy += Math.sin(angToPlayer) * b.speed;
+
+                    b.vx *= 0.93;
+                    b.vy *= 0.93;
+                    b.x += b.vx;
+                    b.y += b.vy;
+
+                    if (Math.hypot(b.x - 400, b.y - 300) > offlineArenaRadius) {
+                        b.alive = false;
+                    }
+
+                    let cdx = b.x - player.x;
+                    let cdy = b.y - player.y;
+                    let cdist = Math.hypot(cdx, cdy);
+
+                    if (cdist < player.radius + b.radius) {
+                        let overlap = (player.radius + b.radius) - cdist;
+                        let cang = Math.atan2(cdy, cdx);
+
+                        player.x -= Math.cos(cang) * (overlap * 0.4);
+                        player.y -= Math.sin(cang) * (overlap * 0.4);
+                        b.x += Math.cos(cang) * (overlap * 0.6);
+                        b.y += Math.sin(cang) * (overlap * 0.6);
+
+                        let playerMass = 1.0 + (upgrades.weight * 0.35);
+                        let playerHitPower = 6.0 + (upgrades.power * 1.8);
+
+                        let playerSpeedMag = Math.hypot(player.vx, player.vy);
+                        let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.25);
+
+                        player.vx -= Math.cos(cang) * (b.power / playerMass);
+                        player.vy -= Math.sin(cang) * (b.power / playerMass);
+                        b.vx += Math.cos(cang) * (totalPlayerPush / b.mass);
+                        b.vy += Math.sin(cang) * (totalPlayerPush / b.mass);
+                    }
                 }
-                saveData();
-                hideAllMenus();
-                document.getElementById('modal-win-stage').classList.remove('hidden');
+
+                if (activeBots.length === 0 && !stageEnded) {
+                    stageEnded = true;
+                    coins += 5;
+                    if (currentPlayingStage === maxUnlockedStage && maxUnlockedStage < 1000) {
+                        maxUnlockedStage++;
+                    }
+                    saveData();
+                    hideAllMenus();
+                    document.getElementById('modal-win-stage').classList.remove('hidden');
+                }
             }
         }, 1000 / 60);
 
@@ -614,52 +757,73 @@
             ctx.clearRect(0, 0, 800, 600);
 
             if (gameMode !== 'none') {
+                let rad = gameMode === 'online' ? onlineRadius : offlineArenaRadius;
+
                 ctx.beginPath();
-                ctx.arc(400, 300, offlineArenaRadius, 0, Math.PI * 2);
+                ctx.arc(400, 300, rad, 0, Math.PI * 2);
                 ctx.fillStyle = '#0f121d';
                 ctx.fill();
                 ctx.lineWidth = 5;
-                ctx.strokeStyle = offlineArenaRadius < BASE_ARENA_RADIUS * 0.7 ? '#ff0055' : '#00e5ff';
+                ctx.strokeStyle = rad < BASE_ARENA_RADIUS * 0.7 ? '#ff0055' : '#00e5ff';
                 ctx.stroke();
 
                 ctx.beginPath();
-                ctx.arc(400, 300, offlineArenaRadius * 0.5, 0, Math.PI * 2);
+                ctx.arc(400, 300, rad * 0.5, 0, Math.PI * 2);
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                for (let b of bots) {
-                    if (!b.alive) continue;
-                    ctx.beginPath();
-                    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = b.color;
-                    ctx.shadowColor = b.isBoss ? '#ff0055' : 'transparent';
-                    ctx.shadowBlur = b.isBoss ? 20 : 0;
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    ctx.lineWidth = b.isBoss ? 4 : 2;
-                    ctx.strokeStyle = '#fff';
-                    ctx.stroke();
+                if (gameMode === 'online') {
+                    for (let id in onlinePlayers) {
+                        let p = onlinePlayers[id];
+                        if (!p.alive) continue;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = p.color;
+                        ctx.fill();
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = '#fff';
+                        ctx.stroke();
 
-                    if (b.isBoss) {
-                        ctx.fillStyle = '#ff0055';
-                        ctx.font = 'bold 12px Segoe UI';
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '12px Segoe UI';
                         ctx.textAlign = 'center';
-                        ctx.fillText("👑 BOSS", b.x, b.y - b.radius - 8);
+                        ctx.fillText(id === myId ? "YOU" : "OPPONENT", p.x, p.y - p.radius - 8);
                     }
-                }
+                } else {
+                    for (let b of bots) {
+                        if (!b.alive) continue;
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = b.color;
+                        ctx.shadowColor = b.isBoss ? '#ff0055' : 'transparent';
+                        ctx.shadowBlur = b.isBoss ? 20 : 0;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.lineWidth = b.isBoss ? 4 : 2;
+                        ctx.strokeStyle = '#fff';
+                        ctx.stroke();
 
-                if (player.alive) {
-                    ctx.beginPath();
-                    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = player.color;
-                    ctx.shadowColor = player.color;
-                    ctx.shadowBlur = 15;
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = '#fff';
-                    ctx.stroke();
+                        if (b.isBoss) {
+                            ctx.fillStyle = '#ff0055';
+                            ctx.font = 'bold 12px Segoe UI';
+                            ctx.textAlign = 'center';
+                            ctx.fillText("👑 BOSS", b.x, b.y - b.radius - 8);
+                        }
+                    }
+
+                    if (player.alive) {
+                        ctx.beginPath();
+                        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = player.color;
+                        ctx.shadowColor = player.color;
+                        ctx.shadowBlur = 15;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.lineWidth = 3;
+                        ctx.strokeStyle = '#fff';
+                        ctx.stroke();
+                    }
                 }
             }
 
