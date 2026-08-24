@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Neon Sumo Arena</title>
+    
+    <!-- Adsterra Popunder Ad Script -->
+    <script src="https://pl31012283.profitableratecpmnetwork.com/57/8a/18/578a1867ba6f1dd3225b413221bd9b2c.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
         html, body {
@@ -674,9 +678,6 @@
             startOfflineStage(currentPlayingStage + 1);
         }
 
-        // ================= Optimized Physics & Render Loop =================
-        let lastTime = performance.now();
-
         function updatePhysics() {
             if (gameMode === 'none') return;
 
@@ -846,7 +847,6 @@
             if (gameMode !== 'none') {
                 let rad = gameMode === 'p2p' ? p2pArenaRadius : offlineArenaRadius;
 
-                // Arena
                 ctx.beginPath();
                 ctx.arc(400, 300, rad, 0, Math.PI * 2);
                 ctx.fillStyle = '#0f121d';
@@ -887,7 +887,10 @@
                         ctx.beginPath();
                         ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
                         ctx.fillStyle = b.color;
+                        ctx.shadowColor = b.isBoss ? '#ff0055' : 'transparent';
+                        ctx.shadowBlur = b.isBoss ? 20 : 0;
                         ctx.fill();
+                        ctx.shadowBlur = 0;
                         ctx.lineWidth = b.isBoss ? 4 : 2;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
@@ -904,7 +907,10 @@
                         ctx.beginPath();
                         ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
                         ctx.fillStyle = player.color;
+                        ctx.shadowColor = player.color;
+                        ctx.shadowBlur = 15;
                         ctx.fill();
+                        ctx.shadowBlur = 0;
                         ctx.lineWidth = 2.5;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
@@ -913,6 +919,7 @@
             }
         }
 
+        let lastTime = performance.now();
         function gameLoop(time) {
             let dt = time - lastTime;
             if (dt >= 16.6) {
