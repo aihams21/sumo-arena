@@ -49,6 +49,7 @@
             max-height: 600px;
             aspect-ratio: 4 / 3;
             object-fit: contain;
+            image-rendering: auto;
         }
 
         .overlay {
@@ -66,7 +67,7 @@
         }
         .hidden { display: none !important; }
 
-        h1 { font-size: clamp(22px, 5vw, 34px); margin-bottom: 8px; color: #00e5ff; text-shadow: 0 0 15px rgba(0,229,255,0.4); }
+        h1 { font-size: clamp(22px, 5vw, 34px); margin-bottom: 8px; color: #00e5ff; }
         h2 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 12px; }
 
         .btn {
@@ -77,10 +78,10 @@
             border-radius: 8px;
             cursor: pointer;
             margin: 5px;
-            transition: all 0.2s;
+            transition: transform 0.1s;
             width: min(280px, 85vw);
         }
-        .btn:hover { transform: translateY(-2px); }
+        .btn:active { transform: scale(0.96); }
         .btn-cyan { background: #00e5ff; color: #000; }
         .btn-gold { background: #ffbb00; color: #000; }
         .btn-magenta { background: #ff3366; color: #fff; }
@@ -198,13 +199,13 @@
 
         #touch-controller {
             position: absolute;
-            bottom: 20px;
+            bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
-            width: 110px;
-            height: 110px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(0, 229, 255, 0.3);
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 2px solid rgba(0, 229, 255, 0.25);
             border-radius: 50%;
             touch-action: none;
             z-index: 8;
@@ -214,16 +215,14 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             background: #00e5ff;
             border-radius: 50%;
             transform: translate(-50%, -50%);
             pointer-events: none;
-            box-shadow: 0 0 10px #00e5ff;
         }
     </style>
-    <!-- WebRTC Peer-to-Peer Engine -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -246,7 +245,7 @@
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
-            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P Serverless)</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -323,7 +322,7 @@
 
     <script>
         const canvas = document.getElementById('c');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         const touchBox = document.getElementById('touch-controller');
         const stick = document.getElementById('stick');
 
@@ -337,7 +336,7 @@
             let rect = touchBox.getBoundingClientRect();
             startX = rect.left + rect.width / 2;
             startY = rect.top + rect.height / 2;
-        }, { passive: false });
+        }, { passive: true });
 
         window.addEventListener('touchmove', e => {
             if (activeTouchId === null) return;
@@ -346,7 +345,7 @@
                     let dx = t.clientX - startX;
                     let dy = t.clientY - startY;
                     let dist = Math.hypot(dx, dy);
-                    let maxDist = 40;
+                    let maxDist = 42;
                     if (dist > maxDist) {
                         dx = (dx / dist) * maxDist;
                         dy = (dy / dist) * maxDist;
@@ -356,7 +355,7 @@
                     touchVec.y = dy / maxDist;
                 }
             }
-        }, { passive: false });
+        }, { passive: true });
 
         const resetTouch = e => {
             for (let t of e.changedTouches) {
@@ -367,8 +366,8 @@
                 }
             }
         };
-        window.addEventListener('touchend', resetTouch);
-        window.addEventListener('touchcancel', resetTouch);
+        window.addEventListener('touchend', resetTouch, { passive: true });
+        window.addEventListener('touchcancel', resetTouch, { passive: true });
 
         const BASE_ARENA_RADIUS = 240;
 
@@ -406,7 +405,6 @@
         let keys = {};
         let stageEnded = false;
 
-        // P2P Networking State
         let peer = null;
         let conn = null;
         let isHost = false;
@@ -495,7 +493,6 @@
             showMainMenu();
         }
 
-        // ================= WebRTC P2P Multiplayer =================
         function createP2PRoom() {
             hideAllMenus();
             isHost = true;
@@ -602,7 +599,6 @@
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
-        // ================= Offline Stages =================
         function startOfflineStage(lvl) {
             gameMode = 'offline';
             currentPlayingStage = lvl;
@@ -678,8 +674,10 @@
             startOfflineStage(currentPlayingStage + 1);
         }
 
-        // ================= Physics Loop =================
-        setInterval(() => {
+        // ================= Optimized Physics & Render Loop =================
+        let lastTime = performance.now();
+
+        function updatePhysics() {
             if (gameMode === 'none') return;
 
             let dx = 0, dy = 0;
@@ -839,19 +837,21 @@
                     document.getElementById('modal-win-stage').classList.remove('hidden');
                 }
             }
-        }, 1000 / 60);
+        }
 
-        function draw() {
-            ctx.clearRect(0, 0, 800, 600);
+        function render() {
+            ctx.fillStyle = '#08090f';
+            ctx.fillRect(0, 0, 800, 600);
 
             if (gameMode !== 'none') {
                 let rad = gameMode === 'p2p' ? p2pArenaRadius : offlineArenaRadius;
 
+                // Arena
                 ctx.beginPath();
                 ctx.arc(400, 300, rad, 0, Math.PI * 2);
                 ctx.fillStyle = '#0f121d';
                 ctx.fill();
-                ctx.lineWidth = 5;
+                ctx.lineWidth = 4;
                 ctx.strokeStyle = rad < BASE_ARENA_RADIUS * 0.7 ? '#ff0055' : '#00e5ff';
                 ctx.stroke();
 
@@ -865,37 +865,36 @@
                     for (let key of ['host', 'guest']) {
                         let p = p2pPlayers[key];
                         if (!p.alive) continue;
+                        
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                         ctx.fillStyle = p.color;
                         ctx.fill();
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 2;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
 
                         let isMe = (isHost && key === 'host') || (!isHost && key === 'guest');
                         ctx.fillStyle = '#fff';
-                        ctx.font = '12px Segoe UI';
+                        ctx.font = '12px Segoe UI, sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillText(isMe ? "YOU" : "OPPONENT", p.x, p.y - p.radius - 8);
                     }
                 } else {
                     for (let b of bots) {
                         if (!b.alive) continue;
+                        
                         ctx.beginPath();
                         ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
                         ctx.fillStyle = b.color;
-                        ctx.shadowColor = b.isBoss ? '#ff0055' : 'transparent';
-                        ctx.shadowBlur = b.isBoss ? 20 : 0;
                         ctx.fill();
-                        ctx.shadowBlur = 0;
                         ctx.lineWidth = b.isBoss ? 4 : 2;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
 
                         if (b.isBoss) {
                             ctx.fillStyle = '#ff0055';
-                            ctx.font = 'bold 12px Segoe UI';
+                            ctx.font = 'bold 12px Segoe UI, sans-serif';
                             ctx.textAlign = 'center';
                             ctx.fillText("👑 BOSS", b.x, b.y - b.radius - 8);
                         }
@@ -905,20 +904,25 @@
                         ctx.beginPath();
                         ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
                         ctx.fillStyle = player.color;
-                        ctx.shadowColor = player.color;
-                        ctx.shadowBlur = 15;
                         ctx.fill();
-                        ctx.shadowBlur = 0;
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 2.5;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
                     }
                 }
             }
-
-            requestAnimationFrame(draw);
         }
-        requestAnimationFrame(draw);
+
+        function gameLoop(time) {
+            let dt = time - lastTime;
+            if (dt >= 16.6) {
+                updatePhysics();
+                render();
+                lastTime = time;
+            }
+            requestAnimationFrame(gameLoop);
+        }
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>
