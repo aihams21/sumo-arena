@@ -135,7 +135,7 @@
             background: #ff3366;
             color: #fff;
             border: none;
-            padding: 4px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 11px;
@@ -144,22 +144,24 @@
 
         .mic-btn {
             pointer-events: auto;
-            background: #1c2030;
-            border: 1px solid #00e5ff;
+            background: #171b2a;
+            border: 2px solid #00e5ff;
             color: #fff;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            padding: 6px 12px;
+            border-radius: 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
+            font-weight: bold;
+            transition: 0.2s;
         }
         .mic-btn.active {
             background: #00e5ff;
             color: #000;
-            box-shadow: 0 0 10px #00e5ff;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+            border-color: #fff;
         }
 
         #stage-grid {
@@ -256,10 +258,10 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-    <div id="banner-ad" onclick="openDirectReward('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
+    <div id="banner-ad" onclick="triggerSmartlinkReward('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
-        <audio id="remote-audio" autoplay></audio>
+        <audio id="remote-audio" autoplay playsinline></audio>
         
         <div id="touch-controller">
             <div id="stick"></div>
@@ -269,7 +271,7 @@
             <div class="hud-card" id="hud-left">STAGE: 1</div>
             <div class="hud-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
             <div class="hud-card" id="hud-right">
-                <button id="mic-toggle" class="mic-btn hidden" onclick="toggleMic()">🎤</button>
+                <button id="mic-toggle" class="mic-btn hidden" onclick="toggleVoiceMic()">🎤 Mic: OFF</button>
                 <button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button>
             </div>
         </div>
@@ -301,7 +303,7 @@
                 <div class="shop-card">
                     <div style="text-align:left;">
                         <div style="font-size:13px; font-weight:bold;">🏋️ Weight (الوزن)</div>
-                        <div style="font-size:10px; color:#aaa;">يكبر حجمك ويزيدك ثباتاً</div>
+                        <div style="font-size:10px; color:#aaa;">ثبات وقوة تحمل أكبر</div>
                     </div>
                     <button class="shop-btn" id="buy-weight" onclick="buyUpgrade('weight')">Buy</button>
                 </div>
@@ -309,12 +311,12 @@
                 <div class="shop-card">
                     <div style="text-align:left;">
                         <div style="font-size:13px; font-weight:bold;">💥 Power (القوة)</div>
-                        <div style="font-size:10px; color:#aaa;">يزيد قوة الدفع والصد</div>
+                        <div style="font-size:10px; color:#aaa;">دفع ناري وصد صلب</div>
                     </div>
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
 
-                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="openDirectReward('free_coins')">🎁 Watch Video (+50 Free Coins)</button>
+                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="triggerSmartlinkReward('free_coins')">🎁 Open Sponsor Link (+50 Coins)</button>
             </div>
 
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
@@ -344,14 +346,14 @@
 
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
-            <button class="btn btn-green" onclick="openDirectReward('revive')">📺 Revive Sumo (Continue Stage)</button>
+            <button class="btn btn-green" onclick="triggerSmartlinkReward('revive')">📺 Revive Sumo (Open Sponsor)</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Stage Map</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
             <p style="margin-bottom: 10px; color:#ffbb00; font-size: 14px;">+5 Coins Earned! 🪙</p>
-            <button class="btn btn-gold" onclick="openDirectReward('double')">🪙 Watch Ad (Claim +10 Coins 2x)</button>
+            <button class="btn btn-gold" onclick="triggerSmartlinkReward('double')">🪙 Claim +10 Coins (2x Bonus)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
@@ -360,8 +362,29 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        function openDirectReward(type) {
+        // Guaranteed Ad View & Reward Claim
+        let pendingRewardType = null;
+        function triggerSmartlinkReward(type) {
+            pendingRewardType = type;
             window.open(SMARTLINK_URL, '_blank');
+            
+            // Give reward when player returns or after 2s
+            const rewardTimer = setTimeout(() => {
+                applyReward();
+            }, 2000);
+
+            window.addEventListener('focus', function onFocus() {
+                clearTimeout(rewardTimer);
+                applyReward();
+                window.removeEventListener('focus', onFocus);
+            }, { once: true });
+        }
+
+        function applyReward() {
+            if (!pendingRewardType) return;
+            let type = pendingRewardType;
+            pendingRewardType = null;
+
             if (type === 'revive') {
                 reviveOffline();
             } else if (type === 'double') {
@@ -458,14 +481,16 @@
         let offlineArenaRadius = BASE_ARENA_RADIUS;
         let player = { x: 400, y: 300, vx: 0, vy: 0, radius: 24, color: '#00e5ff', alive: true };
         let bots = [];
+        let particles = [];
         let keys = {};
         let stageEnded = false;
 
         // P2P Networking & Audio Voice
         let peer = null;
         let conn = null;
+        let currentMediaCall = null;
         let localStream = null;
-        let isMicActive = false;
+        let isMicMuted = true;
         let isHost = false;
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         let p2pPlayers = {
@@ -555,15 +580,16 @@
         }
 
         // ================= Voice & WebRTC P2P =================
-        async function initVoiceStream() {
-            try {
-                if (!localStream) {
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    localStream.getAudioTracks().forEach(t => t.enabled = false);
+        async function getOrCreateAudioStream() {
+            if (!localStream) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+                    localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+                } catch(e) {
+                    console.warn("Microphone access permission rejected", e);
                 }
-            } catch(e) {
-                console.warn("Microphone access denied or unavailable", e);
             }
+            return localStream;
         }
 
         function closeVoiceStream() {
@@ -571,24 +597,27 @@
                 localStream.getTracks().forEach(t => t.stop());
                 localStream = null;
             }
-            isMicActive = false;
+            if (currentMediaCall) {
+                currentMediaCall.close();
+                currentMediaCall = null;
+            }
+            isMicMuted = true;
             micBtn.classList.remove('active');
-            micBtn.innerText = '🎤';
+            micBtn.innerText = '🎤 Mic: OFF';
         }
 
-        async function toggleMic() {
-            if (!localStream) {
-                await initVoiceStream();
-            }
+        async function toggleVoiceMic() {
+            await getOrCreateAudioStream();
             if (localStream && localStream.getAudioTracks().length > 0) {
-                isMicActive = !isMicActive;
-                localStream.getAudioTracks()[0].enabled = isMicActive;
-                if (isMicActive) {
+                isMicMuted = !isMicMuted;
+                localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+                
+                if (!isMicMuted) {
                     micBtn.classList.add('active');
-                    micBtn.innerText = '🎙️';
+                    micBtn.innerText = '🎙️ Mic: ON';
                 } else {
                     micBtn.classList.remove('active');
-                    micBtn.innerText = '🎤';
+                    micBtn.innerText = '🎤 Mic: OFF';
                 }
             }
         }
@@ -610,9 +639,13 @@
             });
 
             peer.on('call', async call => {
-                if (!localStream) await initVoiceStream();
-                call.answer(localStream);
-                call.on('stream', stream => { remoteAudio.srcObject = stream; });
+                currentMediaCall = call;
+                let stream = await getOrCreateAudioStream();
+                call.answer(stream);
+                call.on('stream', remStream => {
+                    remoteAudio.srcObject = remStream;
+                    remoteAudio.play().catch(e => console.log(e));
+                });
             });
 
             peer.on('error', err => alert('Connection error: ' + err.type));
@@ -628,9 +661,12 @@
             peer.on('open', async () => {
                 conn = peer.connect(code);
                 setupP2PConnection();
-                if (!localStream) await initVoiceStream();
-                let call = peer.call(code, localStream);
-                call.on('stream', stream => { remoteAudio.srcObject = stream; });
+                let stream = await getOrCreateAudioStream();
+                currentMediaCall = peer.call(code, stream);
+                currentMediaCall.on('stream', remStream => {
+                    remoteAudio.srcObject = remStream;
+                    remoteAudio.play().catch(e => console.log(e));
+                });
             });
 
             peer.on('error', err => alert('Room not found or connection failed!'));
@@ -734,9 +770,8 @@
             bots = [];
             let isBossLevel = (lvl % 5 === 0);
             
-            // Balanced progression
-            let stageBaseMass = 0.65 + (lvl * 0.05);
-            let stageBasePower = 3.5 + Math.min(12, lvl * 0.45);
+            let stageBaseMass = 0.7 + (lvl * 0.04);
+            let stageBasePower = 4.0 + Math.min(14, lvl * 0.45);
 
             if (isBossLevel) {
                 bots.push({
@@ -745,7 +780,7 @@
                     vx: 0, vy: 0,
                     radius: 30 + Math.min(18, lvl * 0.35),
                     mass: stageBaseMass * 1.6,
-                    speed: 0.32,
+                    speed: 0.35,
                     power: stageBasePower * 1.35,
                     color: '#ff0055',
                     isBoss: true,
@@ -765,7 +800,7 @@
                         vx: 0, vy: 0,
                         radius: 19 + Math.min(14, lvl * 0.25),
                         mass: stageBaseMass,
-                        speed: 0.28 + Math.min(0.22, lvl * 0.015),
+                        speed: 0.30 + Math.min(0.24, lvl * 0.015),
                         power: stageBasePower,
                         color: lvl >= 6 ? '#ff6600' : '#ffaa00',
                         isBoss: false,
@@ -793,9 +828,34 @@
             startOfflineStage(currentPlayingStage + 1);
         }
 
+        function spawnImpactParticles(x, y, color) {
+            for (let i = 0; i < 6; i++) {
+                let ang = Math.random() * Math.PI * 2;
+                let spd = 2 + Math.random() * 4;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    alpha: 1,
+                    color
+                });
+            }
+        }
+
         // ================= Physics Loop =================
         function updatePhysics() {
             if (gameMode === 'none') return;
+
+            // Particle update
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.92;
+                p.vy *= 0.92;
+                p.alpha -= 0.05;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
 
             let dx = 0, dy = 0;
             if (keys['arrowup'] || keys['w']) dy -= 1;
@@ -808,7 +868,6 @@
                 dy = touchVec.y;
             }
 
-            // Smooth natural movement
             let mag = Math.hypot(dx, dy);
             if (mag > 1) { dx /= mag; dy /= mag; }
 
@@ -820,11 +879,11 @@
                         for (let key of ['host', 'guest']) {
                             let p = p2pPlayers[key];
                             if (!p.alive) continue;
-                            let pSpeed = 1.1;
+                            let pSpeed = 1.35;
                             p.vx += p.input.dx * pSpeed;
                             p.vy += p.input.dy * pSpeed;
-                            p.vx *= 0.89;
-                            p.vy *= 0.89;
+                            p.vx *= 0.88;
+                            p.vy *= 0.88;
                             p.x += p.vx;
                             p.y += p.vy;
 
@@ -850,11 +909,12 @@
                                 p2.x += Math.cos(ang) * (overlap * 0.5);
                                 p2.y += Math.sin(ang) * (overlap * 0.5);
 
-                                let push = 11;
+                                let push = 12;
                                 p1.vx -= Math.cos(ang) * push;
                                 p1.vy -= Math.sin(ang) * push;
                                 p2.vx += Math.cos(ang) * push;
                                 p2.vy += Math.sin(ang) * push;
+                                spawnImpactParticles((p1.x + p2.x)/2, (p1.y + p2.y)/2, '#00e5ff');
                             }
                         }
 
@@ -884,12 +944,12 @@
                     }
                 }
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
-                let moveForce = 1.15;
+                let moveForce = 1.35;
                 player.vx += dx * moveForce;
                 player.vy += dy * moveForce;
 
-                player.vx *= 0.89;
-                player.vy *= 0.89;
+                player.vx *= 0.88;
+                player.vy *= 0.88;
 
                 player.x += player.vx;
                 player.y += player.vy;
@@ -910,30 +970,27 @@
                 for (let b of activeBots) {
                     let angToPlayer = Math.atan2(player.y - b.y, player.x - b.x);
                     
-                    // Bot AI: Taunt & Multi-Hit Rush
                     b.dashCooldown = (b.dashCooldown || 0) + 1;
                     b.feintTimer = (b.feintTimer || 0) + 1;
 
                     let currentBotSpeed = b.speed;
                     
-                    // Medium & Boss difficulty: Frequent dash attacks
-                    if (currentPlayingStage >= 4 && b.dashCooldown > 80) {
-                        currentBotSpeed *= 2.2; // Quick Rush
-                        if (b.dashCooldown > 105) b.dashCooldown = 0;
+                    if (currentPlayingStage >= 3 && b.dashCooldown > 75) {
+                        currentBotSpeed *= 2.4; // Multi-hit Rush
+                        if (b.dashCooldown > 100) b.dashCooldown = 0;
                     }
 
-                    // Flanking feint movement
-                    if (b.feintTimer > 120 && b.feintTimer < 150) {
+                    if (b.feintTimer > 110 && b.feintTimer < 140) {
                         angToPlayer += Math.PI / 3;
-                    } else if (b.feintTimer >= 150) {
+                    } else if (b.feintTimer >= 140) {
                         b.feintTimer = 0;
                     }
 
                     b.vx += Math.cos(angToPlayer) * currentBotSpeed;
                     b.vy += Math.sin(angToPlayer) * currentBotSpeed;
 
-                    b.vx *= 0.90;
-                    b.vy *= 0.90;
+                    b.vx *= 0.89;
+                    b.vy *= 0.89;
                     b.x += b.vx;
                     b.y += b.vy;
 
@@ -955,15 +1012,17 @@
                         b.y += Math.sin(cang) * (overlap * 0.6);
 
                         let playerMass = 1.0 + (upgrades.weight * 0.35);
-                        let playerHitPower = 6.5 + (upgrades.power * 2.0);
+                        let playerHitPower = 7.0 + (upgrades.power * 2.2);
 
                         let playerSpeedMag = Math.hypot(player.vx, player.vy);
-                        let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.3);
+                        let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.35);
 
                         player.vx -= Math.cos(cang) * (b.power / playerMass);
                         player.vy -= Math.sin(cang) * (b.power / playerMass);
                         b.vx += Math.cos(cang) * (totalPlayerPush / b.mass);
                         b.vy += Math.sin(cang) * (totalPlayerPush / b.mass);
+
+                        spawnImpactParticles((player.x + b.x)/2, (player.y + b.y)/2, b.color);
                     }
                 }
 
@@ -1000,6 +1059,16 @@
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Draw Impact Particles
+                for (let p of particles) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
 
                 if (gameMode === 'p2p') {
                     for (let key of ['host', 'guest']) {
