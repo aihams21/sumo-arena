@@ -311,7 +311,7 @@
 
         <div id="menu-lobby" class="overlay hidden">
             <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">-----</span></h2>
-            <p style="color:#aaa; margin: 15px 0;">Send this code to your friend to join...</p>
+            <p style="color:#aaa; margin: 15px 0;">Send this 4-digit code to your friend...</p>
             <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
         </div>
 
@@ -468,15 +468,16 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // PeerJS configuration with Google STUN Servers (Direct Data Channel only)
+        // Optimized Global PeerJS Configuration
         const PEER_CONFIG = {
+            host: '0.peerjs.com',
+            port: 443,
+            path: '/',
+            secure: true,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' }
                 ]
             }
         };
@@ -490,6 +491,7 @@
             guest: { x: 520, y: 300, vx: 0, vy: 0, radius: P2P_EQUAL_RADIUS, color: '#ff0055', alive: true, input: { dx: 0, dy: 0 } }
         };
         let p2pScores = { host: 0, guest: 0 };
+        let joinTimeout = null;
 
         window.onkeydown = e => keys[e.key.toLowerCase()] = true;
         window.onkeyup = e => keys[e.key.toLowerCase()] = false;
@@ -505,6 +507,7 @@
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
+            if (joinTimeout) clearTimeout(joinTimeout);
             if (conn) { conn.close(); conn = null; }
             if (peer) { peer.destroy(); peer = null; }
             updateCoinDisplays();
@@ -574,14 +577,14 @@
             showMainMenu();
         }
 
-        // ================= Pure P2P Data Network =================
+        // ================= Direct Fast P2P Handshake =================
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
             isHost = true;
             let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
             
-            if (peer) peer.destroy();
+            if (peer) { peer.destroy(); peer = null; }
             peer = new Peer(roomCode, PEER_CONFIG);
             
             peer.on('open', id => {
@@ -591,7 +594,7 @@
 
             peer.on('connection', c => {
                 conn = c;
-                setupP2PConnection();
+                setupHostEvents();
             });
 
             peer.on('error', err => {
@@ -602,7 +605,7 @@
 
         function joinP2PRoom() {
             let rawCode = document.getElementById('room-input').value.trim();
-            if (!rawCode) return alert("Please enter the room code!");
+            if (!rawCode) return alert("Please enter the 4-digit room code!");
             
             let targetCode = rawCode.startsWith('SUMO-') ? rawCode : 'SUMO-' + rawCode;
             let joinBtn = document.getElementById('btn-join');
@@ -611,22 +614,55 @@
             isHost = false;
             bannerAd.style.display = 'none';
 
-            if (peer) peer.destroy();
+            if (peer) { peer.destroy(); peer = null; }
             peer = new Peer(PEER_CONFIG);
             
             peer.on('open', () => {
                 conn = peer.connect(targetCode, { reliable: true });
-                setupP2PConnection();
+
+                joinTimeout = setTimeout(() => {
+                    if (joinBtn.innerText === "Connecting...") {
+                        joinBtn.innerText = "🚀 Join Room";
+                        alert("Room not found or Host is not in lobby. Make sure the Host has created the room!");
+                    }
+                }, 8000);
+
+                setupGuestEvents();
             });
 
             peer.on('error', err => {
+                if (joinTimeout) clearTimeout(joinTimeout);
                 joinBtn.innerText = "🚀 Join Room";
-                alert('Room not found or Host is offline.');
+                alert('Room not found or Host offline.');
             });
         }
 
-        function setupP2PConnection() {
+        function setupHostEvents() {
             conn.on('open', () => {
+                gameMode = 'p2p';
+                hideAllMenus();
+                bannerAd.style.display = 'none';
+                hudCoinsCard.style.display = 'none';
+                document.getElementById('hud').classList.remove('hidden');
+                touchBox.style.display = 'block';
+                startP2PRound();
+            });
+
+            conn.on('data', data => {
+                if (data.type === 'input') {
+                    p2pPlayers.guest.input = data.input;
+                }
+            });
+
+            conn.on('close', () => {
+                alert('Opponent disconnected.');
+                exitToMenu();
+            });
+        }
+
+        function setupGuestEvents() {
+            conn.on('open', () => {
+                if (joinTimeout) clearTimeout(joinTimeout);
                 let joinBtn = document.getElementById('btn-join');
                 if (joinBtn) joinBtn.innerText = "🚀 Join Room";
 
@@ -636,35 +672,22 @@
                 hudCoinsCard.style.display = 'none';
                 document.getElementById('hud').classList.remove('hidden');
                 touchBox.style.display = 'block';
-
-                if (isHost) {
-                    startP2PRound();
-                } else {
-                    conn.send({ type: 'guest_ready' });
-                }
             });
 
             conn.on('data', data => {
-                if (data.type === 'guest_ready') {
-                    if (isHost) startP2PRound();
-                } else if (data.type === 'state') {
+                if (data.type === 'state') {
                     p2pPlayers = data.players;
                     p2pArenaRadius = data.arenaRadius;
                     p2pScores = data.scores;
                     updateP2PHud();
-                } else if (data.type === 'input') {
-                    if (isHost) p2pPlayers.guest.input = data.input;
                 } else if (data.type === 'round_end') {
                     p2pScores = data.scores;
                     let title = document.getElementById('round-title');
-                    let won = (isHost && data.winner === 'host') || (!isHost && data.winner === 'guest');
+                    let won = (data.winner === 'guest');
                     title.innerText = won ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
                     title.style.color = won ? "#00ff66" : "#ff3366";
                     
-                    let myScore = isHost ? p2pScores.host : p2pScores.guest;
-                    let oppScore = isHost ? p2pScores.guest : p2pScores.host;
-                    document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
-
+                    document.getElementById('round-score').innerText = `${p2pScores.guest}  -  ${p2pScores.host}`;
                     hideAllMenus();
                     bannerAd.style.display = 'none';
                     document.getElementById('modal-round').classList.remove('hidden');
