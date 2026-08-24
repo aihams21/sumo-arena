@@ -94,8 +94,7 @@
             background: #111420;
             color: #fff;
             text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             margin: 8px 0;
             outline: none;
             width: 220px;
@@ -224,6 +223,8 @@
             box-shadow: 0 0 10px #00e5ff;
         }
     </style>
+    <!-- WebRTC Peer-to-Peer Engine -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div id="banner-ad">[ ADVERTISEMENT SPACE: RESPONSIVE BANNER ]</div>
@@ -245,7 +246,7 @@
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
-            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 Rooms</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P Serverless)</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -285,24 +286,24 @@
         </div>
 
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE MULTIPLAYER</h2>
-            <button class="btn btn-cyan" onclick="createRoom()">➕ Create Room</button>
+            <h2>ONLINE 1v1 (SERVERLESS)</h2>
+            <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="CODE" maxlength="5">
-            <button class="btn btn-magenta" onclick="joinRoom()">🚀 Join Room</button>
+            <input type="text" id="room-input" placeholder="ROOM CODE">
+            <button class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
         <div id="menu-lobby" class="overlay hidden">
             <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">-----</span></h2>
-            <p style="color:#aaa; margin: 15px 0;">Share code with a friend to play...</p>
+            <p style="color:#aaa; margin: 15px 0;">Send this code to your friend to join...</p>
             <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
         </div>
 
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
-            <button class="btn btn-cyan" onclick="reqNextRound()">Next Round ➔</button>
+            <button class="btn btn-cyan" onclick="restartP2PRound()">Next Round ➔</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
@@ -319,19 +320,6 @@
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
     </div>
-
-    <!-- Safe Dynamic Socket.IO Loader -->
-    <script>
-        let socket = null;
-        if (typeof io !== 'undefined') {
-            socket = io();
-        } else {
-            let s = document.createElement('script');
-            s.src = '/socket.io/socket.io.js';
-            s.onload = () => { if (typeof io !== 'undefined') socket = io(); };
-            document.head.appendChild(s);
-        }
-    </script>
 
     <script>
         const canvas = document.getElementById('c');
@@ -382,8 +370,6 @@
         window.addEventListener('touchend', resetTouch);
         window.addEventListener('touchcancel', resetTouch);
 
-        const CENTER_X = 400;
-        const CENTER_Y = 300;
         const BASE_ARENA_RADIUS = 240;
 
         let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
@@ -413,17 +399,23 @@
         updateCoinDisplays();
 
         let gameMode = 'none';
-        let myId = null;
-        let onlinePlayers = {};
-        let onlineRadius = BASE_ARENA_RADIUS;
-        let scores = {};
-
         let currentPlayingStage = 1;
         let offlineArenaRadius = BASE_ARENA_RADIUS;
         let player = { x: 400, y: 300, vx: 0, vy: 0, radius: 24, color: '#00e5ff', alive: true };
         let bots = [];
         let keys = {};
         let stageEnded = false;
+
+        // P2P Networking State
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let p2pArenaRadius = BASE_ARENA_RADIUS;
+        let p2pPlayers = {
+            host: { x: 300, y: 300, vx: 0, vy: 0, radius: 24, color: '#00e5ff', alive: true, input: { dx: 0, dy: 0 } },
+            guest: { x: 500, y: 300, vx: 0, vy: 0, radius: 24, color: '#ff0055', alive: true, input: { dx: 0, dy: 0 } }
+        };
+        let p2pScores = { host: 0, guest: 0 };
 
         window.onkeydown = e => keys[e.key.toLowerCase()] = true;
         window.onkeyup = e => keys[e.key.toLowerCase()] = false;
@@ -437,6 +429,7 @@
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
+            if (peer) { peer.destroy(); peer = null; }
             updateCoinDisplays();
             document.getElementById('menu-main').classList.remove('hidden');
         }
@@ -494,96 +487,122 @@
         }
 
         function showMultiMenu() {
-            if (!socket) {
-                alert("Online 1v1 requires local/tunneled Node.js server. Run 'node server.js' to play online.");
-                return;
-            }
             hideAllMenus();
             document.getElementById('menu-multi').classList.remove('hidden');
         }
 
         function exitToMenu() {
-            if (gameMode === 'online' && socket) socket.emit('leaveRoom');
             showMainMenu();
         }
 
-        function createRoom() { if (socket) socket.emit('createRoom'); }
-        function joinRoom() {
-            let code = document.getElementById('room-input').value.trim();
-            if (code && socket) socket.emit('joinRoom', code);
-        }
-        function reqNextRound() {
-            if (socket) socket.emit('nextRound');
+        // ================= WebRTC P2P Multiplayer =================
+        function createP2PRoom() {
             hideAllMenus();
-            document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block';
-        }
-
-        // Socket Bindings if Available
-        setInterval(() => {
-            if (!socket || socket._configured) return;
-            socket._configured = true;
-
-            socket.on('roomJoined', data => {
-                myId = data.myId;
-                gameMode = 'online';
-                hideAllMenus();
-                document.getElementById('lobby-code').innerText = data.code;
+            isHost = true;
+            let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
+            
+            peer = new Peer(roomCode);
+            peer.on('open', id => {
+                document.getElementById('lobby-code').innerText = id;
                 document.getElementById('menu-lobby').classList.remove('hidden');
             });
 
-            socket.on('roundStarted', data => {
+            peer.on('connection', c => {
+                conn = c;
+                setupP2PConnection();
+            });
+
+            peer.on('error', err => alert('Connection error: ' + err.type));
+        }
+
+        function joinP2PRoom() {
+            let code = document.getElementById('room-input').value.trim();
+            if (!code) return alert("Enter Room Code!");
+            if (!code.startsWith('SUMO-')) code = 'SUMO-' + code;
+
+            isHost = false;
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(code);
+                setupP2PConnection();
+            });
+
+            peer.on('error', err => alert('Room not found or connection failed!'));
+        }
+
+        function setupP2PConnection() {
+            conn.on('open', () => {
+                gameMode = 'p2p';
                 hideAllMenus();
                 document.getElementById('hud').classList.remove('hidden');
                 touchBox.style.display = 'block';
-                scores = data.scores;
-                updateOnlineHud();
+                if (isHost) startP2PRound();
             });
 
-            socket.on('onlineState', data => {
-                if (gameMode !== 'online') return;
-                onlinePlayers = data.players;
-                onlineRadius = data.arenaRadius;
-            });
+            conn.on('data', data => {
+                if (data.type === 'state') {
+                    p2pPlayers = data.players;
+                    p2pArenaRadius = data.arenaRadius;
+                    p2pScores = data.scores;
+                    updateP2PHud();
+                } else if (data.type === 'input') {
+                    if (isHost) p2pPlayers.guest.input = data.input;
+                } else if (data.type === 'round_end') {
+                    p2pScores = data.scores;
+                    let title = document.getElementById('round-title');
+                    let won = (isHost && data.winner === 'host') || (!isHost && data.winner === 'guest');
+                    title.innerText = won ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
+                    title.style.color = won ? "#00ff66" : "#ff3366";
+                    
+                    let myScore = isHost ? p2pScores.host : p2pScores.guest;
+                    let oppScore = isHost ? p2pScores.guest : p2pScores.host;
+                    document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
 
-            socket.on('roundEnded', data => {
-                if (gameMode !== 'online') return;
-                scores = data.scores;
-                let title = document.getElementById('round-title');
-                if (data.winnerId === myId) {
-                    title.innerText = "ROUND WON! 🏆";
-                    title.style.color = "#00ff66";
-                } else {
-                    title.innerText = "ROUND LOST! 💀";
-                    title.style.color = "#ff3366";
+                    hideAllMenus();
+                    document.getElementById('modal-round').classList.remove('hidden');
+                } else if (data.type === 'start_round') {
+                    hideAllMenus();
+                    document.getElementById('hud').classList.remove('hidden');
+                    touchBox.style.display = 'block';
                 }
-
-                let ids = Object.keys(scores);
-                let myScore = scores[myId] || 0;
-                let otherId = ids.find(id => id !== myId);
-                let oppScore = otherId ? (scores[otherId] || 0) : 0;
-                document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
-
-                hideAllMenus();
-                document.getElementById('modal-round').classList.remove('hidden');
             });
 
-            socket.on('opponentLeft', () => {
-                alert("Opponent left the room.");
+            conn.on('close', () => {
+                alert('Opponent disconnected.');
                 exitToMenu();
             });
+        }
 
-            socket.on('errorMsg', msg => alert(msg));
-        }, 500);
+        function startP2PRound() {
+            p2pArenaRadius = BASE_ARENA_RADIUS;
+            p2pPlayers.host.x = 300; p2pPlayers.host.y = 300; p2pPlayers.host.vx = 0; p2pPlayers.host.vy = 0; p2pPlayers.host.alive = true;
+            p2pPlayers.guest.x = 500; p2pPlayers.guest.y = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
+            stageEnded = false;
 
-        function updateOnlineHud() {
-            let ids = Object.keys(scores);
-            let myScore = scores[myId] || 0;
-            let otherId = ids.find(id => id !== myId);
-            let oppScore = otherId ? (scores[otherId] || 0) : 0;
+            if (conn && conn.open) {
+                conn.send({ type: 'start_round' });
+            }
+            hideAllMenus();
+            document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block';
+            updateP2PHud();
+        }
+
+        function restartP2PRound() {
+            if (isHost) {
+                startP2PRound();
+            } else {
+                alert("Waiting for Host to start...");
+            }
+        }
+
+        function updateP2PHud() {
+            let myScore = isHost ? p2pScores.host : p2pScores.guest;
+            let oppScore = isHost ? p2pScores.guest : p2pScores.host;
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
+        // ================= Offline Stages =================
         function startOfflineStage(lvl) {
             gameMode = 'offline';
             currentPlayingStage = lvl;
@@ -659,6 +678,7 @@
             startOfflineStage(currentPlayingStage + 1);
         }
 
+        // ================= Physics Loop =================
         setInterval(() => {
             if (gameMode === 'none') return;
 
@@ -673,8 +693,76 @@
                 dy = touchVec.y;
             }
 
-            if (gameMode === 'online' && socket) {
-                socket.emit('input', { dx, dy, dash: false });
+            if (gameMode === 'p2p') {
+                if (isHost) {
+                    p2pPlayers.host.input = { dx, dy };
+
+                    if (!stageEnded) {
+                        for (let key of ['host', 'guest']) {
+                            let p = p2pPlayers[key];
+                            if (!p.alive) continue;
+                            p.vx += p.input.dx * 0.75;
+                            p.vy += p.input.dy * 0.75;
+                            p.vx *= 0.92;
+                            p.vy *= 0.92;
+                            p.x += p.vx;
+                            p.y += p.vy;
+
+                            if (Math.hypot(p.x - 400, p.y - 300) > p2pArenaRadius) {
+                                p.alive = false;
+                            }
+                        }
+
+                        if (p2pArenaRadius > BASE_ARENA_RADIUS * 0.6) {
+                            p2pArenaRadius -= 0.02;
+                        }
+
+                        if (p2pPlayers.host.alive && p2pPlayers.guest.alive) {
+                            let p1 = p2pPlayers.host;
+                            let p2 = p2pPlayers.guest;
+                            let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                            if (dist < p1.radius + p2.radius) {
+                                let overlap = (p1.radius + p2.radius) - dist;
+                                let ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                                p1.x -= Math.cos(ang) * (overlap * 0.5);
+                                p1.y -= Math.sin(ang) * (overlap * 0.5);
+                                p2.x += Math.cos(ang) * (overlap * 0.5);
+                                p2.y += Math.sin(ang) * (overlap * 0.5);
+
+                                let push = 10;
+                                p1.vx -= Math.cos(ang) * push;
+                                p1.vy -= Math.sin(ang) * push;
+                                p2.vx += Math.cos(ang) * push;
+                                p2.vy += Math.sin(ang) * push;
+                            }
+                        }
+
+                        if (conn && conn.open) {
+                            conn.send({ type: 'state', players: p2pPlayers, arenaRadius: p2pArenaRadius, scores: p2pScores });
+                        }
+
+                        if (!p2pPlayers.host.alive || !p2pPlayers.guest.alive) {
+                            stageEnded = true;
+                            let winner = p2pPlayers.host.alive ? 'host' : 'guest';
+                            p2pScores[winner]++;
+                            
+                            let endData = { type: 'round_end', winner, scores: p2pScores };
+                            if (conn && conn.open) conn.send(endData);
+                            
+                            let title = document.getElementById('round-title');
+                            title.innerText = (winner === 'host') ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
+                            title.style.color = (winner === 'host') ? "#00ff66" : "#ff3366";
+                            document.getElementById('round-score').innerText = `${p2pScores.host}  -  ${p2pScores.guest}`;
+                            hideAllMenus();
+                            document.getElementById('modal-round').classList.remove('hidden');
+                        }
+                    }
+                } else {
+                    if (conn && conn.open) {
+                        conn.send({ type: 'input', input: { dx, dy } });
+                    }
+                }
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
                 let moveForce = 0.72;
                 player.vx += dx * moveForce;
@@ -757,7 +845,7 @@
             ctx.clearRect(0, 0, 800, 600);
 
             if (gameMode !== 'none') {
-                let rad = gameMode === 'online' ? onlineRadius : offlineArenaRadius;
+                let rad = gameMode === 'p2p' ? p2pArenaRadius : offlineArenaRadius;
 
                 ctx.beginPath();
                 ctx.arc(400, 300, rad, 0, Math.PI * 2);
@@ -773,9 +861,9 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                if (gameMode === 'online') {
-                    for (let id in onlinePlayers) {
-                        let p = onlinePlayers[id];
+                if (gameMode === 'p2p') {
+                    for (let key of ['host', 'guest']) {
+                        let p = p2pPlayers[key];
                         if (!p.alive) continue;
                         ctx.beginPath();
                         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -785,10 +873,11 @@
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
 
+                        let isMe = (isHost && key === 'host') || (!isHost && key === 'guest');
                         ctx.fillStyle = '#fff';
                         ctx.font = '12px Segoe UI';
                         ctx.textAlign = 'center';
-                        ctx.fillText(id === myId ? "YOU" : "OPPONENT", p.x, p.y - p.radius - 8);
+                        ctx.fillText(isMe ? "YOU" : "OPPONENT", p.x, p.y - p.radius - 8);
                     }
                 } else {
                     for (let b of bots) {
