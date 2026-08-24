@@ -259,7 +259,7 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-    <div id="banner-ad" onclick="triggerSmartlinkReward('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
+    <div id="banner-ad" onclick="triggerSmartlinkDirect('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
         <audio id="remote-audio" autoplay playsinline></audio>
@@ -317,7 +317,7 @@
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
 
-                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="triggerSmartlinkReward('free_coins')">🎁 Open Sponsor Link (+50 Coins)</button>
+                <button id="btn-free-coins" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="clickFreeCoinTask()">🎁 Sponsor Task: Visit 5x for +50🪙 (<span id="coin-task-count">0/5</span>)</button>
             </div>
 
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
@@ -348,14 +348,14 @@
 
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
-            <button class="btn btn-green" onclick="triggerSmartlinkReward('revive')">📺 Revive Sumo (Open Sponsor)</button>
+            <button class="btn btn-green" onclick="triggerSmartlinkDirect('revive')">📺 Revive Sumo (Open Sponsor)</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Stage Map</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
             <p style="margin-bottom: 10px; color:#ffbb00; font-size: 14px;">+5 Coins Earned! 🪙</p>
-            <button class="btn btn-gold" onclick="triggerSmartlinkReward('double')">🪙 Claim +10 Coins (2x Bonus)</button>
+            <button class="btn btn-gold" onclick="triggerSmartlinkDirect('double')">🪙 Claim +10 Coins (2x Bonus)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
@@ -364,37 +364,31 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        let pendingRewardType = null;
-        function triggerSmartlinkReward(type) {
-            pendingRewardType = type;
+        // 5-Clicks Rule for Free Coins
+        let freeCoinClicks = 0;
+        function clickFreeCoinTask() {
             window.open(SMARTLINK_URL, '_blank');
+            freeCoinClicks++;
             
-            const rewardTimer = setTimeout(() => {
-                applyReward();
-            }, 2000);
-
-            window.addEventListener('focus', function onFocus() {
-                clearTimeout(rewardTimer);
-                applyReward();
-                window.removeEventListener('focus', onFocus);
-            }, { once: true });
-        }
-
-        function applyReward() {
-            if (!pendingRewardType) return;
-            let type = pendingRewardType;
-            pendingRewardType = null;
-
-            if (type === 'revive') {
-                reviveOffline();
-            } else if (type === 'double') {
-                coins += 10;
-                saveData();
-                nextStageOffline();
-            } else if (type === 'free_coins') {
+            if (freeCoinClicks >= 5) {
+                freeCoinClicks = 0;
                 coins += 50;
                 saveData();
                 showShop();
+                alert("🎉 Success! 5 Sponsor Visits completed. +50 Coins Claimed!");
+            } else {
+                document.getElementById('coin-task-count').innerText = `${freeCoinClicks}/5`;
+            }
+        }
+
+        function triggerSmartlinkDirect(action) {
+            window.open(SMARTLINK_URL, '_blank');
+            if (action === 'revive') {
+                reviveOffline();
+            } else if (action === 'double') {
+                coins += 10;
+                saveData();
+                nextStageOffline();
             }
         }
 
@@ -485,7 +479,6 @@
         let keys = {};
         let stageEnded = false;
 
-        // P2P Multiplayer (100% Equal Balanced Values)
         const P2P_EQUAL_RADIUS = 24;
         const P2P_MOVE_FORCE = 1.6;
         const P2P_FRICTION = 0.88;
@@ -553,6 +546,7 @@
         function showShop() {
             hideAllMenus();
             updateCoinDisplays();
+            document.getElementById('coin-task-count').innerText = `${freeCoinClicks}/5`;
 
             document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
             document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
@@ -845,11 +839,10 @@
             }
         }
 
-        // ================= Physics Loop (Fast & Smooth) =================
+        // ================= Physics Loop =================
         function updatePhysics() {
             if (gameMode === 'none') return;
 
-            // Particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
                 p.x += p.vx;
@@ -874,7 +867,6 @@
             let mag = Math.hypot(dx, dy);
             if (mag > 1) { dx /= mag; dy /= mag; }
 
-            // ================= 1v1 Online (100% Equal) =================
             if (gameMode === 'p2p') {
                 if (isHost) {
                     p2pPlayers.host.input = { dx, dy };
@@ -914,7 +906,6 @@
                                 p2.x += Math.cos(ang) * (overlap * 0.5);
                                 p2.y += Math.sin(ang) * (overlap * 0.5);
 
-                                // Equal bounce and impulse calculation
                                 let relVx = p1.vx - p2.vx;
                                 let relVy = p1.vy - p2.vy;
                                 let impactSpeed = Math.hypot(relVx, relVy);
@@ -954,7 +945,6 @@
                         conn.send({ type: 'input', input: { dx, dy } });
                     }
                 }
-            // ================= Offline Progression Mode =================
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
                 let moveForce = 1.6;
                 player.vx += dx * moveForce;
@@ -1134,7 +1124,6 @@
             }
         }
 
-        // Native 60-120FPS smooth game loop
         function gameLoop() {
             updatePhysics();
             render();
