@@ -317,7 +317,7 @@
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
 
-                <button id="btn-free-coins" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="clickFreeCoinTask()">🎁 Sponsor Task: Visit 5x for +50🪙 (<span id="coin-task-count">0/5</span>)</button>
+                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">🎁 Sponsor: Visit 5x for +50🪙 (<span id="count-free_coins">0/5</span>)</button>
             </div>
 
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
@@ -348,14 +348,14 @@
 
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
-            <button class="btn btn-green" onclick="triggerSmartlinkDirect('revive')">📺 Revive Sumo (Open Sponsor)</button>
+            <button class="btn btn-green" onclick="handleAdClickWithCounter('revive')">📺 Revive Sumo: Visit 5x (<span id="count-revive">0/5</span>)</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Stage Map</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
             <p style="margin-bottom: 10px; color:#ffbb00; font-size: 14px;">+5 Coins Earned! 🪙</p>
-            <button class="btn btn-gold" onclick="triggerSmartlinkDirect('double')">🪙 Claim +10 Coins (2x Bonus)</button>
+            <button class="btn btn-gold" onclick="handleAdClickWithCounter('double')">🪙 2x Bonus: Visit 5x for +10🪙 (<span id="count-double">0/5</span>)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
@@ -364,32 +364,41 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        // 5-Clicks Rule for Free Coins
-        let freeCoinClicks = 0;
-        function clickFreeCoinTask() {
+        // Strict 5 Clicks Counter Tracker
+        const clickCounters = {
+            free_coins: 0,
+            revive: 0,
+            double: 0
+        };
+
+        function handleAdClickWithCounter(type) {
             window.open(SMARTLINK_URL, '_blank');
-            freeCoinClicks++;
-            
-            if (freeCoinClicks >= 5) {
-                freeCoinClicks = 0;
-                coins += 50;
-                saveData();
-                showShop();
-                alert("🎉 Success! 5 Sponsor Visits completed. +50 Coins Claimed!");
-            } else {
-                document.getElementById('coin-task-count').innerText = `${freeCoinClicks}/5`;
+            clickCounters[type]++;
+
+            let labelEl = document.getElementById(`count-${type}`);
+            if (labelEl) labelEl.innerText = `${clickCounters[type]}/5`;
+
+            if (clickCounters[type] >= 5) {
+                clickCounters[type] = 0;
+                if (labelEl) labelEl.innerText = `0/5`;
+
+                if (type === 'free_coins') {
+                    coins += 50;
+                    saveData();
+                    showShop();
+                    alert("🎉 5 Visits Verified! +50 Coins Added!");
+                } else if (type === 'revive') {
+                    reviveOffline();
+                } else if (type === 'double') {
+                    coins += 10;
+                    saveData();
+                    nextStageOffline();
+                }
             }
         }
 
-        function triggerSmartlinkDirect(action) {
+        function triggerSmartlinkDirect(type) {
             window.open(SMARTLINK_URL, '_blank');
-            if (action === 'revive') {
-                reviveOffline();
-            } else if (action === 'double') {
-                coins += 10;
-                saveData();
-                nextStageOffline();
-            }
         }
 
         const canvas = document.getElementById('c');
@@ -546,7 +555,6 @@
         function showShop() {
             hideAllMenus();
             updateCoinDisplays();
-            document.getElementById('coin-task-count').innerText = `${freeCoinClicks}/5`;
 
             document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
             document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
@@ -746,7 +754,7 @@
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
-        // ================= Offline Mode =================
+        // ================= Dynamic Boss & Offline Mode =================
         function startOfflineStage(lvl) {
             gameMode = 'offline';
             currentPlayingStage = lvl;
@@ -766,21 +774,22 @@
             player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5);
 
+            let playerStatPower = 6.0 + (upgrades.power * 1.5);
+            let playerStatMass = 1.0 + (upgrades.weight * 0.25);
+
             bots = [];
             let isBossLevel = (lvl % 5 === 0);
-            
-            let stageBaseMass = 0.8 + (lvl * 0.04);
-            let stageBasePower = 4.5 + Math.min(10, lvl * 0.35);
 
             if (isBossLevel) {
+                // Dynamic Scaled Boss: Always 25% stronger than player's upgraded stats
                 bots.push({
                     x: 400,
-                    y: 160,
+                    y: 150,
                     vx: 0, vy: 0,
-                    radius: 30 + Math.min(14, lvl * 0.3),
-                    mass: stageBaseMass * 1.4,
-                    speed: 0.45,
-                    power: stageBasePower * 1.3,
+                    radius: player.radius * 1.25,
+                    mass: playerStatMass * 1.25,
+                    speed: 0.52,
+                    power: playerStatPower * 1.25,
                     color: '#ff0055',
                     isBoss: true,
                     alive: true,
@@ -797,9 +806,9 @@
                         y: 300 + Math.sin(ang) * spawnDist,
                         vx: 0, vy: 0,
                         radius: 19 + Math.min(10, lvl * 0.2),
-                        mass: stageBaseMass,
+                        mass: 0.8 + (lvl * 0.04),
                         speed: 0.38 + Math.min(0.2, lvl * 0.015),
-                        power: stageBasePower,
+                        power: 4.5 + Math.min(10, lvl * 0.35),
                         color: lvl >= 6 ? '#ff6600' : '#ffaa00',
                         isBoss: false,
                         alive: true,
@@ -975,9 +984,9 @@
                     b.dashCooldown = (b.dashCooldown || 0) + 1;
                     let currentBotSpeed = b.speed;
                     
-                    if (b.dashCooldown > 80) {
-                        currentBotSpeed *= 2.0;
-                        if (b.dashCooldown > 100) b.dashCooldown = 0;
+                    if (b.dashCooldown > 70) {
+                        currentBotSpeed *= 2.2;
+                        if (b.dashCooldown > 95) b.dashCooldown = 0;
                     }
 
                     b.vx += Math.cos(angToPlayer) * currentBotSpeed;
