@@ -300,8 +300,8 @@
         </div>
 
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (FAIR MATCH)</h2>
-            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Ad-Free Match</p>
+            <h2>ONLINE 1v1 (GLOBAL P2P)</h2>
+            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Pure Skill</p>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
             <input type="text" id="room-input" placeholder="ROOM CODE (e.g. 5421)">
@@ -468,6 +468,19 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
+        // PeerJS configuration with Google STUN Servers (Direct Data Channel only)
+        const PEER_CONFIG = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
+        };
+
         let peer = null;
         let conn = null;
         let isHost = false;
@@ -569,7 +582,8 @@
             let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
             
             if (peer) peer.destroy();
-            peer = new Peer(roomCode);
+            peer = new Peer(roomCode, PEER_CONFIG);
+            
             peer.on('open', id => {
                 document.getElementById('lobby-code').innerText = id.replace('SUMO-', '');
                 document.getElementById('menu-lobby').classList.remove('hidden');
@@ -598,7 +612,7 @@
             bannerAd.style.display = 'none';
 
             if (peer) peer.destroy();
-            peer = new Peer();
+            peer = new Peer(PEER_CONFIG);
             
             peer.on('open', () => {
                 conn = peer.connect(targetCode, { reliable: true });
@@ -607,7 +621,7 @@
 
             peer.on('error', err => {
                 joinBtn.innerText = "🚀 Join Room";
-                alert('Could not join room. Check the code and try again.');
+                alert('Room not found or Host is offline.');
             });
         }
 
@@ -622,11 +636,18 @@
                 hudCoinsCard.style.display = 'none';
                 document.getElementById('hud').classList.remove('hidden');
                 touchBox.style.display = 'block';
-                if (isHost) startP2PRound();
+
+                if (isHost) {
+                    startP2PRound();
+                } else {
+                    conn.send({ type: 'guest_ready' });
+                }
             });
 
             conn.on('data', data => {
-                if (data.type === 'state') {
+                if (data.type === 'guest_ready') {
+                    if (isHost) startP2PRound();
+                } else if (data.type === 'state') {
                     p2pPlayers = data.players;
                     p2pArenaRadius = data.arenaRadius;
                     p2pScores = data.scores;
@@ -683,7 +704,7 @@
             if (isHost) {
                 startP2PRound();
             } else {
-                alert("Waiting for Host to start...");
+                alert("Waiting for Host to start next round...");
             }
         }
 
