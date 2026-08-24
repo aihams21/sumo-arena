@@ -147,20 +147,21 @@
             background: #171b2a;
             border: 2px solid #00e5ff;
             color: #fff;
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 20px;
             display: flex;
             align-items: center;
             gap: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
             transition: 0.2s;
+            z-index: 20;
         }
         .mic-btn.active {
-            background: #00e5ff;
+            background: #00ff66;
             color: #000;
-            box-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.7);
             border-color: #fff;
         }
 
@@ -270,7 +271,7 @@
 
         <div id="hud" class="hidden">
             <div class="hud-card" id="hud-left">STAGE: 1</div>
-            <div class="hud-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
+            <div class="hud-card" id="hud-coins-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
             <div class="hud-card" id="hud-right">
                 <button id="mic-toggle" class="mic-btn hidden" onclick="toggleVoiceMic()">🎤 Mic: OFF</button>
                 <button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button>
@@ -282,7 +283,7 @@
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
-            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (Fair Match 🎙️)</button>
+            <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (No Ads 🎙️)</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -324,8 +325,8 @@
         </div>
 
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (100% BALANCED)</h2>
-            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">Equal Speed, Equal Power, Pure Skill</p>
+            <h2>ONLINE 1v1 (FAIR MATCH)</h2>
+            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Ad-Free Match</p>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
             <input type="text" id="room-input" placeholder="ROOM CODE">
@@ -339,6 +340,7 @@
             <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
         </div>
 
+        <!-- 100% Ad-Free Online Round Modal -->
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
@@ -364,7 +366,7 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        // Strict 5 Clicks Counter Tracker
+        // Strict 5-Clicks Counter for Stage & Shop Rewards only
         const clickCounters = {
             free_coins: 0,
             revive: 0,
@@ -407,6 +409,8 @@
         const stick = document.getElementById('stick');
         const micBtn = document.getElementById('mic-toggle');
         const remoteAudio = document.getElementById('remote-audio');
+        const bannerAd = document.getElementById('banner-ad');
+        const hudCoinsCard = document.getElementById('hud-coins-card');
 
         let touchVec = { x: 0, y: 0 };
         let activeTouchId = null;
@@ -493,11 +497,12 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
+        // WebRTC Voice & P2P Stream Architecture
         let peer = null;
         let conn = null;
         let currentMediaCall = null;
         let localStream = null;
-        let isMicMuted = true;
+        let isMicEnabled = false;
         let isHost = false;
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         let p2pPlayers = {
@@ -514,6 +519,8 @@
             document.getElementById('hud').classList.add('hidden');
             touchBox.style.display = 'none';
             micBtn.classList.add('hidden');
+            bannerAd.style.display = 'flex';
+            hudCoinsCard.style.display = 'block';
         }
 
         function showMainMenu() {
@@ -555,6 +562,7 @@
         function showShop() {
             hideAllMenus();
             updateCoinDisplays();
+            document.getElementById('count-free_coins').innerText = `${clickCounters.free_coins}/5`;
 
             document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
             document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
@@ -579,6 +587,7 @@
 
         function showMultiMenu() {
             hideAllMenus();
+            bannerAd.style.display = 'none'; // No Ads on Online section
             document.getElementById('menu-multi').classList.remove('hidden');
         }
 
@@ -586,14 +595,17 @@
             showMainMenu();
         }
 
-        // ================= WebRTC Voice Chat =================
+        // ================= Optimized Mobile & PC Voice Engine =================
         async function getOrCreateAudioStream() {
             if (!localStream) {
                 try {
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-                    localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                        video: false
+                    });
+                    localStream.getAudioTracks().forEach(t => t.enabled = isMicEnabled);
                 } catch(e) {
-                    console.warn("Microphone permission rejected", e);
+                    alert("Please allow Microphone access in your browser to speak!");
                 }
             }
             return localStream;
@@ -608,18 +620,18 @@
                 currentMediaCall.close();
                 currentMediaCall = null;
             }
-            isMicMuted = true;
+            isMicEnabled = false;
             micBtn.classList.remove('active');
             micBtn.innerText = '🎤 Mic: OFF';
         }
 
         async function toggleVoiceMic() {
-            await getOrCreateAudioStream();
-            if (localStream && localStream.getAudioTracks().length > 0) {
-                isMicMuted = !isMicMuted;
-                localStream.getAudioTracks().forEach(track => track.enabled = !isMicMuted);
+            let stream = await getOrCreateAudioStream();
+            if (stream && stream.getAudioTracks().length > 0) {
+                isMicEnabled = !isMicEnabled;
+                stream.getAudioTracks().forEach(t => t.enabled = isMicEnabled);
                 
-                if (!isMicMuted) {
+                if (isMicEnabled) {
                     micBtn.classList.add('active');
                     micBtn.innerText = '🎙️ Mic: ON';
                 } else {
@@ -629,8 +641,19 @@
             }
         }
 
+        function attachRemoteAudio(stream) {
+            remoteAudio.srcObject = stream;
+            remoteAudio.muted = false;
+            remoteAudio.play().catch(e => {
+                // Auto-play unlock on Mobile touch
+                window.addEventListener('touchstart', () => remoteAudio.play(), { once: true });
+                window.addEventListener('click', () => remoteAudio.play(), { once: true });
+            });
+        }
+
         function createP2PRoom() {
             hideAllMenus();
+            bannerAd.style.display = 'none';
             isHost = true;
             let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
             
@@ -649,10 +672,7 @@
                 currentMediaCall = call;
                 let stream = await getOrCreateAudioStream();
                 call.answer(stream);
-                call.on('stream', remStream => {
-                    remoteAudio.srcObject = remStream;
-                    remoteAudio.play().catch(e => console.log(e));
-                });
+                call.on('stream', remStream => attachRemoteAudio(remStream));
             });
 
             peer.on('error', err => alert('Connection error: ' + err.type));
@@ -664,16 +684,14 @@
             if (!code.startsWith('SUMO-')) code = 'SUMO-' + code;
 
             isHost = false;
+            bannerAd.style.display = 'none';
             peer = new Peer();
             peer.on('open', async () => {
                 conn = peer.connect(code);
                 setupP2PConnection();
                 let stream = await getOrCreateAudioStream();
                 currentMediaCall = peer.call(code, stream);
-                currentMediaCall.on('stream', remStream => {
-                    remoteAudio.srcObject = remStream;
-                    remoteAudio.play().catch(e => console.log(e));
-                });
+                currentMediaCall.on('stream', remStream => attachRemoteAudio(remStream));
             });
 
             peer.on('error', err => alert('Room not found or connection failed!'));
@@ -683,6 +701,8 @@
             conn.on('open', () => {
                 gameMode = 'p2p';
                 hideAllMenus();
+                bannerAd.style.display = 'none';
+                hudCoinsCard.style.display = 'none'; // Clean HUD for 1v1
                 document.getElementById('hud').classList.remove('hidden');
                 micBtn.classList.remove('hidden');
                 touchBox.style.display = 'block';
@@ -709,9 +729,12 @@
                     document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
 
                     hideAllMenus();
+                    bannerAd.style.display = 'none';
                     document.getElementById('modal-round').classList.remove('hidden');
                 } else if (data.type === 'start_round') {
                     hideAllMenus();
+                    bannerAd.style.display = 'none';
+                    hudCoinsCard.style.display = 'none';
                     document.getElementById('hud').classList.remove('hidden');
                     micBtn.classList.remove('hidden');
                     touchBox.style.display = 'block';
@@ -734,6 +757,8 @@
                 conn.send({ type: 'start_round' });
             }
             hideAllMenus();
+            bannerAd.style.display = 'none';
+            hudCoinsCard.style.display = 'none';
             document.getElementById('hud').classList.remove('hidden');
             micBtn.classList.remove('hidden');
             touchBox.style.display = 'block';
@@ -781,7 +806,6 @@
             let isBossLevel = (lvl % 5 === 0);
 
             if (isBossLevel) {
-                // Dynamic Scaled Boss: Always 25% stronger than player's upgraded stats
                 bots.push({
                     x: 400,
                     y: 150,
@@ -946,6 +970,7 @@
                             title.style.color = (winner === 'host') ? "#00ff66" : "#ff3366";
                             document.getElementById('round-score').innerText = `${p2pScores.host}  -  ${p2pScores.guest}`;
                             hideAllMenus();
+                            bannerAd.style.display = 'none';
                             document.getElementById('modal-round').classList.remove('hidden');
                         }
                     }
