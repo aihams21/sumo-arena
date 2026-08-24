@@ -363,7 +363,7 @@
                     showShop();
                     alert("🎉 5 Visits Verified! +50 Coins Added!");
                 } else if (type === 'revive') {
-                    reviveOffline();
+                    reviveInPlaceOffline();
                 } else if (type === 'double') {
                     coins += 10;
                     saveData();
@@ -468,7 +468,6 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // Optimized Global PeerJS Configuration
         const PEER_CONFIG = {
             host: '0.peerjs.com',
             port: 443,
@@ -577,7 +576,6 @@
             showMainMenu();
         }
 
-        // ================= Direct Fast P2P Handshake =================
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
@@ -737,7 +735,6 @@
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
 
-        // ================= Dynamic Boss & Offline Mode =================
         function startOfflineStage(lvl) {
             gameMode = 'offline';
             currentPlayingStage = lvl;
@@ -802,11 +799,18 @@
             updateCoinDisplays();
         }
 
-        function reviveOffline() {
+        // Revive directly in place without resetting the stage
+        function reviveInPlaceOffline() {
+            stageEnded = false;
+            player.x = 400;
+            player.y = 300;
+            player.vx = 0;
+            player.vy = 0;
+            player.alive = true;
+
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
-            spawnOfflineStage(currentPlayingStage);
         }
 
         function nextStageOffline() {
@@ -830,7 +834,6 @@
             }
         }
 
-        // ================= Physics Loop =================
         function updatePhysics() {
             if (gameMode === 'none') return;
 
