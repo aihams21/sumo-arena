@@ -35,6 +35,7 @@
             font-size: 11px;
             letter-spacing: 1px;
             flex-shrink: 0;
+            cursor: pointer;
         }
         #game-box {
             position: relative;
@@ -90,6 +91,7 @@
         .btn-cyan { background: #00e5ff; color: #000; }
         .btn-gold { background: #ffbb00; color: #000; }
         .btn-magenta { background: #ff3366; color: #fff; }
+        .btn-green { background: #00ff66; color: #000; }
         .btn-gray { background: #1c2030; color: #aaa; }
 
         input {
@@ -231,7 +233,7 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-    <div id="banner-ad">[ ADVERTISEMENT SPACE: RESPONSIVE BANNER ]</div>
+    <div id="banner-ad" onclick="openDirectReward('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
         
@@ -284,6 +286,8 @@
                     </div>
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
+
+                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="openDirectReward('free_coins')">🎁 Watch Video (+50 Free Coins)</button>
             </div>
 
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
@@ -313,19 +317,38 @@
 
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
-            <button class="btn btn-cyan" onclick="reviveOffline()">📺 Retry Stage</button>
+            <button class="btn btn-green" onclick="openDirectReward('revive')">📺 Revive Sumo (Continue Stage)</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Stage Map</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
             <p style="margin-bottom: 10px; color:#ffbb00; font-size: 14px;">+5 Coins Earned! 🪙</p>
+            <button class="btn btn-gold" onclick="openDirectReward('double')">🪙 Watch Ad (Claim +10 Coins 2x)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
     </div>
 
     <script>
+        const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
+
+        function openDirectReward(type) {
+            window.open(SMARTLINK_URL, '_blank');
+            
+            if (type === 'revive') {
+                reviveOffline();
+            } else if (type === 'double') {
+                coins += 10;
+                saveData();
+                nextStageOffline();
+            } else if (type === 'free_coins') {
+                coins += 50;
+                saveData();
+                showShop();
+            }
+        }
+
         const canvas = document.getElementById('c');
         const ctx = canvas.getContext('2d', { alpha: false });
         const touchBox = document.getElementById('touch-controller');
