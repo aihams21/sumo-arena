@@ -312,6 +312,7 @@
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
+        <!-- 100% Ad-Free Online Section -->
         <div id="menu-multi" class="overlay hidden">
             <h2>ONLINE 1v1 (AD-FREE)</h2>
             <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Pure Skill</p>
@@ -552,16 +553,17 @@
         let stageEnded = false;
 
         const P2P_EQUAL_RADIUS = 24;
-        const P2P_MOVE_FORCE = 1.6;
+        const P2P_MOVE_FORCE = 1.4;
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // Optimized P2P Low-Latency Architecture
+        // Ultra-Smooth Networking Engine
         let peer = null;
         let conn = null;
         let isHost = false;
         let currentHostRoomCode = "";
         let p2pArenaRadius = BASE_ARENA_RADIUS;
+        
         let p2pPlayers = {
             host: { x: 280, y: 300, vx: 0, vy: 0, targetX: 280, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#00e5ff', alive: true, input: { dx: 0, dy: 0 } },
             guest: { x: 520, y: 300, vx: 0, vy: 0, targetX: 520, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#ff0055', alive: true, input: { dx: 0, dy: 0 } }
@@ -655,7 +657,6 @@
             showMainMenu();
         }
 
-        // Host creates clean room
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
@@ -708,7 +709,6 @@
             peer = new Peer();
             
             peer.on('open', myId => {
-                // Low latency reliable:false for gaming
                 conn = peer.connect(targetId, { reliable: false });
 
                 joinTimeout = setTimeout(() => {
@@ -739,7 +739,7 @@
             }
         });
 
-        // 30Hz Network Ticking to completely eliminate buffer bloat & lag
+        // 60Hz High-Frequency Sync
         function startNetworkTickRate() {
             if (netInterval) clearInterval(netInterval);
             
@@ -747,28 +747,30 @@
                 if (!conn || !conn.open || gameMode !== 'p2p') return;
 
                 if (isHost) {
-                    // Send compact flat array: [hX, hY, hVx, hVy, gX, gY, gVx, gVy, rad, hAlive, gAlive, scoreH, scoreG]
-                    let packet = [
-                        Math.round(p2pPlayers.host.x),
-                        Math.round(p2pPlayers.host.y),
+                    // Send compact float array
+                    conn.send([
+                        1, // Packet type 1: Host State
+                        +p2pPlayers.host.x.toFixed(1),
+                        +p2pPlayers.host.y.toFixed(1),
                         +p2pPlayers.host.vx.toFixed(2),
                         +p2pPlayers.host.vy.toFixed(2),
-                        Math.round(p2pPlayers.guest.x),
-                        Math.round(p2pPlayers.guest.y),
-                        +p2pPlayers.guest.vx.toFixed(2),
-                        +p2pPlayers.guest.vy.toFixed(2),
-                        Math.round(p2pArenaRadius),
+                        +p2pArenaRadius.toFixed(1),
                         p2pPlayers.host.alive ? 1 : 0,
                         p2pPlayers.guest.alive ? 1 : 0,
                         p2pScores.host,
                         p2pScores.guest
-                    ];
-                    conn.send(packet);
+                    ]);
                 } else {
-                    // Guest sends flat input vector [dx, dy]
-                    conn.send([+p2pPlayers.guest.input.dx.toFixed(2), +p2pPlayers.guest.input.dy.toFixed(2)]);
+                    // Packet type 2: Guest State (Authoritative Position for Zero Stutter)
+                    conn.send([
+                        2,
+                        +p2pPlayers.guest.x.toFixed(1),
+                        +p2pPlayers.guest.y.toFixed(1),
+                        +p2pPlayers.guest.vx.toFixed(2),
+                        +p2pPlayers.guest.vy.toFixed(2)
+                    ]);
                 }
-            }, 33); // 30Hz fixed interval
+            }, 16); // 60 FPS Network Sync
         }
 
         function setupHostEvents() {
@@ -784,8 +786,12 @@
             });
 
             conn.on('data', data => {
-                if (Array.isArray(data)) {
-                    p2pPlayers.guest.input = { dx: data[0], dy: data[1] };
+                if (Array.isArray(data) && data[0] === 2) {
+                    // Smoothly receive guest position on host
+                    p2pPlayers.guest.targetX = data[1];
+                    p2pPlayers.guest.targetY = data[2];
+                    p2pPlayers.guest.vx = data[3];
+                    p2pPlayers.guest.vy = data[4];
                 }
             });
 
@@ -811,21 +817,18 @@
             });
 
             conn.on('data', data => {
-                if (Array.isArray(data)) {
-                    // Update target positions for smooth interpolation (LERP)
-                    p2pPlayers.host.targetX = data[0];
-                    p2pPlayers.host.targetY = data[1];
-                    p2pPlayers.host.vx = data[2];
-                    p2pPlayers.host.vy = data[3];
-
-                    p2pPlayers.guest.targetX = data[4];
-                    p2pPlayers.guest.targetY = data[5];
+                if (Array.isArray(data) && data[0] === 1) {
+                    // Smoothly receive host position on guest
+                    p2pPlayers.host.targetX = data[1];
+                    p2pPlayers.host.targetY = data[2];
+                    p2pPlayers.host.vx = data[3];
+                    p2pPlayers.host.vy = data[4];
                     
-                    p2pArenaRadius = data[8];
-                    p2pPlayers.host.alive = (data[9] === 1);
-                    p2pPlayers.guest.alive = (data[10] === 1);
-                    p2pScores.host = data[11];
-                    p2pScores.guest = data[12];
+                    p2pArenaRadius = data[5];
+                    p2pPlayers.host.alive = (data[6] === 1);
+                    p2pPlayers.guest.alive = (data[7] === 1);
+                    p2pScores.host = data[8];
+                    p2pScores.guest = data[9];
                     
                     updateP2PHud();
 
@@ -861,8 +864,8 @@
 
         function startP2PRound() {
             p2pArenaRadius = BASE_ARENA_RADIUS;
-            p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.vx = 0; p2pPlayers.host.vy = 0; p2pPlayers.host.alive = true;
-            p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
+            p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300; p2pPlayers.host.vx = 0; p2pPlayers.host.vy = 0; p2pPlayers.host.alive = true;
+            p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
             stageEnded = false;
 
             if (conn && conn.open) {
@@ -997,7 +1000,7 @@
             }
         }
 
-        // ================= High Performance Physics =================
+        // ================= Pure Butter Smooth Physics =================
         function updatePhysics() {
             if (gameMode === 'none') return;
 
@@ -1025,80 +1028,16 @@
             let mag = Math.hypot(dx, dy);
             if (mag > 1) { dx /= mag; dy /= mag; }
 
-            // ================= Zero-Lag P2P Simulation =================
+            // ================= Zero-Stutter 1v1 Sync =================
             if (gameMode === 'p2p') {
-                if (isHost) {
-                    p2pPlayers.host.input = { dx, dy };
+                let localRole = isHost ? 'host' : 'guest';
+                let remoteRole = isHost ? 'guest' : 'host';
+                
+                let me = p2pPlayers[localRole];
+                let opp = p2pPlayers[remoteRole];
 
-                    if (!stageEnded) {
-                        for (let key of ['host', 'guest']) {
-                            let p = p2pPlayers[key];
-                            if (!p.alive) continue;
-                            
-                            p.vx += p.input.dx * P2P_MOVE_FORCE;
-                            p.vy += p.input.dy * P2P_MOVE_FORCE;
-                            p.vx *= P2P_FRICTION;
-                            p.vy *= P2P_FRICTION;
-                            p.x += p.vx;
-                            p.y += p.vy;
-
-                            if (Math.hypot(p.x - 400, p.y - 300) > p2pArenaRadius) {
-                                p.alive = false;
-                            }
-                        }
-
-                        if (p2pArenaRadius > BASE_ARENA_RADIUS * 0.6) {
-                            p2pArenaRadius -= 0.02;
-                        }
-
-                        if (p2pPlayers.host.alive && p2pPlayers.guest.alive) {
-                            let p1 = p2pPlayers.host;
-                            let p2 = p2pPlayers.guest;
-                            let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-                            if (dist < p1.radius + p2.radius) {
-                                let overlap = (p1.radius + p2.radius) - dist;
-                                let ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                                
-                                p1.x -= Math.cos(ang) * (overlap * 0.5);
-                                p1.y -= Math.sin(ang) * (overlap * 0.5);
-                                p2.x += Math.cos(ang) * (overlap * 0.5);
-                                p2.y += Math.sin(ang) * (overlap * 0.5);
-
-                                let relVx = p1.vx - p2.vx;
-                                let relVy = p1.vy - p2.vy;
-                                let impactSpeed = Math.hypot(relVx, relVy);
-                                let totalImpulse = P2P_HIT_POWER + (impactSpeed * 0.45);
-
-                                p1.vx -= Math.cos(ang) * totalImpulse;
-                                p1.vy -= Math.sin(ang) * totalImpulse;
-                                p2.vx += Math.cos(ang) * totalImpulse;
-                                p2.vy += Math.sin(ang) * totalImpulse;
-
-                                spawnImpactParticles((p1.x + p2.x)/2, (p1.y + p2.y)/2, '#00e5ff');
-                            }
-                        }
-
-                        if (!p2pPlayers.host.alive || !p2pPlayers.guest.alive) {
-                            stageEnded = true;
-                            let winner = p2pPlayers.host.alive ? 'host' : 'guest';
-                            p2pScores[winner]++;
-                            
-                            let title = document.getElementById('round-title');
-                            title.innerText = (winner === 'host') ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
-                            title.style.color = (winner === 'host') ? "#00ff66" : "#ff3366";
-                            document.getElementById('round-score').innerText = `${p2pScores.host}  -  ${p2pScores.guest}`;
-                            hideAllMenus();
-                            bannerAd.style.display = 'none';
-                            document.getElementById('modal-round').classList.remove('hidden');
-                        }
-                    }
-                } else {
-                    // Guest Client-Side Prediction: Moves instantly on touch!
-                    p2pPlayers.guest.input = { dx, dy };
-                    let me = p2pPlayers.guest;
-                    let opp = p2pPlayers.host;
-
+                if (!stageEnded) {
+                    // Local input runs on native frame rate (No stuttering ever)
                     me.vx += dx * P2P_MOVE_FORCE;
                     me.vy += dy * P2P_MOVE_FORCE;
                     me.vx *= P2P_FRICTION;
@@ -1106,17 +1045,61 @@
                     me.x += me.vx;
                     me.y += me.vy;
 
-                    // Smooth LERP reconciliation with server positions
-                    if (me.targetX !== undefined) {
-                        me.x += (me.targetX - me.x) * 0.15;
-                        me.y += (me.targetY - me.y) * 0.15;
-                    }
+                    // Opponent smoothly interpolates using Dead Reckoning (Lerp factor: 0.35)
                     if (opp.targetX !== undefined) {
-                        opp.x += (opp.targetX - opp.x) * 0.35;
-                        opp.y += (opp.targetY - opp.y) * 0.35;
+                        opp.x += (opp.targetX - opp.x) * 0.35 + (opp.vx * 0.5);
+                        opp.y += (opp.targetY - opp.y) * 0.35 + (opp.vy * 0.5);
+                    }
+
+                    // Check boundaries locally
+                    if (Math.hypot(me.x - 400, me.y - 300) > p2pArenaRadius) me.alive = false;
+                    if (Math.hypot(opp.x - 400, opp.y - 300) > p2pArenaRadius) opp.alive = false;
+
+                    if (isHost && p2pArenaRadius > BASE_ARENA_RADIUS * 0.6) {
+                        p2pArenaRadius -= 0.02;
+                    }
+
+                    // Collision Physics (Instant Local Response)
+                    if (me.alive && opp.alive) {
+                        let dist = Math.hypot(opp.x - me.x, opp.y - me.y);
+                        if (dist < me.radius + opp.radius) {
+                            let overlap = (me.radius + opp.radius) - dist;
+                            let ang = Math.atan2(opp.y - me.y, opp.x - me.x);
+                            
+                            me.x -= Math.cos(ang) * (overlap * 0.5);
+                            me.y -= Math.sin(ang) * (overlap * 0.5);
+                            opp.x += Math.cos(ang) * (overlap * 0.5);
+                            opp.y += Math.sin(ang) * (overlap * 0.5);
+
+                            let relVx = me.vx - opp.vx;
+                            let relVy = me.vy - opp.vy;
+                            let impactSpeed = Math.hypot(relVx, relVy);
+                            let totalImpulse = P2P_HIT_POWER + (impactSpeed * 0.45);
+
+                            me.vx -= Math.cos(ang) * totalImpulse;
+                            me.vy -= Math.sin(ang) * totalImpulse;
+                            opp.vx += Math.cos(ang) * totalImpulse;
+                            opp.vy += Math.sin(ang) * totalImpulse;
+
+                            spawnImpactParticles((me.x + opp.x)/2, (me.y + opp.y)/2, '#00e5ff');
+                        }
+                    }
+
+                    if (isHost && (!p2pPlayers.host.alive || !p2pPlayers.guest.alive)) {
+                        stageEnded = true;
+                        let winner = p2pPlayers.host.alive ? 'host' : 'guest';
+                        p2pScores[winner]++;
+                        
+                        let title = document.getElementById('round-title');
+                        title.innerText = (winner === 'host') ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
+                        title.style.color = (winner === 'host') ? "#00ff66" : "#ff3366";
+                        document.getElementById('round-score').innerText = `${p2pScores.host}  -  ${p2pScores.guest}`;
+                        hideAllMenus();
+                        bannerAd.style.display = 'none';
+                        document.getElementById('modal-round').classList.remove('hidden');
                     }
                 }
-            // ================= Offline Mode Physics =================
+            // ================= Offline Physics =================
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
                 let moveForce = 1.6;
                 player.vx += dx * moveForce;
