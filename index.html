@@ -286,6 +286,7 @@
             }
         }
 
+        // ================= Responsive 60FPS Synchronized Physics =================
         function updatePhysics() {
             if (gameMode === 'none') return;
             for (let i = particles.length - 1; i >= 0; i--) {
@@ -300,56 +301,47 @@
             let mag = Math.hypot(dx, dy); if (mag > 1) { dx /= mag; dy /= mag; }
 
             if (gameMode === 'p2p') {
-                if (isHost) {
-                    let h = p2pPlayers.host;
-                    let g = p2pPlayers.guest;
-                    let gIn = window.remoteGuestInput || { dx: 0, dy: 0 };
+                let me = isHost ? p2pPlayers.host : p2pPlayers.guest;
+                let opp = isHost ? p2pPlayers.guest : p2pPlayers.host;
 
-                    if (!stageEnded) {
-                        // Host Movement
-                        h.vx += dx * 1.4; h.vy += dy * 1.4;
-                        h.vx *= 0.88; h.vy *= 0.88;
-                        h.x += h.vx; h.y += h.vy;
+                if (!stageEnded) {
+                    // Local movement responds instantly (0ms input lag)
+                    me.vx += dx * 1.4; me.vy += dy * 1.4;
+                    me.vx *= 0.88; me.vy *= 0.88;
+                    me.x += me.vx; me.y += me.vy;
 
-                        // Guest Movement based on remote touch inputs
-                        g.vx += gIn.dx * 1.4; g.vy += gIn.dy * 1.4;
-                        g.vx *= 0.88; g.vy *= 0.88;
-                        g.x += g.vx; g.y += g.vy;
+                    // Opponent smoothly moves to target position
+                    if (opp.targetX !== undefined) {
+                        opp.x += (opp.targetX - opp.x) * 0.45;
+                        opp.y += (opp.targetY - opp.y) * 0.45;
+                    }
 
-                        if (Math.hypot(h.x - 400, h.y - 300) > p2pArenaRadius) h.alive = false;
-                        if (Math.hypot(g.x - 400, g.y - 300) > p2pArenaRadius) g.alive = false;
-                        if (p2pArenaRadius > 144) p2pArenaRadius -= 0.02;
+                    if (Math.hypot(me.x - 400, me.y - 300) > p2pArenaRadius) me.alive = false;
+                    if (isHost && p2pArenaRadius > 144) p2pArenaRadius -= 0.02;
 
-                        if (h.alive && g.alive) {
-                            let d = Math.hypot(g.x - h.x, g.y - h.y);
-                            if (d < h.radius + g.radius) {
-                                let ov = (h.radius + g.radius) - d, a = Math.atan2(g.y - h.y, g.x - h.x);
-                                h.x -= Math.cos(a) * (ov * 0.5); h.y -= Math.sin(a) * (ov * 0.5);
-                                g.x += Math.cos(a) * (ov * 0.5); g.y += Math.sin(a) * (ov * 0.5);
-                                let imp = 8.5 + (Math.hypot(h.vx - g.vx, h.vy - g.vy) * 0.45);
-                                h.vx -= Math.cos(a) * imp; h.vy -= Math.sin(a) * imp;
-                                g.vx += Math.cos(a) * imp; g.vy += Math.sin(a) * imp;
-                                spawnImpact((h.x + g.x) / 2, (h.y + g.y) / 2, '#00e5ff');
-                            }
-                        }
-
-                        if (!h.alive || !g.alive) {
-                            stageEnded = true; p2pScores[h.alive ? 'host' : 'guest']++;
-                            showOnlineEnd(h.alive);
+                    // Collision between host and guest
+                    if (me.alive && opp.alive) {
+                        let d = Math.hypot(opp.x - me.x, opp.y - me.y);
+                        if (d < me.radius + opp.radius) {
+                            let ov = (me.radius + opp.radius) - d, a = Math.atan2(opp.y - me.y, opp.x - me.x);
+                            me.x -= Math.cos(a) * (ov * 0.5); me.y -= Math.sin(a) * (ov * 0.5);
+                            opp.x += Math.cos(a) * (ov * 0.5); opp.y += Math.sin(a) * (ov * 0.5);
+                            let imp = 8.5 + (Math.hypot(me.vx - opp.vx, me.vy - opp.vy) * 0.45);
+                            me.vx -= Math.cos(a) * imp; me.vy -= Math.sin(a) * imp;
+                            opp.vx += Math.cos(a) * imp; opp.vy += Math.sin(a) * imp;
+                            spawnImpact((me.x + opp.x) / 2, (me.y + opp.y) / 2, '#00e5ff');
                         }
                     }
-                } else {
-                    // Guest rendering: smoothly glides toward authoritative server positions
-                    let h = p2pPlayers.host;
-                    let g = p2pPlayers.guest;
 
-                    if (h.targetX !== undefined) {
-                        h.x += (h.targetX - h.x) * 0.4;
-                        h.y += (h.targetY - h.y) * 0.4;
-                    }
-                    if (g.targetX !== undefined) {
-                        g.x += (g.targetX - g.x) * 0.4;
-                        g.y += (g.targetY - g.y) * 0.4;
+                    // Host decides round completion
+                    if (isHost && (!p2pPlayers.host.alive || !p2pPlayers.guest.alive)) {
+                        stageEnded = true;
+                        let winner = p2pPlayers.host.alive ? 'host' : 'guest';
+                        p2pScores[winner]++;
+                        if (ws && ws.readyState === 1) {
+                            ws.send(JSON.stringify({ type: 'round_over', winner, scores: p2pScores }));
+                        }
+                        showOnlineEnd(winner === 'host');
                     }
                 }
             } else if (gameMode === 'offline' && player.alive && !stageEnded) {
@@ -401,6 +393,10 @@
                         let p = p2pPlayers[k]; if (!p.alive) continue;
                         ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill();
                         ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+
+                        let isMe = (isHost && k === 'host') || (!isHost && k === 'guest');
+                        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText(isMe ? "YOU" : "OPPONENT", p.x, p.y - p.radius - 8);
                     }
                 } else {
                     for (let b of bots) {
