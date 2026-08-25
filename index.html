@@ -239,7 +239,6 @@
             box-shadow: 0 0 10px rgba(0, 229, 255, 0.8);
         }
     </style>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div id="banner-ad" onclick="triggerSmartlinkDirect('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
@@ -314,12 +313,12 @@
 
         <!-- 100% Ad-Free Online Section -->
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (AD-FREE)</h2>
-            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Pure Skill</p>
-            <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
+            <h2>ONLINE 1v1 (DEDICATED EU SERVER)</h2>
+            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">Ultra Low Latency | Pure Skill</p>
+            <button class="btn btn-cyan" onclick="createOnlineRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="ROOM CODE">
-            <button id="btn-join" class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
+            <input type="text" id="room-input" placeholder="4-DIGIT CODE (e.g. 5421)" maxlength="4">
+            <button id="btn-join" class="btn btn-magenta" onclick="joinOnlineRoom()">🚀 Join Room</button>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
@@ -334,7 +333,7 @@
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
-            <button class="btn btn-cyan" onclick="restartP2PRound()">Next Round ➔</button>
+            <button class="btn btn-cyan" onclick="restartOnlineRound()">Next Round ➔</button>
             <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
@@ -557,19 +556,18 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // Ultra-Smooth Networking Engine
-        let peer = null;
-        let conn = null;
+        // Dedicated WebSocket Relay Server
+        const SERVER_WS_URL = "wss://sumo-server.onrender.com";
+        let ws = null;
         let isHost = false;
-        let currentHostRoomCode = "";
+        let currentRoomCode = "";
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         
         let p2pPlayers = {
-            host: { x: 280, y: 300, vx: 0, vy: 0, targetX: 280, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#00e5ff', alive: true, input: { dx: 0, dy: 0 } },
-            guest: { x: 520, y: 300, vx: 0, vy: 0, targetX: 520, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#ff0055', alive: true, input: { dx: 0, dy: 0 } }
+            host: { x: 280, y: 300, vx: 0, vy: 0, targetX: 280, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#00e5ff', alive: true },
+            guest: { x: 520, y: 300, vx: 0, vy: 0, targetX: 520, targetY: 300, radius: P2P_EQUAL_RADIUS, color: '#ff0055', alive: true }
         };
         let p2pScores = { host: 0, guest: 0 };
-        let joinTimeout = null;
         let netInterval = null;
 
         window.onkeydown = e => keys[e.key.toLowerCase()] = true;
@@ -586,10 +584,8 @@
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
-            if (joinTimeout) clearTimeout(joinTimeout);
             if (netInterval) { clearInterval(netInterval); netInterval = null; }
-            if (conn) { conn.close(); conn = null; }
-            if (peer) { peer.destroy(); peer = null; }
+            if (ws) { ws.close(); ws = null; }
             updateCoinDisplays();
             document.getElementById('menu-main').classList.remove('hidden');
         }
@@ -657,153 +653,86 @@
             showMainMenu();
         }
 
-        function createP2PRoom() {
+        function connectWebSocket(callback) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                callback();
+                return;
+            }
+            ws = new WebSocket(SERVER_WS_URL);
+            ws.onopen = () => callback();
+            ws.onmessage = (event) => handleServerMessage(event.data);
+            ws.onerror = (err) => console.error("WS Error:", err);
+            ws.onclose = () => {
+                if (gameMode === 'p2p') {
+                    alert("Disconnected from European Game Server.");
+                    exitToMenu();
+                }
+            };
+        }
+
+        function createOnlineRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
             isHost = true;
             
-            if (peer) { peer.destroy(); peer = null; }
-            peer = new Peer();
-            
-            peer.on('open', id => {
-                currentHostRoomCode = id;
-                document.getElementById('lobby-code').innerText = id;
-                document.getElementById('menu-lobby').classList.remove('hidden');
-            });
+            document.getElementById('lobby-code').innerText = "Connecting...";
+            document.getElementById('menu-lobby').classList.remove('hidden');
 
-            peer.on('connection', c => {
-                conn = c;
-                setupHostEvents();
-            });
-
-            peer.on('error', err => {
-                alert('Signaling error: ' + err.type);
-                showMultiMenu();
+            connectWebSocket(() => {
+                ws.send(JSON.stringify({ type: 'create' }));
             });
         }
 
-        function shareRoomWhatsApp() {
-            let link = `${window.location.origin}${window.location.pathname}#room=${encodeURIComponent(currentHostRoomCode)}`;
-            let msg = encodeURIComponent(`🔥 Challenge me in Neon Sumo Arena 1v1! Click here to join: ${link}`);
-            window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
-        }
+        function joinOnlineRoom(directCode = null) {
+            let code = directCode || document.getElementById('room-input').value.trim();
+            if (!code) return alert("Please enter the 4-digit room code!");
 
-        function copyRoomLink() {
-            let link = `${window.location.origin}${window.location.pathname}#room=${encodeURIComponent(currentHostRoomCode)}`;
-            navigator.clipboard.writeText(link).then(() => {
-                alert("✅ Invite link copied to clipboard!");
-            });
-        }
-
-        function joinP2PRoom(directCode = null) {
-            let targetId = (directCode || document.getElementById('room-input').value).trim();
-            if (!targetId) return alert("Please enter the room code!");
-            
             let joinBtn = document.getElementById('btn-join');
             if (joinBtn) joinBtn.innerText = "Connecting...";
 
             isHost = false;
             bannerAd.style.display = 'none';
 
-            if (peer) { peer.destroy(); peer = null; }
-            peer = new Peer();
-            
-            peer.on('open', myId => {
-                conn = peer.connect(targetId, { reliable: false });
-
-                joinTimeout = setTimeout(() => {
-                    if (joinBtn && joinBtn.innerText === "Connecting...") {
-                        joinBtn.innerText = "🚀 Join Room";
-                        alert("Room not found or Host is offline. Ensure Host is waiting in the room!");
-                    }
-                }, 10000);
-
-                setupGuestEvents();
-            });
-
-            peer.on('error', err => {
-                if (joinTimeout) clearTimeout(joinTimeout);
-                if (joinBtn) joinBtn.innerText = "🚀 Join Room";
-                alert('Connection error: ' + err.type);
+            connectWebSocket(() => {
+                ws.send(JSON.stringify({ type: 'join', room: code }));
             });
         }
 
-        window.addEventListener('load', () => {
-            if (window.location.hash && window.location.hash.includes('room=')) {
-                let code = decodeURIComponent(window.location.hash.split('room=')[1]);
-                if (code) {
-                    setTimeout(() => {
-                        joinP2PRoom(code);
-                    }, 500);
-                }
-            }
-        });
-
-        // 60Hz High-Frequency Sync
-        function startNetworkTickRate() {
-            if (netInterval) clearInterval(netInterval);
-            
-            netInterval = setInterval(() => {
-                if (!conn || !conn.open || gameMode !== 'p2p') return;
-
-                if (isHost) {
-                    // Send compact float array
-                    conn.send([
-                        1, // Packet type 1: Host State
-                        +p2pPlayers.host.x.toFixed(1),
-                        +p2pPlayers.host.y.toFixed(1),
-                        +p2pPlayers.host.vx.toFixed(2),
-                        +p2pPlayers.host.vy.toFixed(2),
-                        +p2pArenaRadius.toFixed(1),
-                        p2pPlayers.host.alive ? 1 : 0,
-                        p2pPlayers.guest.alive ? 1 : 0,
-                        p2pScores.host,
-                        p2pScores.guest
-                    ]);
-                } else {
-                    // Packet type 2: Guest State (Authoritative Position for Zero Stutter)
-                    conn.send([
-                        2,
-                        +p2pPlayers.guest.x.toFixed(1),
-                        +p2pPlayers.guest.y.toFixed(1),
-                        +p2pPlayers.guest.vx.toFixed(2),
-                        +p2pPlayers.guest.vy.toFixed(2)
-                    ]);
-                }
-            }, 16); // 60 FPS Network Sync
+        function shareRoomWhatsApp() {
+            let link = `${window.location.origin}${window.location.pathname}#room=${currentRoomCode}`;
+            let msg = encodeURIComponent(`🔥 Challenge me in Neon Sumo Arena 1v1! Click here to join: ${link}`);
+            window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
         }
 
-        function setupHostEvents() {
-            conn.on('open', () => {
+        function copyRoomLink() {
+            let link = `${window.location.origin}${window.location.pathname}#room=${currentRoomCode}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert("✅ Invite link copied to clipboard!");
+            });
+        }
+
+        function handleServerMessage(msg) {
+            let data;
+            try {
+                data = JSON.parse(msg);
+            } catch (e) { return; }
+
+            if (data.type === 'created') {
+                currentRoomCode = data.room;
+                document.getElementById('lobby-code').innerText = data.room;
+            } else if (data.type === 'player_joined') {
+                // Host starts the game
                 gameMode = 'p2p';
                 hideAllMenus();
                 bannerAd.style.display = 'none';
                 hudCoinsCard.style.display = 'none';
                 document.getElementById('hud').classList.remove('hidden');
                 touchBox.style.display = 'block';
-                startP2PRound();
-                startNetworkTickRate();
-            });
-
-            conn.on('data', data => {
-                if (Array.isArray(data) && data[0] === 2) {
-                    // Smoothly receive guest position on host
-                    p2pPlayers.guest.targetX = data[1];
-                    p2pPlayers.guest.targetY = data[2];
-                    p2pPlayers.guest.vx = data[3];
-                    p2pPlayers.guest.vy = data[4];
-                }
-            });
-
-            conn.on('close', () => {
-                alert('Opponent disconnected.');
-                exitToMenu();
-            });
-        }
-
-        function setupGuestEvents() {
-            conn.on('open', () => {
-                if (joinTimeout) clearTimeout(joinTimeout);
+                startOnlineRound();
+                startNetworkSync();
+            } else if (data.type === 'joined') {
+                // Guest joins
+                currentRoomCode = data.room;
                 let joinBtn = document.getElementById('btn-join');
                 if (joinBtn) joinBtn.innerText = "🚀 Join Room";
 
@@ -813,23 +742,23 @@
                 hudCoinsCard.style.display = 'none';
                 document.getElementById('hud').classList.remove('hidden');
                 touchBox.style.display = 'block';
-                startNetworkTickRate();
-            });
-
-            conn.on('data', data => {
-                if (Array.isArray(data) && data[0] === 1) {
-                    // Smoothly receive host position on guest
-                    p2pPlayers.host.targetX = data[1];
-                    p2pPlayers.host.targetY = data[2];
-                    p2pPlayers.host.vx = data[3];
-                    p2pPlayers.host.vy = data[4];
-                    
-                    p2pArenaRadius = data[5];
-                    p2pPlayers.host.alive = (data[6] === 1);
-                    p2pPlayers.guest.alive = (data[7] === 1);
-                    p2pScores.host = data[8];
-                    p2pScores.guest = data[9];
-                    
+                startNetworkSync();
+            } else if (data.type === 'state') {
+                // Smooth state replication
+                if (isHost) {
+                    p2pPlayers.guest.targetX = data.x;
+                    p2pPlayers.guest.targetY = data.y;
+                    p2pPlayers.guest.vx = data.vx;
+                    p2pPlayers.guest.vy = data.vy;
+                } else {
+                    p2pPlayers.host.targetX = data.hx;
+                    p2pPlayers.host.targetY = data.hy;
+                    p2pPlayers.host.vx = data.hvx;
+                    p2pPlayers.host.vy = data.hvy;
+                    p2pArenaRadius = data.rad;
+                    p2pPlayers.host.alive = data.hAlive;
+                    p2pPlayers.guest.alive = data.gAlive;
+                    p2pScores = data.scores;
                     updateP2PHud();
 
                     if (!p2pPlayers.host.alive || !p2pPlayers.guest.alive) {
@@ -837,39 +766,69 @@
                         let won = p2pPlayers.guest.alive;
                         title.innerText = won ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
                         title.style.color = won ? "#00ff66" : "#ff3366";
-                        
                         document.getElementById('round-score').innerText = `${p2pScores.guest}  -  ${p2pScores.host}`;
                         hideAllMenus();
                         bannerAd.style.display = 'none';
                         document.getElementById('modal-round').classList.remove('hidden');
                     }
-                } else if (data === 'start_round') {
-                    p2pArenaRadius = BASE_ARENA_RADIUS;
-                    p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300; p2pPlayers.host.alive = true;
-                    p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300; p2pPlayers.guest.alive = true;
-                    stageEnded = false;
-                    hideAllMenus();
-                    bannerAd.style.display = 'none';
-                    hudCoinsCard.style.display = 'none';
-                    document.getElementById('hud').classList.remove('hidden');
-                    touchBox.style.display = 'block';
                 }
-            });
-
-            conn.on('close', () => {
-                alert('Opponent disconnected.');
+            } else if (data.type === 'start_round') {
+                p2pArenaRadius = BASE_ARENA_RADIUS;
+                p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300; p2pPlayers.host.alive = true;
+                p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300; p2pPlayers.guest.alive = true;
+                stageEnded = false;
+                hideAllMenus();
+                bannerAd.style.display = 'none';
+                hudCoinsCard.style.display = 'none';
+                document.getElementById('hud').classList.remove('hidden');
+                touchBox.style.display = 'block';
+            } else if (data.type === 'error') {
+                let joinBtn = document.getElementById('btn-join');
+                if (joinBtn) joinBtn.innerText = "🚀 Join Room";
+                alert(data.message);
+            } else if (data.type === 'opponent_left') {
+                alert("Opponent left the match.");
                 exitToMenu();
-            });
+            }
         }
 
-        function startP2PRound() {
+        function startNetworkSync() {
+            if (netInterval) clearInterval(netInterval);
+            netInterval = setInterval(() => {
+                if (!ws || ws.readyState !== WebSocket.OPEN || gameMode !== 'p2p') return;
+
+                if (isHost) {
+                    ws.send(JSON.stringify({
+                        type: 'state',
+                        hx: +p2pPlayers.host.x.toFixed(1),
+                        hy: +p2pPlayers.host.y.toFixed(1),
+                        hvx: +p2pPlayers.host.vx.toFixed(2),
+                        hvy: +p2pPlayers.host.vy.toFixed(2),
+                        rad: +p2pArenaRadius.toFixed(1),
+                        hAlive: p2pPlayers.host.alive,
+                        gAlive: p2pPlayers.guest.alive,
+                        scores: p2pScores
+                    }));
+                } else {
+                    ws.send(JSON.stringify({
+                        type: 'state',
+                        x: +p2pPlayers.guest.x.toFixed(1),
+                        y: +p2pPlayers.guest.y.toFixed(1),
+                        vx: +p2pPlayers.guest.vx.toFixed(2),
+                        vy: +p2pPlayers.guest.vy.toFixed(2)
+                    }));
+                }
+            }, 16); // 60 FPS Sync
+        }
+
+        function startOnlineRound() {
             p2pArenaRadius = BASE_ARENA_RADIUS;
             p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300; p2pPlayers.host.vx = 0; p2pPlayers.host.vy = 0; p2pPlayers.host.alive = true;
             p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
             stageEnded = false;
 
-            if (conn && conn.open) {
-                conn.send('start_round');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'start_round' }));
             }
             hideAllMenus();
             bannerAd.style.display = 'none';
@@ -879,9 +838,9 @@
             updateP2PHud();
         }
 
-        function restartP2PRound() {
+        function restartOnlineRound() {
             if (isHost) {
-                startP2PRound();
+                startOnlineRound();
             } else {
                 alert("Waiting for Host to start next round...");
             }
@@ -892,6 +851,17 @@
             let oppScore = isHost ? p2pScores.guest : p2pScores.host;
             document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
         }
+
+        window.addEventListener('load', () => {
+            if (window.location.hash && window.location.hash.includes('room=')) {
+                let code = window.location.hash.split('room=')[1];
+                if (code) {
+                    setTimeout(() => {
+                        joinOnlineRoom(code);
+                    }, 500);
+                }
+            }
+        });
 
         function startOfflineStage(lvl) {
             gameMode = 'offline';
@@ -1028,7 +998,7 @@
             let mag = Math.hypot(dx, dy);
             if (mag > 1) { dx /= mag; dy /= mag; }
 
-            // ================= Zero-Stutter 1v1 Sync =================
+            // ================= Dedicated Server Ultra 1v1 Sync =================
             if (gameMode === 'p2p') {
                 let localRole = isHost ? 'host' : 'guest';
                 let remoteRole = isHost ? 'guest' : 'host';
@@ -1037,7 +1007,6 @@
                 let opp = p2pPlayers[remoteRole];
 
                 if (!stageEnded) {
-                    // Local input runs on native frame rate (No stuttering ever)
                     me.vx += dx * P2P_MOVE_FORCE;
                     me.vy += dy * P2P_MOVE_FORCE;
                     me.vx *= P2P_FRICTION;
@@ -1045,13 +1014,11 @@
                     me.x += me.vx;
                     me.y += me.vy;
 
-                    // Opponent smoothly interpolates using Dead Reckoning (Lerp factor: 0.35)
                     if (opp.targetX !== undefined) {
                         opp.x += (opp.targetX - opp.x) * 0.35 + (opp.vx * 0.5);
                         opp.y += (opp.targetY - opp.y) * 0.35 + (opp.vy * 0.5);
                     }
 
-                    // Check boundaries locally
                     if (Math.hypot(me.x - 400, me.y - 300) > p2pArenaRadius) me.alive = false;
                     if (Math.hypot(opp.x - 400, opp.y - 300) > p2pArenaRadius) opp.alive = false;
 
@@ -1059,7 +1026,6 @@
                         p2pArenaRadius -= 0.02;
                     }
 
-                    // Collision Physics (Instant Local Response)
                     if (me.alive && opp.alive) {
                         let dist = Math.hypot(opp.x - me.x, opp.y - me.y);
                         if (dist < me.radius + opp.radius) {
