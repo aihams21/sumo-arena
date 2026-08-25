@@ -5,7 +5,7 @@ let p2pPlayers = {
     guest: { x: 520, y: 300, vx: 0, vy: 0, targetX: 520, targetY: 300, radius: 24, color: '#ff0055', alive: true }
 };
 let p2pScores = { host: 0, guest: 0 };
-let guestInput = { dx: 0, dy: 0 };
+window.remoteGuestInput = { dx: 0, dy: 0 };
 
 function connectWS(cb) {
     if (ws && ws.readyState === 1) return cb();
@@ -15,29 +15,30 @@ function connectWS(cb) {
     ws.onmessage = (e) => {
         let msg = e.data;
 
-        // Fast CSV Stream Handling
-        if (typeof msg === 'string' && msg.startsWith('S:')) {
-            let p = msg.substring(2).split(',');
-            if (isHost) {
-                // Host receives Guest Input: S:dx,dy
-                guestInput.dx = parseFloat(p[0]) || 0;
-                guestInput.dy = parseFloat(p[1]) || 0;
-            } else {
-                // Guest receives World State: S:hx,hy,gx,gy,rad,hAlive,gAlive,scH,scG
-                p2pPlayers.host.targetX = parseFloat(p[0]);
-                p2pPlayers.host.targetY = parseFloat(p[1]);
-                p2pPlayers.guest.targetX = parseFloat(p[2]);
-                p2pPlayers.guest.targetY = parseFloat(p[3]);
-                p2pArenaRadius = parseFloat(p[4]);
-                p2pPlayers.host.alive = (p[5] === '1');
-                p2pPlayers.guest.alive = (p[6] === '1');
-                p2pScores.host = parseInt(p[7]) || 0;
-                p2pScores.guest = parseInt(p[8]) || 0;
-                updateP2PHud();
+        if (typeof msg === 'string' && msg.startsWith('G:')) {
+            // Host receives input from guest: G:dx,dy
+            let parts = msg.substring(2).split(',');
+            window.remoteGuestInput.dx = parseFloat(parts[0]) || 0;
+            window.remoteGuestInput.dy = parseFloat(parts[1]) || 0;
+            return;
+        }
 
-                if (!p2pPlayers.host.alive || !p2pPlayers.guest.alive) {
-                    showOnlineEnd(p2pPlayers.guest.alive);
-                }
+        if (typeof msg === 'string' && msg.startsWith('H:')) {
+            // Guest receives full game state from host: H:hx,hy,gx,gy,rad,hAlive,gAlive,scH,scG
+            let p = msg.substring(2).split(',');
+            p2pPlayers.host.targetX = parseFloat(p[0]);
+            p2pPlayers.host.targetY = parseFloat(p[1]);
+            p2pPlayers.guest.targetX = parseFloat(p[2]);
+            p2pPlayers.guest.targetY = parseFloat(p[3]);
+            p2pArenaRadius = parseFloat(p[4]);
+            p2pPlayers.host.alive = (p[5] === '1');
+            p2pPlayers.guest.alive = (p[6] === '1');
+            p2pScores.host = parseInt(p[7]) || 0;
+            p2pScores.guest = parseInt(p[8]) || 0;
+            updateP2PHud();
+
+            if (!p2pPlayers.host.alive || !p2pPlayers.guest.alive) {
+                showOnlineEnd(p2pPlayers.guest.alive);
             }
             return;
         }
@@ -89,18 +90,17 @@ function startOnlineGame() {
 
     if (netInterval) clearInterval(netInterval);
     
-    // Fixed 30Hz ultra lightweight CSV Sync
     netInterval = setInterval(() => {
         if (!ws || ws.readyState !== 1 || gameMode !== 'p2p') return;
         if (isHost) {
-            let payload = `S:${Math.round(p2pPlayers.host.x)},${Math.round(p2pPlayers.host.y)},${Math.round(p2pPlayers.guest.x)},${Math.round(p2pPlayers.guest.y)},${Math.round(p2pArenaRadius)},${p2pPlayers.host.alive?1:0},${p2pPlayers.guest.alive?1:0},${p2pScores.host},${p2pScores.guest}`;
+            let payload = `H:${Math.round(p2pPlayers.host.x)},${Math.round(p2pPlayers.host.y)},${Math.round(p2pPlayers.guest.x)},${Math.round(p2pPlayers.guest.y)},${Math.round(p2pArenaRadius)},${p2pPlayers.host.alive?1:0},${p2pPlayers.guest.alive?1:0},${p2pScores.host},${p2pScores.guest}`;
             ws.send(payload);
         } else {
             let dx = touchVec.x || (keys['arrowright']||keys['d']?1:keys['arrowleft']||keys['a']?-1:0);
             let dy = touchVec.y || (keys['arrowdown']||keys['s']?1:keys['arrowup']||keys['w']?-1:0);
-            ws.send(`S:${dx.toFixed(2)},${dy.toFixed(2)}`);
+            ws.send(`G:${dx.toFixed(2)},${dy.toFixed(2)}`);
         }
-    }, 33);
+    }, 20); // 50Hz Fast Synchronization
 }
 
 function resetP2PRound() {
@@ -109,7 +109,7 @@ function resetP2PRound() {
     p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
     p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300;
     p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300;
-    guestInput.dx = 0; guestInput.dy = 0;
+    window.remoteGuestInput = { dx: 0, dy: 0 };
     stageEnded = false; hideAllMenus();
     document.getElementById('hud').classList.remove('hidden');
     touchBox.style.display = 'block'; updateP2PHud();
