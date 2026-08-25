@@ -280,7 +280,7 @@
                 <div class="shop-card">
                     <div style="text-align:left;">
                         <div style="font-size:13px; font-weight:bold;">🏋️ Weight (الوزن)</div>
-                        <div style="font-size:10px; color:#aaa;">ثبات وقوة تحمل أكبر ضد البوتات</div>
+                        <div style="font-size:10px; color:#aaa;">ثبات وقوة تحمل أكبر ضد البوتات والبوس</div>
                     </div>
                     <button class="shop-btn" id="buy-weight" onclick="buyUpgrade('weight')">Buy</button>
                 </div>
@@ -322,7 +322,6 @@
             <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
-        <!-- Loss Screen with Direct In-Place Revive, Retry, and Main Menu -->
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
             <button class="btn btn-green" onclick="handleAdClickWithCounter('revive')">📺 Revive In Place: Visit 5x (<span id="count-revive">0/5</span>)</button>
@@ -770,18 +769,20 @@
             let isBossLevel = (lvl % 5 === 0);
 
             if (isBossLevel) {
+                // Hard Boss: Super Armor, Heavy Mass, Rapid Furious Dash
                 bots.push({
                     x: 400,
-                    y: 150,
+                    y: 140,
                     vx: 0, vy: 0,
-                    radius: player.radius * 1.25,
-                    mass: playerStatMass * 1.25,
-                    speed: 0.52,
-                    power: playerStatPower * 1.25,
+                    radius: Math.max(34, player.radius * 1.35),
+                    mass: Math.max(3.2, playerStatMass * 2.2),
+                    speed: 0.42,
+                    power: Math.max(12.0, playerStatPower * 1.85),
                     color: '#ff0055',
                     isBoss: true,
                     alive: true,
-                    dashCooldown: 0
+                    dashCooldown: 0,
+                    isDashing: false
                 });
             } else {
                 let botCount = Math.min(1 + Math.floor(lvl / 3), 3);
@@ -800,7 +801,8 @@
                         color: lvl >= 6 ? '#ff6600' : '#ffaa00',
                         isBoss: false,
                         alive: true,
-                        dashCooldown: Math.floor(Math.random() * 50)
+                        dashCooldown: Math.floor(Math.random() * 50),
+                        isDashing: false
                     });
                 }
             }
@@ -808,7 +810,6 @@
             updateCoinDisplays();
         }
 
-        // Revive directly in place without resetting the stage
         function reviveInPlaceOffline() {
             stageEnded = false;
             player.x = 400;
@@ -822,7 +823,6 @@
             touchBox.style.display = 'block';
         }
 
-        // Direct Retry from death screen
         function retryStageDirectly() {
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
@@ -987,16 +987,28 @@
                     b.dashCooldown = (b.dashCooldown || 0) + 1;
                     let currentBotSpeed = b.speed;
                     
-                    if (b.dashCooldown > 70) {
-                        currentBotSpeed *= 2.2;
-                        if (b.dashCooldown > 95) b.dashCooldown = 0;
+                    if (b.isBoss) {
+                        // Boss AI: Smart Charge every 80 frames with high velocity
+                        if (b.dashCooldown > 75) {
+                            currentBotSpeed *= 2.8;
+                            b.isDashing = true;
+                            if (b.dashCooldown > 105) {
+                                b.dashCooldown = 0;
+                                b.isDashing = false;
+                            }
+                        }
+                    } else {
+                        if (b.dashCooldown > 70) {
+                            currentBotSpeed *= 2.2;
+                            if (b.dashCooldown > 95) b.dashCooldown = 0;
+                        }
                     }
 
                     b.vx += Math.cos(angToPlayer) * currentBotSpeed;
                     b.vy += Math.sin(angToPlayer) * currentBotSpeed;
 
-                    b.vx *= 0.89;
-                    b.vy *= 0.89;
+                    b.vx *= (b.isBoss ? 0.92 : 0.89);
+                    b.vy *= (b.isBoss ? 0.92 : 0.89);
                     b.x += b.vx;
                     b.y += b.vy;
 
@@ -1012,10 +1024,13 @@
                         let overlap = (player.radius + b.radius) - cdist;
                         let cang = Math.atan2(cdy, cdx);
 
-                        player.x -= Math.cos(cang) * (overlap * 0.45);
-                        player.y -= Math.sin(cang) * (overlap * 0.45);
-                        b.x += Math.cos(cang) * (overlap * 0.55);
-                        b.y += Math.sin(cang) * (overlap * 0.55);
+                        let playerWeightRatio = b.isBoss ? 0.75 : 0.45;
+                        let botWeightRatio = b.isBoss ? 0.25 : 0.55;
+
+                        player.x -= Math.cos(cang) * (overlap * playerWeightRatio);
+                        player.y -= Math.sin(cang) * (overlap * playerWeightRatio);
+                        b.x += Math.cos(cang) * (overlap * botWeightRatio);
+                        b.y += Math.sin(cang) * (overlap * botWeightRatio);
 
                         let playerMass = 1.0 + (upgrades.weight * 0.25);
                         let playerHitPower = 6.0 + (upgrades.power * 1.5);
@@ -1023,8 +1038,10 @@
                         let playerSpeedMag = Math.hypot(player.vx, player.vy);
                         let totalPlayerPush = playerHitPower * (1 + playerSpeedMag * 0.25);
 
-                        player.vx -= Math.cos(cang) * (b.power / playerMass);
-                        player.vy -= Math.sin(cang) * (b.power / playerMass);
+                        let bossHitBonus = (b.isBoss && b.isDashing) ? 1.5 : 1.0;
+
+                        player.vx -= Math.cos(cang) * ((b.power * bossHitBonus) / playerMass);
+                        player.vy -= Math.sin(cang) * ((b.power * bossHitBonus) / playerMass);
                         b.vx += Math.cos(cang) * (totalPlayerPush / b.mass);
                         b.vy += Math.sin(cang) * (totalPlayerPush / b.mass);
 
@@ -1105,16 +1122,16 @@
                         ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
                         ctx.fillStyle = b.color;
                         ctx.shadowColor = b.isBoss ? '#ff0055' : b.color;
-                        ctx.shadowBlur = b.isBoss ? 20 : 10;
+                        ctx.shadowBlur = b.isBoss ? 25 : 10;
                         ctx.fill();
                         ctx.shadowBlur = 0;
-                        ctx.lineWidth = b.isBoss ? 4 : 2;
+                        ctx.lineWidth = b.isBoss ? 4.5 : 2;
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
 
                         if (b.isBoss) {
                             ctx.fillStyle = '#ff0055';
-                            ctx.font = 'bold 12px Segoe UI, sans-serif';
+                            ctx.font = 'bold 13px Segoe UI, sans-serif';
                             ctx.textAlign = 'center';
                             ctx.fillText("👑 BOSS", b.x, b.y - b.radius - 8);
                         }
