@@ -293,7 +293,7 @@
                     <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
                 </div>
 
-                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">🎁 Sponsor: Visit 5x for +50🪙 (<span id="count-free_coins">0/5</span>)</button>
+                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">🎁 Sponsor: Visit 10x for +50🪙 (<span id="count-free_coins">0/10</span>)</button>
             </div>
 
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
@@ -331,7 +331,7 @@
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
             <p style="margin-bottom: 10px; color:#ffbb00; font-size: 14px;">+5 Coins Earned! 🪙</p>
-            <button class="btn btn-gold" onclick="handleAdClickWithCounter('double')">🪙 2x Bonus: Visit 5x for +10🪙 (<span id="count-double">0/5</span>)</button>
+            <button class="btn btn-gold" onclick="handleAdClickWithCounter('double')">🪙 2x Bonus: Visit 10x for +10🪙 (<span id="count-double">0/10</span>)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
@@ -340,28 +340,36 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
+        // Click Counters with Custom Limits
         const clickCounters = {
             free_coins: 0,
             revive: 0,
             double: 0
         };
 
+        const targetLimits = {
+            free_coins: 10,
+            revive: 5,
+            double: 10
+        };
+
         function handleAdClickWithCounter(type) {
             window.open(SMARTLINK_URL, '_blank');
             clickCounters[type]++;
 
+            let maxTarget = targetLimits[type];
             let labelEl = document.getElementById(`count-${type}`);
-            if (labelEl) labelEl.innerText = `${clickCounters[type]}/5`;
+            if (labelEl) labelEl.innerText = `${clickCounters[type]}/${maxTarget}`;
 
-            if (clickCounters[type] >= 5) {
+            if (clickCounters[type] >= maxTarget) {
                 clickCounters[type] = 0;
-                if (labelEl) labelEl.innerText = `0/5`;
+                if (labelEl) labelEl.innerText = `0/${maxTarget}`;
 
                 if (type === 'free_coins') {
                     coins += 50;
                     saveData();
                     showShop();
-                    alert("🎉 5 Visits Verified! +50 Coins Added!");
+                    alert("🎉 10 Visits Verified! +50 Coins Added!");
                 } else if (type === 'revive') {
                     reviveInPlaceOffline();
                 } else if (type === 'double') {
@@ -372,6 +380,7 @@
             }
         }
 
+        // 1-Click direct ads
         function triggerSmartlinkDirect(type) {
             window.open(SMARTLINK_URL, '_blank');
         }
@@ -543,7 +552,7 @@
         function showShop() {
             hideAllMenus();
             updateCoinDisplays();
-            document.getElementById('count-free_coins').innerText = `${clickCounters.free_coins}/5`;
+            document.getElementById('count-free_coins').innerText = `${clickCounters.free_coins}/10`;
 
             document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
             document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
