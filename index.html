@@ -259,28 +259,21 @@
             </div>
         </div>
 
-        <!-- Main Menu with always visible Install Button -->
         <div id="menu-main" class="overlay">
             <h1>NEON SUMO ARENA</h1>
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
             <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
-            <button class="btn btn-green" onclick="handleInstallClick()">📲 Install App / Add to Home</button>
+            <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
         </div>
 
-        <!-- iOS & General Install Instructions Modal -->
-        <div id="modal-ios-install" class="overlay hidden">
-            <h2>📲 HOW TO INSTALL</h2>
-            <div style="background:#111420; border:1px solid #20263a; border-radius:10px; padding:15px; max-width:320px; text-align:left; font-size:13px; line-height:1.6; margin:10px 0;">
-                <p><b>🍏 iPhone / iPad (Safari):</b></p>
-                <p>1. Tap the <b>Share</b> button (square with arrow ↑) at the bottom.</p>
-                <p>2. Scroll and tap <b>"Add to Home Screen"</b> ➕.</p>
-                <hr style="border:0; border-top:1px solid #23293d; margin:8px 0;">
-                <p><b>💻 PC / Android (Chrome):</b></p>
-                <p>Tap the <b>3 dots menu ⋮</b> ➔ Select <b>"Install App"</b>.</p>
+        <!-- Dynamic Device-Specific Install Guide Modal -->
+        <div id="modal-install-guide" class="overlay hidden">
+            <h2 id="guide-device-title" style="color:#00e5ff;">📲 تثبيت اللعبة كتطبيق</h2>
+            <div id="guide-device-body" style="background:#111420; border:1px solid #20263a; border-radius:10px; padding:15px; width:min(340px, 90vw); text-align:right; font-size:13px; line-height:1.7; margin:10px 0; direction:rtl;">
             </div>
-            <button class="btn btn-cyan" onclick="document.getElementById('modal-ios-install').classList.add('hidden')">Got it! 👍</button>
+            <button class="btn btn-cyan" onclick="document.getElementById('modal-install-guide').classList.add('hidden')">فهمت 👍</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -363,7 +356,6 @@
     </div>
 
     <script>
-        // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
@@ -374,15 +366,54 @@
             deferredPrompt = e;
         });
 
-        function handleInstallClick() {
+        // Smart Device & Browser Detector
+        function handleSmartInstall() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then(() => {
                     deferredPrompt = null;
                 });
-            } else {
-                document.getElementById('modal-ios-install').classList.remove('hidden');
+                return;
             }
+
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+            const isFirefox = /Firefox/i.test(ua);
+            const isAndroid = /Android/i.test(ua);
+
+            let titleEl = document.getElementById('guide-device-title');
+            let bodyEl = document.getElementById('guide-device-body');
+
+            if (isIOS) {
+                titleEl.innerText = "🍏 التثبيت على الآيفون (iOS)";
+                bodyEl.innerHTML = `
+                    1. اضغط على زر <b>المشاركة (Share)</b> (المربع ذو السهم ⬆️) في أسفل Safari.<br>
+                    2. مرر للأسفل واضغط على <b>"إضافة إلى الصفحة الرئيسية" (Add to Home Screen) ➕</b>.<br>
+                    3. ستظهر اللعبة مباشرة كتطبيق على شاشة هاتفك!
+                `;
+            } else if (isFirefox) {
+                titleEl.innerText = "🦊 متصفح فايرفوكس (Firefox)";
+                bodyEl.innerHTML = `
+                    فايرفوكس لا يدعم التثبيت المباشر بنقرة زر لأسباب أمنية.<br>
+                    • <b>على الهاتف:</b> اضغط على القائمة (⋮) ➔ <b>"تثبيت" أو "إضافة إلى الشاشة الرئيسية"</b>.<br>
+                    • <b>على الكمبيوتر:</b> يفضل فتح الرابط عبر <b>Google Chrome</b> أو <b>Brave</b> لتثبيتها بضغطة واحدة، أو يمكنك حفظ الصفحة في المفضلة (Ctrl+D).
+                `;
+            } else if (isAndroid) {
+                titleEl.innerText = "🤖 التثبيت على أندرويد (Android)";
+                bodyEl.innerHTML = `
+                    1. اضغط على النقاط الثلاث <b>(⋮)</b> في أعلى يمين المتصفح.<br>
+                    2. اضغط على <b>"تثبيت التطبيق" (Install App)</b> أو "إضافة إلى الشاشة الرئيسية".<br>
+                    3. ستفتح اللعبة Fullscreen كتطبيق بدون شريط المتصفح!
+                `;
+            } else {
+                titleEl.innerText = "💻 التثبيت على الكمبيوتر (PC / Laptop)";
+                bodyEl.innerHTML = `
+                    1. من شريط العنوان في الأعلى، اضغط على أيقونة <b>التثبيت (🖥️)</b> بجانب النجمة.<br>
+                    2. أو اضغط على (⋮) ➔ <b>"حفظ ومشاركة" ➔ "تثبيت صفحة الويب كتطبيق"</b>.
+                `;
+            }
+
+            document.getElementById('modal-install-guide').classList.remove('hidden');
         }
 
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
