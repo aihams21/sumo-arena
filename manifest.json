@@ -1,0 +1,17 @@
+{
+  "name": "Neon Sumo Arena",
+  "short_name": "SumoArena",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#08090f",
+  "theme_color": "#00e5ff",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/isometric/512/sumo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

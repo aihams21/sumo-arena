@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#00e5ff">
     <title>Neon Sumo Arena</title>
+    
+    <!-- PWA Manifest & Meta -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
     
     <!-- Adsterra Monetization Scripts -->
     <script src="https://pl31012283.profitableratecpmnetwork.com/57/8a/18/578a1867ba6f1dd3225b413221bd9b2c.js"></script>
@@ -93,6 +98,7 @@
         .btn-magenta { background: #ff3366; color: #fff; }
         .btn-green { background: #00ff66; color: #000; }
         .btn-gray { background: #1c2030; color: #aaa; }
+        .btn-whatsapp { background: #25D366; color: #fff; }
 
         input {
             padding: 10px 15px;
@@ -259,6 +265,7 @@
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
             <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
+            <button id="btn-pwa-install" class="btn btn-green hidden" onclick="installPWA()">📲 Install App on Phone</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -311,8 +318,10 @@
 
         <div id="menu-lobby" class="overlay hidden">
             <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">-----</span></h2>
-            <p style="color:#aaa; margin: 15px 0;">Send this 4-digit code to your friend...</p>
-            <button class="btn btn-gray" onclick="exitToMenu()">Cancel</button>
+            <p style="color:#aaa; margin: 10px 0;">Share link with your friend to join instantly:</p>
+            <button class="btn btn-whatsapp" onclick="shareRoomWhatsApp()">💬 Invite on WhatsApp</button>
+            <button class="btn btn-cyan" onclick="copyRoomLink()">📋 Copy Direct Invite Link</button>
+            <button class="btn btn-gray" style="margin-top:8px;" onclick="exitToMenu()">Cancel</button>
         </div>
 
         <div id="modal-round" class="overlay hidden">
@@ -339,6 +348,29 @@
     </div>
 
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const btn = document.getElementById('btn-pwa-install');
+            if (btn) btn.classList.remove('hidden');
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => {
+                    deferredPrompt = null;
+                    document.getElementById('btn-pwa-install').classList.add('hidden');
+                });
+            }
+        }
+
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
         const clickCounters = {
@@ -492,6 +524,7 @@
         let peer = null;
         let conn = null;
         let isHost = false;
+        let currentHostRoomCode = "";
         let p2pArenaRadius = BASE_ARENA_RADIUS;
         let p2pPlayers = {
             host: { x: 280, y: 300, vx: 0, vy: 0, radius: P2P_EQUAL_RADIUS, color: '#00e5ff', alive: true, input: { dx: 0, dy: 0 } },
@@ -594,7 +627,8 @@
             peer = new Peer(roomCode, PEER_CONFIG);
             
             peer.on('open', id => {
-                document.getElementById('lobby-code').innerText = id.replace('SUMO-', '');
+                currentHostRoomCode = id.replace('SUMO-', '');
+                document.getElementById('lobby-code').innerText = currentHostRoomCode;
                 document.getElementById('menu-lobby').classList.remove('hidden');
             });
 
@@ -609,13 +643,26 @@
             });
         }
 
-        function joinP2PRoom() {
-            let rawCode = document.getElementById('room-input').value.trim();
+        function shareRoomWhatsApp() {
+            let link = `${window.location.origin}${window.location.pathname}#room=${currentHostRoomCode}`;
+            let msg = encodeURIComponent(`🔥 Challenge me in Neon Sumo Arena 1v1! Click here to join my room instantly: ${link}`);
+            window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
+        }
+
+        function copyRoomLink() {
+            let link = `${window.location.origin}${window.location.pathname}#room=${currentHostRoomCode}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert("✅ Invite link copied to clipboard!");
+            });
+        }
+
+        function joinP2PRoom(directCode = null) {
+            let rawCode = directCode || document.getElementById('room-input').value.trim();
             if (!rawCode) return alert("Please enter the 4-digit room code!");
             
             let targetCode = rawCode.startsWith('SUMO-') ? rawCode : 'SUMO-' + rawCode;
             let joinBtn = document.getElementById('btn-join');
-            joinBtn.innerText = "Connecting...";
+            if (joinBtn) joinBtn.innerText = "Connecting...";
 
             isHost = false;
             bannerAd.style.display = 'none';
@@ -627,7 +674,7 @@
                 conn = peer.connect(targetCode, { reliable: true });
 
                 joinTimeout = setTimeout(() => {
-                    if (joinBtn.innerText === "Connecting...") {
+                    if (joinBtn && joinBtn.innerText === "Connecting...") {
                         joinBtn.innerText = "🚀 Join Room";
                         alert("Room not found or Host is not in lobby. Make sure the Host has created the room!");
                     }
@@ -638,10 +685,22 @@
 
             peer.on('error', err => {
                 if (joinTimeout) clearTimeout(joinTimeout);
-                joinBtn.innerText = "🚀 Join Room";
+                if (joinBtn) joinBtn.innerText = "🚀 Join Room";
                 alert('Room not found or Host offline.');
             });
         }
+
+        // Auto Join if opened via invite link (#room=1234)
+        window.addEventListener('load', () => {
+            if (window.location.hash && window.location.hash.includes('room=')) {
+                let code = window.location.hash.split('room=')[1];
+                if (code) {
+                    setTimeout(() => {
+                        joinP2PRoom(code);
+                    }, 500);
+                }
+            }
+        });
 
         function setupHostEvents() {
             conn.on('open', () => {
@@ -769,7 +828,6 @@
             let isBossLevel = (lvl % 5 === 0);
 
             if (isBossLevel) {
-                // Hard Boss: Super Armor, Heavy Mass, Rapid Furious Dash
                 bots.push({
                     x: 400,
                     y: 140,
@@ -988,7 +1046,6 @@
                     let currentBotSpeed = b.speed;
                     
                     if (b.isBoss) {
-                        // Boss AI: Smart Charge every 80 frames with high velocity
                         if (b.dashCooldown > 75) {
                             currentBotSpeed *= 2.8;
                             b.isDashing = true;
