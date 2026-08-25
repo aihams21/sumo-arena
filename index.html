@@ -268,7 +268,6 @@
             <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
         </div>
 
-        <!-- 100% Ad-Free Dynamic Device Install Guide -->
         <div id="modal-install-guide" class="overlay hidden">
             <h2 id="guide-device-title" style="color:#00e5ff;">📲 تثبيت اللعبة كتطبيق</h2>
             <div id="guide-device-body" style="background:#111420; border:1px solid #20263a; border-radius:10px; padding:15px; width:min(340px, 90vw); text-align:right; font-size:13px; line-height:1.7; margin:10px 0; direction:rtl;">
@@ -316,17 +315,17 @@
 
         <!-- 100% Ad-Free Online Section -->
         <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (100% AD-FREE)</h2>
+            <h2>ONLINE 1v1 (AD-FREE)</h2>
             <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Pure Skill</p>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="ROOM CODE (e.g. 5421)">
+            <input type="text" id="room-input" placeholder="ROOM CODE (e.g. 5421)" maxlength="6">
             <button id="btn-join" class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
         <div id="menu-lobby" class="overlay hidden">
-            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">-----</span></h2>
+            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">Creating...</span></h2>
             <p style="color:#aaa; margin: 10px 0;">Share link with your friend to join instantly:</p>
             <button class="btn btn-whatsapp" onclick="shareRoomWhatsApp()">💬 Invite on WhatsApp</button>
             <button class="btn btn-cyan" onclick="copyRoomLink()">📋 Copy Direct Invite Link</button>
@@ -368,7 +367,7 @@
         });
 
         function handleSmartInstall() {
-            bannerAd.style.display = 'none'; // Hide banner during install guide
+            bannerAd.style.display = 'none';
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then(() => {
@@ -559,15 +558,14 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
+        // Reliable Global PeerJS Config with Multiple Public STUNs
         const PEER_CONFIG = {
-            host: '0.peerjs.com',
-            port: 443,
-            path: '/',
-            secure: true,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' }
                 ]
             }
         };
@@ -660,7 +658,7 @@
 
         function showMultiMenu() {
             hideAllMenus();
-            bannerAd.style.display = 'none'; // Completely hide ads for 1v1
+            bannerAd.style.display = 'none';
             document.getElementById('menu-multi').classList.remove('hidden');
         }
 
@@ -668,19 +666,24 @@
             showMainMenu();
         }
 
+        // Host creates room with clean 4-character ID
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
             isHost = true;
-            let roomCode = 'SUMO-' + Math.floor(1000 + Math.random() * 9000);
             
+            // Random 4-digit code
+            currentHostRoomCode = String(Math.floor(1000 + Math.random() * 9000));
+            let peerId = 'sumo-room-' + currentHostRoomCode;
+
+            document.getElementById('lobby-code').innerText = currentHostRoomCode;
+            document.getElementById('menu-lobby').classList.remove('hidden');
+
             if (peer) { peer.destroy(); peer = null; }
-            peer = new Peer(roomCode, PEER_CONFIG);
+            peer = new Peer(peerId, PEER_CONFIG);
             
             peer.on('open', id => {
-                currentHostRoomCode = id.replace('SUMO-', '');
-                document.getElementById('lobby-code').innerText = currentHostRoomCode;
-                document.getElementById('menu-lobby').classList.remove('hidden');
+                console.log("Host room opened with ID:", id);
             });
 
             peer.on('connection', c => {
@@ -689,8 +692,13 @@
             });
 
             peer.on('error', err => {
-                alert('Connection error: ' + err.type);
-                showMultiMenu();
+                console.error("Host peer error:", err);
+                if (err.type === 'unavailable-id') {
+                    createP2PRoom(); // Retry with another code if taken
+                } else {
+                    alert('Server connection error: ' + err.type);
+                    showMultiMenu();
+                }
             });
         }
 
@@ -707,11 +715,12 @@
             });
         }
 
+        // Guest joins with exact 4-digit code
         function joinP2PRoom(directCode = null) {
             let rawCode = directCode || document.getElementById('room-input').value.trim();
             if (!rawCode) return alert("Please enter the 4-digit room code!");
             
-            let targetCode = rawCode.startsWith('SUMO-') ? rawCode : 'SUMO-' + rawCode;
+            let targetPeerId = 'sumo-room-' + rawCode.replace(/[^0-9]/g, '');
             let joinBtn = document.getElementById('btn-join');
             if (joinBtn) joinBtn.innerText = "Connecting...";
 
@@ -721,23 +730,25 @@
             if (peer) { peer.destroy(); peer = null; }
             peer = new Peer(PEER_CONFIG);
             
-            peer.on('open', () => {
-                conn = peer.connect(targetCode, { reliable: true });
+            peer.on('open', myId => {
+                console.log("Guest peer initialized, connecting to:", targetPeerId);
+                conn = peer.connect(targetPeerId, { reliable: true });
 
                 joinTimeout = setTimeout(() => {
                     if (joinBtn && joinBtn.innerText === "Connecting...") {
                         joinBtn.innerText = "🚀 Join Room";
-                        alert("Room not found or Host is not in lobby. Make sure the Host has created the room!");
+                        alert("Room not found or Host is offline. Make sure the Host has created the room!");
                     }
-                }, 8000);
+                }, 10000);
 
                 setupGuestEvents();
             });
 
             peer.on('error', err => {
+                console.error("Guest peer error:", err);
                 if (joinTimeout) clearTimeout(joinTimeout);
                 if (joinBtn) joinBtn.innerText = "🚀 Join Room";
-                alert('Room not found or Host offline.');
+                alert('Connection error: ' + err.type);
             });
         }
 
