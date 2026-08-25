@@ -322,10 +322,12 @@
             <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
+        <!-- Loss Screen with Direct In-Place Revive, Retry, and Main Menu -->
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
-            <button class="btn btn-green" onclick="handleAdClickWithCounter('revive')">📺 Revive Sumo: Visit 5x (<span id="count-revive">0/5</span>)</button>
-            <button class="btn btn-gray" onclick="exitToMenu()">Stage Map</button>
+            <button class="btn btn-green" onclick="handleAdClickWithCounter('revive')">📺 Revive In Place: Visit 5x (<span id="count-revive">0/5</span>)</button>
+            <button class="btn btn-cyan" onclick="retryStageDirectly()">🔄 Retry Stage</button>
+            <button class="btn btn-gray" onclick="exitToMenu()">🏠 Main Menu</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
@@ -340,7 +342,6 @@
     <script>
         const SMARTLINK_URL = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
 
-        // Click Counters with Custom Limits
         const clickCounters = {
             free_coins: 0,
             revive: 0,
@@ -380,7 +381,6 @@
             }
         }
 
-        // 1-Click direct ads
         function triggerSmartlinkDirect(type) {
             window.open(SMARTLINK_URL, '_blank');
         }
@@ -820,6 +820,14 @@
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
+        }
+
+        // Direct Retry from death screen
+        function retryStageDirectly() {
+            hideAllMenus();
+            document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block';
+            spawnOfflineStage(currentPlayingStage);
         }
 
         function nextStageOffline() {
