@@ -82,13 +82,13 @@
         h2 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 12px; }
 
         .btn {
-            padding: 12px 20px;
+            padding: 11px 18px;
             font-size: clamp(13px, 3.5vw, 15px);
             font-weight: bold;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            margin: 5px;
+            margin: 4px;
             transition: transform 0.1s;
             width: min(280px, 85vw);
         }
@@ -259,13 +259,28 @@
             </div>
         </div>
 
+        <!-- Main Menu with always visible Install Button -->
         <div id="menu-main" class="overlay">
             <h1>NEON SUMO ARENA</h1>
             <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
             <button class="btn btn-magenta" onclick="showMultiMenu()">🌐 Online 1v1 (P2P)</button>
-            <button id="btn-pwa-install" class="btn btn-green hidden" onclick="installPWA()">📲 Install App on Phone</button>
+            <button class="btn btn-green" onclick="handleInstallClick()">📲 Install App / Add to Home</button>
+        </div>
+
+        <!-- iOS & General Install Instructions Modal -->
+        <div id="modal-ios-install" class="overlay hidden">
+            <h2>📲 HOW TO INSTALL</h2>
+            <div style="background:#111420; border:1px solid #20263a; border-radius:10px; padding:15px; max-width:320px; text-align:left; font-size:13px; line-height:1.6; margin:10px 0;">
+                <p><b>🍏 iPhone / iPad (Safari):</b></p>
+                <p>1. Tap the <b>Share</b> button (square with arrow ↑) at the bottom.</p>
+                <p>2. Scroll and tap <b>"Add to Home Screen"</b> ➕.</p>
+                <hr style="border:0; border-top:1px solid #23293d; margin:8px 0;">
+                <p><b>💻 PC / Android (Chrome):</b></p>
+                <p>Tap the <b>3 dots menu ⋮</b> ➔ Select <b>"Install App"</b>.</p>
+            </div>
+            <button class="btn btn-cyan" onclick="document.getElementById('modal-ios-install').classList.add('hidden')">Got it! 👍</button>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -357,17 +372,16 @@
         window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
             deferredPrompt = e;
-            const btn = document.getElementById('btn-pwa-install');
-            if (btn) btn.classList.remove('hidden');
         });
 
-        function installPWA() {
+        function handleInstallClick() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then(() => {
                     deferredPrompt = null;
-                    document.getElementById('btn-pwa-install').classList.add('hidden');
                 });
+            } else {
+                document.getElementById('modal-ios-install').classList.remove('hidden');
             }
         }
 
@@ -690,7 +704,6 @@
             });
         }
 
-        // Auto Join if opened via invite link (#room=1234)
         window.addEventListener('load', () => {
             if (window.location.hash && window.location.hash.includes('room=')) {
                 let code = window.location.hash.split('room=')[1];
