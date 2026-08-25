@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#00e5ff">
     <title>Neon Sumo Arena</title>
     
-    <!-- PWA Manifest & Meta -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
     
@@ -111,7 +110,7 @@
             letter-spacing: 2px;
             margin: 8px 0;
             outline: none;
-            width: 220px;
+            width: 240px;
         }
 
         #hud {
@@ -319,13 +318,13 @@
             <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">100% Equal Speed & Power | Pure Skill</p>
             <button class="btn btn-cyan" onclick="createP2PRoom()">➕ Create Room</button>
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="ROOM CODE (e.g. 5421)" maxlength="6">
+            <input type="text" id="room-input" placeholder="ROOM CODE">
             <button id="btn-join" class="btn btn-magenta" onclick="joinP2PRoom()">🚀 Join Room</button>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
         <div id="menu-lobby" class="overlay hidden">
-            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;">Creating...</span></h2>
+            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff; letter-spacing:3px;">Creating...</span></h2>
             <p style="color:#aaa; margin: 10px 0;">Share link with your friend to join instantly:</p>
             <button class="btn btn-whatsapp" onclick="shareRoomWhatsApp()">💬 Invite on WhatsApp</button>
             <button class="btn btn-cyan" onclick="copyRoomLink()">📋 Copy Direct Invite Link</button>
@@ -558,18 +557,6 @@
         const P2P_FRICTION = 0.88;
         const P2P_HIT_POWER = 8.5;
 
-        // Reliable Global PeerJS Config with Multiple Public STUNs
-        const PEER_CONFIG = {
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun.cloudflare.com:3478' }
-                ]
-            }
-        };
-
         let peer = null;
         let conn = null;
         let isHost = false;
@@ -666,24 +653,19 @@
             showMainMenu();
         }
 
-        // Host creates room with clean 4-character ID
+        // Clean Direct P2P Mesh Network
         function createP2PRoom() {
             hideAllMenus();
             bannerAd.style.display = 'none';
             isHost = true;
             
-            // Random 4-digit code
-            currentHostRoomCode = String(Math.floor(1000 + Math.random() * 9000));
-            let peerId = 'sumo-room-' + currentHostRoomCode;
-
-            document.getElementById('lobby-code').innerText = currentHostRoomCode;
-            document.getElementById('menu-lobby').classList.remove('hidden');
-
             if (peer) { peer.destroy(); peer = null; }
-            peer = new Peer(peerId, PEER_CONFIG);
+            peer = new Peer(); // Let PeerJS assign a 100% verified server ID
             
             peer.on('open', id => {
-                console.log("Host room opened with ID:", id);
+                currentHostRoomCode = id;
+                document.getElementById('lobby-code').innerText = id;
+                document.getElementById('menu-lobby').classList.remove('hidden');
             });
 
             peer.on('connection', c => {
@@ -692,35 +674,28 @@
             });
 
             peer.on('error', err => {
-                console.error("Host peer error:", err);
-                if (err.type === 'unavailable-id') {
-                    createP2PRoom(); // Retry with another code if taken
-                } else {
-                    alert('Server connection error: ' + err.type);
-                    showMultiMenu();
-                }
+                alert('Signaling error: ' + err.type);
+                showMultiMenu();
             });
         }
 
         function shareRoomWhatsApp() {
-            let link = `${window.location.origin}${window.location.pathname}#room=${currentHostRoomCode}`;
-            let msg = encodeURIComponent(`🔥 Challenge me in Neon Sumo Arena 1v1! Click here to join my room instantly: ${link}`);
+            let link = `${window.location.origin}${window.location.pathname}#room=${encodeURIComponent(currentHostRoomCode)}`;
+            let msg = encodeURIComponent(`🔥 Challenge me in Neon Sumo Arena 1v1! Click here to join: ${link}`);
             window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
         }
 
         function copyRoomLink() {
-            let link = `${window.location.origin}${window.location.pathname}#room=${currentHostRoomCode}`;
+            let link = `${window.location.origin}${window.location.pathname}#room=${encodeURIComponent(currentHostRoomCode)}`;
             navigator.clipboard.writeText(link).then(() => {
                 alert("✅ Invite link copied to clipboard!");
             });
         }
 
-        // Guest joins with exact 4-digit code
         function joinP2PRoom(directCode = null) {
-            let rawCode = directCode || document.getElementById('room-input').value.trim();
-            if (!rawCode) return alert("Please enter the 4-digit room code!");
+            let targetId = (directCode || document.getElementById('room-input').value).trim();
+            if (!targetId) return alert("Please enter the room code!");
             
-            let targetPeerId = 'sumo-room-' + rawCode.replace(/[^0-9]/g, '');
             let joinBtn = document.getElementById('btn-join');
             if (joinBtn) joinBtn.innerText = "Connecting...";
 
@@ -728,16 +703,15 @@
             bannerAd.style.display = 'none';
 
             if (peer) { peer.destroy(); peer = null; }
-            peer = new Peer(PEER_CONFIG);
+            peer = new Peer();
             
             peer.on('open', myId => {
-                console.log("Guest peer initialized, connecting to:", targetPeerId);
-                conn = peer.connect(targetPeerId, { reliable: true });
+                conn = peer.connect(targetId, { reliable: true });
 
                 joinTimeout = setTimeout(() => {
                     if (joinBtn && joinBtn.innerText === "Connecting...") {
                         joinBtn.innerText = "🚀 Join Room";
-                        alert("Room not found or Host is offline. Make sure the Host has created the room!");
+                        alert("Room not found or Host is offline. Ensure Host is waiting in the room!");
                     }
                 }, 10000);
 
@@ -745,7 +719,6 @@
             });
 
             peer.on('error', err => {
-                console.error("Guest peer error:", err);
                 if (joinTimeout) clearTimeout(joinTimeout);
                 if (joinBtn) joinBtn.innerText = "🚀 Join Room";
                 alert('Connection error: ' + err.type);
@@ -754,7 +727,7 @@
 
         window.addEventListener('load', () => {
             if (window.location.hash && window.location.hash.includes('room=')) {
-                let code = window.location.hash.split('room=')[1];
+                let code = decodeURIComponent(window.location.hash.split('room=')[1]);
                 if (code) {
                     setTimeout(() => {
                         joinP2PRoom(code);
