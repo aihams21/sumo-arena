@@ -1,141 +1,483 @@
-const SERVER_WS_URL = "wss://sumo-server.onrender.com";
-let ws = null, isHost = false, currentRoomCode = "", p2pArenaRadius = 240, netInterval = null;
-let p2pPlayers = {
-    host: { x: 280, y: 300, vx: 0, vy: 0, targetX: 280, targetY: 300, radius: 24, color: '#00e5ff', alive: true },
-    guest: { x: 520, y: 300, vx: 0, vy: 0, targetX: 520, targetY: 300, radius: 24, color: '#ff0055', alive: true }
-};
-let p2pScores = { host: 0, guest: 0 };
+// The game and relay are served by the same Replit process. This avoids a
+// hard-coded external relay that can sleep, use the wrong protocol, or add
+// unnecessary latency.
+const SERVER_WS_URL = (() => {
+    const protocol =
+        window.location.protocol === 'https:'
+            ? 'wss:'
+            : 'ws:';
 
-function connectWS(cb) {
-    if (ws && ws.readyState === 1) return cb();
+    return window.location.host
+        ? `${protocol}//${window.location.host}`
+        : 'ws://localhost:3000';
+})();
+
+let ws = null;
+let isHost = false;
+let currentRoomCode = "";
+let p2pArenaRadius = 240;
+let netInterval = null;
+let wsCallbacks = [];
+let p2pInput = {
+    dx: 0,
+    dy: 0
+};
+let inputSequence = 0;
+let leavingOnlineRoom = false;
+
+let p2pPlayers = {
+    host: {
+        x: 280,
+        y: 300,
+        vx: 0,
+        vy: 0,
+        serverX: 280,
+        serverY: 300,
+        targetX: 280,
+        targetY: 300,
+        radius: 24,
+        color: '#00e5ff',
+        alive: true
+    },
+    guest: {
+        x: 520,
+        y: 300,
+        vx: 0,
+        vy: 0,
+        serverX: 520,
+        serverY: 300,
+        targetX: 520,
+        targetY: 300,
+        radius: 24,
+        color: '#ff0055',
+        alive: true
+    }
+};
+
+let p2pScores = {
+    host: 0,
+    guest: 0
+};
+
+function connectWS(callback) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        callback();
+        return;
+    }
+
+    wsCallbacks.push(callback);
+
+    if (
+        ws &&
+        ws.readyState === WebSocket.CONNECTING
+    ) {
+        return;
+    }
+
+    leavingOnlineRoom = false;
     ws = new WebSocket(SERVER_WS_URL);
 
-    ws.onopen = () => cb();
-    ws.onmessage = (e) => {
-        let msg = e.data;
+    ws.onopen = () => {
+        const callbacks = wsCallbacks.splice(0);
+        callbacks.forEach(fn => fn());
+    };
 
-        // Symmetric Position Packets
-        if (typeof msg === 'string' && (msg.startsWith('H:') || msg.startsWith('G:'))) {
-            let p = msg.substring(2).split(',');
-            if (isHost && msg.startsWith('G:')) {
-                // Host receives Guest actual coordinates & status
-                p2pPlayers.guest.targetX = parseFloat(p[0]);
-                p2pPlayers.guest.targetY = parseFloat(p[1]);
-                p2pPlayers.guest.alive = (p[2] === '1');
-            } else if (!isHost && msg.startsWith('H:')) {
-                // Guest receives Host actual coordinates, arena & scores
-                p2pPlayers.host.targetX = parseFloat(p[0]);
-                p2pPlayers.host.targetY = parseFloat(p[1]);
-                p2pPlayers.host.alive = (p[2] === '1');
-                p2pArenaRadius = parseFloat(p[3]);
-                p2pScores.host = parseInt(p[4]) || 0;
-                p2pScores.guest = parseInt(p[5]) || 0;
-                updateP2PHud();
-            }
+    ws.onmessage = event => {
+        let data;
+
+        try {
+            data = JSON.parse(event.data);
+        } catch (_error) {
             return;
         }
 
-        try {
-            let d = JSON.parse(msg);
-            if (d.type === 'created') {
-                currentRoomCode = d.room;
-                document.getElementById('lobby-code').innerText = d.room;
-            } else if (d.type === 'player_joined') {
-                startOnlineGame();
-            } else if (d.type === 'joined') {
-                currentRoomCode = d.room;
-                startOnlineGame();
-            } else if (d.type === 'round_over') {
-                p2pScores = d.scores;
-                showOnlineEnd(d.winner === (isHost ? 'host' : 'guest'));
-            } else if (d.type === 'start_round') {
-                resetP2PRound();
-            } else if (d.type === 'error') {
-                alert(d.message);
-                let b = document.getElementById('btn-join'); if (b) b.innerText = "🚀 Join Room";
-            } else if (d.type === 'opponent_left') {
-                alert("خرج الخصم من الغرفة"); exitToMenu();
+        if (data.type === 'created') {
+            currentRoomCode = data.room;
+            isHost = data.role === 'host';
+
+            document.getElementById('lobby-code').innerText =
+                data.room;
+        } else if (
+            data.type === 'player_joined' ||
+            data.type === 'joined'
+        ) {
+            currentRoomCode =
+                data.room || currentRoomCode;
+
+            if (data.role) {
+                isHost = data.role === 'host';
             }
-        } catch (err) {}
+
+            startOnlineGame();
+        } else if (data.type === 'start_round') {
+            p2pScores = {
+                ...p2pScores,
+                ...(data.scores || {})
+            };
+
+            if (gameMode !== 'p2p') {
+                startOnlineGame();
+            }
+
+            resetP2PRound();
+        } else if (data.type === 'state') {
+            applyOnlineState(data);
+        } else if (data.type === 'round_over') {
+            p2pScores = {
+                ...p2pScores,
+                ...(data.scores || {})
+            };
+
+            if (data.state) {
+                applyOnlineState(data.state);
+            }
+
+            showOnlineEnd(
+                data.winner ===
+                (isHost ? 'host' : 'guest')
+            );
+        } else if (data.type === 'error') {
+            alert(
+                data.message ||
+                'Unable to join room.'
+            );
+
+            const button =
+                document.getElementById('btn-join');
+
+            if (button) {
+                button.innerText = "🚀 Join Room";
+            }
+        } else if (data.type === 'opponent_left') {
+            alert("خرج الخصم من الغرفة");
+            exitToMenu();
+        }
     };
 
-    ws.onclose = () => { if (gameMode === 'p2p') { alert("انقطع الاتصال بالسيرفر"); exitToMenu(); } };
+    ws.onclose = () => {
+        ws = null;
+        wsCallbacks = [];
+
+        if (
+            !leavingOnlineRoom &&
+            gameMode === 'p2p'
+        ) {
+            alert("انقطع الاتصال بالسيرفر");
+            exitToMenu();
+        }
+    };
+
+    ws.onerror = () => {
+        // onclose presents the user-facing message.
+        // Keeping this handler prevents an uncaught browser
+        // WebSocket error in the console.
+    };
 }
 
 function createOnlineRoom() {
-    hideAllMenus(); bannerAd.style.display = 'none'; isHost = true;
-    document.getElementById('lobby-code').innerText = "جاري الإنشاء...";
-    document.getElementById('menu-lobby').classList.remove('hidden');
-    connectWS(() => ws.send(JSON.stringify({ type: 'create' })));
+    hideAllMenus();
+    bannerAd.style.display = 'none';
+    isHost = true;
+
+    document.getElementById('lobby-code').innerText =
+        "جاري الإنشاء...";
+
+    document
+        .getElementById('menu-lobby')
+        .classList
+        .remove('hidden');
+
+    connectWS(() => {
+        ws.send(
+            JSON.stringify({
+                type: 'create'
+            })
+        );
+    });
 }
 
 function joinOnlineRoom(code) {
-    let r = code || document.getElementById('room-input').value.trim();
-    if (!r) return alert("أدخل كود الغرفة المكون من 4 أرقام");
-    let b = document.getElementById('btn-join'); if (b) b.innerText = "Connecting...";
-    hideAllMenus(); bannerAd.style.display = 'none'; isHost = false;
-    connectWS(() => ws.send(JSON.stringify({ type: 'join', room: r })));
+    const room = String(
+        code ||
+        document.getElementById('room-input').value
+    )
+        .trim()
+        .toUpperCase();
+
+    if (!/^\d{4}$/.test(room)) {
+        return alert(
+            "أدخل كود الغرفة المكون من 4 أرقام"
+        );
+    }
+
+    const button =
+        document.getElementById('btn-join');
+
+    if (button) {
+        button.innerText = "Connecting...";
+    }
+
+    hideAllMenus();
+    bannerAd.style.display = 'none';
+    isHost = false;
+
+    connectWS(() => {
+        ws.send(
+            JSON.stringify({
+                type: 'join',
+                room
+            })
+        );
+    });
 }
 
 function startOnlineGame() {
-    gameMode = 'p2p'; hideAllMenus();
-    document.getElementById('hud').classList.remove('hidden');
+    gameMode = 'p2p';
+    hideAllMenus();
+
+    document
+        .getElementById('hud')
+        .classList
+        .remove('hidden');
+
     touchBox.style.display = 'block';
+
     resetP2PRound();
 
-    if (netInterval) clearInterval(netInterval);
-    
-    // High-frequency symmetric 40Hz positional sync
+    if (netInterval) {
+        clearInterval(netInterval);
+    }
+
+    // Inputs are sent frequently enough for responsive server
+    // simulation, while snapshots arrive independently at the
+    // server's fixed tick rate.
     netInterval = setInterval(() => {
-        if (!ws || ws.readyState !== 1 || gameMode !== 'p2p') return;
-        if (isHost) {
-            let payload = `H:${Math.round(p2pPlayers.host.x)},${Math.round(p2pPlayers.host.y)},${p2pPlayers.host.alive?1:0},${Math.round(p2pArenaRadius)},${p2pScores.host},${p2pScores.guest}`;
-            ws.send(payload);
-        } else {
-            let payload = `G:${Math.round(p2pPlayers.guest.x)},${Math.round(p2pPlayers.guest.y)},${p2pPlayers.guest.alive?1:0}`;
-            ws.send(payload);
+        if (
+            !ws ||
+            ws.readyState !== WebSocket.OPEN ||
+            gameMode !== 'p2p'
+        ) {
+            return;
         }
-    }, 25);
+
+        const me = isHost
+            ? p2pPlayers.host
+            : p2pPlayers.guest;
+
+        ws.send(
+            JSON.stringify({
+                type: 'input',
+                dx: p2pInput.dx,
+                dy: p2pInput.dy,
+                seq: inputSequence++,
+                radius: me.radius
+            })
+        );
+    }, 33);
+}
+
+function applyOnlineState(data) {
+    p2pArenaRadius =
+        Number.isFinite(data.arenaRadius)
+            ? data.arenaRadius
+            : p2pArenaRadius;
+
+    p2pScores = {
+        ...p2pScores,
+        ...(data.scores || {})
+    };
+
+    for (const role of ['host', 'guest']) {
+        const incoming =
+            data.players &&
+            data.players[role];
+
+        const local = p2pPlayers[role];
+
+        if (!incoming || !local) {
+            continue;
+        }
+
+        local.serverX = Number(incoming.x);
+        local.serverY = Number(incoming.y);
+        local.targetX = local.serverX;
+        local.targetY = local.serverY;
+        local.vx = Number(incoming.vx) || 0;
+        local.vy = Number(incoming.vy) || 0;
+        local.radius =
+            Number(incoming.radius) ||
+            local.radius;
+        local.alive = incoming.alive !== false;
+
+        const isMe =
+            (isHost && role === 'host') ||
+            (!isHost && role === 'guest');
+
+        if (isMe) {
+            // Preserve prediction for low input latency,
+            // but continuously remove server error so pushes
+            // and ring-outs cannot ghost apart.
+            const errorX =
+                local.serverX - local.x;
+
+            const errorY =
+                local.serverY - local.y;
+
+            if (Math.hypot(errorX, errorY) > 70) {
+                local.x = local.serverX;
+                local.y = local.serverY;
+            } else {
+                local.x += errorX * 0.3;
+                local.y += errorY * 0.3;
+            }
+        }
+    }
+
+    updateP2PHud();
 }
 
 function resetP2PRound() {
     p2pArenaRadius = 240;
-    p2pPlayers.host.x = 280; p2pPlayers.host.y = 300; p2pPlayers.host.vx = 0; p2pPlayers.host.vy = 0; p2pPlayers.host.alive = true;
-    p2pPlayers.guest.x = 520; p2pPlayers.guest.y = 300; p2pPlayers.guest.vx = 0; p2pPlayers.guest.vy = 0; p2pPlayers.guest.alive = true;
-    p2pPlayers.host.targetX = 280; p2pPlayers.host.targetY = 300;
-    p2pPlayers.guest.targetX = 520; p2pPlayers.guest.targetY = 300;
-    stageEnded = false; hideAllMenus();
-    document.getElementById('hud').classList.remove('hidden');
-    touchBox.style.display = 'block'; updateP2PHud();
+
+    p2pInput = {
+        dx: 0,
+        dy: 0
+    };
+
+    const host = p2pPlayers.host;
+    const guest = p2pPlayers.guest;
+
+    Object.assign(host, {
+        x: 280,
+        y: 300,
+        vx: 0,
+        vy: 0,
+        serverX: 280,
+        serverY: 300,
+        targetX: 280,
+        targetY: 300,
+        alive: true
+    });
+
+    Object.assign(guest, {
+        x: 520,
+        y: 300,
+        vx: 0,
+        vy: 0,
+        serverX: 520,
+        serverY: 300,
+        targetX: 520,
+        targetY: 300,
+        alive: true
+    });
+
+    stageEnded = false;
+    hideAllMenus();
+
+    document
+        .getElementById('hud')
+        .classList
+        .remove('hidden');
+
+    touchBox.style.display = 'block';
+    updateP2PHud();
+}
+
+function setP2PInput(dx, dy) {
+    p2pInput = {
+        dx,
+        dy
+    };
 }
 
 function showOnlineEnd(won) {
     stageEnded = true;
-    let t = document.getElementById('round-title');
-    t.innerText = won ? "ROUND WON! 🏆" : "ROUND LOST! 💀";
-    t.style.color = won ? "#00ff66" : "#ff3366";
-    let myScore = isHost ? p2pScores.host : p2pScores.guest;
-    let oppScore = isHost ? p2pScores.guest : p2pScores.host;
-    document.getElementById('round-score').innerText = `${myScore}  -  ${oppScore}`;
-    hideAllMenus(); bannerAd.style.display = 'none';
-    document.getElementById('modal-round').classList.remove('hidden');
+
+    const title =
+        document.getElementById('round-title');
+
+    title.innerText = won
+        ? "ROUND WON! 🏆"
+        : "ROUND LOST! 💀";
+
+    title.style.color = won
+        ? "#00ff66"
+        : "#ff3366";
+
+    const myScore = isHost
+        ? p2pScores.host
+        : p2pScores.guest;
+
+    const opponentScore = isHost
+        ? p2pScores.guest
+        : p2pScores.host;
+
+    document.getElementById('round-score').innerText =
+        `${myScore}  -  ${opponentScore}`;
+
+    hideAllMenus();
+    bannerAd.style.display = 'none';
+
+    document
+        .getElementById('modal-round')
+        .classList
+        .remove('hidden');
 }
 
 function restartOnlineRound() {
-    if (isHost) { ws.send(JSON.stringify({ type: 'start_round' })); resetP2PRound(); }
-    else alert("بانتظار المضيف لبدء الجولة...");
+    if (!isHost) {
+        return alert(
+            "بانتظار المضيف لبدء الجولة..."
+        );
+    }
+
+    if (
+        ws &&
+        ws.readyState === WebSocket.OPEN
+    ) {
+        ws.send(
+            JSON.stringify({
+                type: 'start_round'
+            })
+        );
+    }
 }
 
 function updateP2PHud() {
-    let myScore = isHost ? p2pScores.host : p2pScores.guest;
-    let oppScore = isHost ? p2pScores.guest : p2pScores.host;
-    document.getElementById('hud-left').innerText = `YOU: ${myScore} | OPP: ${oppScore}`;
+    const myScore = isHost
+        ? p2pScores.host
+        : p2pScores.guest;
+
+    const opponentScore = isHost
+        ? p2pScores.guest
+        : p2pScores.host;
+
+    document.getElementById('hud-left').innerText =
+        `YOU: ${myScore} | OPP: ${opponentScore}`;
 }
 
 function shareRoomWhatsApp() {
-    let link = `${window.location.origin}${window.location.pathname}#room=${currentRoomCode}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent('🔥 تحداني في Neon Sumo! اضغط للدخول: ' + link)}`, '_blank');
+    const link =
+        `${window.location.origin}` +
+        `${window.location.pathname}` +
+        `#room=${currentRoomCode}`;
+
+    window.open(
+        `https://api.whatsapp.com/send?text=` +
+        `${encodeURIComponent(
+            '🔥 تحداني في Neon Sumo! اضغط للدخول: ' +
+            link
+        )}`,
+        '_blank'
+    );
 }
+
 function copyRoomLink() {
-    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#room=${currentRoomCode}`).then(() => alert("✅ تم نسخ الرابط!"));
+    navigator.clipboard
+        .writeText(
+            `${window.location.origin}` +
+            `${window.location.pathname}` +
+            `#room=${currentRoomCode}`
+        )
+        .then(() => alert("✅ تم نسخ الرابط!"));
 }

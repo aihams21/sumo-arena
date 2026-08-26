@@ -1,12 +1,13 @@
 {
-  "name": "sumo-arena-server",
+  "name": "neon-sumo-arena",
   "version": "1.0.0",
+  "private": true,
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "express": "^4.22.2",
+    "ws": "^8.21.3"
   }
 }
