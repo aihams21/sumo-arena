@@ -285,13 +285,20 @@
             hideAllMenus();
             gameMode = 'none';
 
-            if (netInterval) {
-                clearInterval(netInterval);
-            }
+            if (typeof disconnectWS === 'function') {
+                disconnectWS();
+            } else {
+                if (netInterval) {
+                    clearInterval(netInterval);
+                    netInterval = null;
+                }
 
-            if (ws) {
-                ws.close();
-                ws = null;
+                if (ws) {
+                    try {
+                        ws.close();
+                    } catch (_error) {}
+                    ws = null;
+                }
             }
 
             updateDisplays();
@@ -623,6 +630,10 @@
                         ? p2pPlayers.guest
                         : p2pPlayers.host;
 
+                if (!me || !opponent) {
+                    return;
+                }
+
                 if (!stageEnded) {
                     // Predict only our own movement. The server is the single
                     // authority for collisions, pushes, and ring-outs.
@@ -639,20 +650,35 @@
                     me.x += me.vx;
                     me.y += me.vy;
 
+                    if (
+                        !Number.isFinite(me.x) ||
+                        !Number.isFinite(me.y)
+                    ) {
+                        me.x = Number.isFinite(me.serverX)
+                            ? me.serverX
+                            : 400;
+                        me.y = Number.isFinite(me.serverY)
+                            ? me.serverY
+                            : 300;
+                        me.vx = 0;
+                        me.vy = 0;
+                    }
+
                     // Render the opponent from server snapshots. The server
                     // resolves the same collision once for both clients.
                     if (
-                        opponent.targetX !== undefined
+                        Number.isFinite(opponent.targetX) &&
+                        Number.isFinite(opponent.targetY)
                     ) {
                         opponent.x +=
                             (opponent.targetX -
                                 opponent.x) *
-                            0.42;
+                            0.45;
 
                         opponent.y +=
                             (opponent.targetY -
                                 opponent.y) *
-                            0.42;
+                            0.45;
                     }
                 }
             } else if (
@@ -839,6 +865,10 @@
                         ? p2pArenaRadius
                         : offlineArenaRadius;
 
+                if (!Number.isFinite(radius) || radius <= 0) {
+                    radius = 240;
+                }
+
                 ctx.beginPath();
                 ctx.arc(
                     400,
@@ -879,9 +909,16 @@
                 if (gameMode === 'p2p') {
                     for (let role of ['host', 'guest']) {
                         let playerState =
+                            p2pPlayers &&
                             p2pPlayers[role];
 
-                        if (!playerState.alive) {
+                        if (
+                            !playerState ||
+                            !playerState.alive ||
+                            !Number.isFinite(playerState.x) ||
+                            !Number.isFinite(playerState.y) ||
+                            !Number.isFinite(playerState.radius)
+                        ) {
                             continue;
                         }
 
@@ -972,8 +1009,14 @@
         }
 
         function gameLoop() {
-            updatePhysics();
-            render();
+            try {
+                updatePhysics();
+                render();
+            } catch (_error) {
+                // Keep the loop alive so a bad network snapshot
+                // cannot freeze the canvas on a black frame.
+            }
+
             requestAnimationFrame(gameLoop);
         }
 

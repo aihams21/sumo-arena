@@ -62,14 +62,18 @@ function emptyPlayer(role, socket) {
 }
 
 function publicPlayer(player) {
+    if (!player) {
+        return null;
+    }
+
     return {
-        x: player.x,
-        y: player.y,
-        vx: player.vx,
-        vy: player.vy,
-        radius: player.radius,
+        x: Number(player.x) || 0,
+        y: Number(player.y) || 0,
+        vx: Number(player.vx) || 0,
+        vy: Number(player.vy) || 0,
+        radius: Number(player.radius) || 24,
         color: player.color,
-        alive: player.alive
+        alive: player.alive !== false
     };
 }
 
@@ -77,7 +81,7 @@ function publicState(room) {
     return {
         type: 'state',
         tick: room.tick,
-        arenaRadius: room.arenaRadius,
+        arenaRadius: Number(room.arenaRadius) || ARENA_RADIUS,
         scores: room.scores,
         players: {
             host: publicPlayer(room.players.host),

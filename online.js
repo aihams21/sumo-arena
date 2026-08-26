@@ -1,16 +1,32 @@
-// The game and relay are served by the same Replit process. This avoids a
-// hard-coded external relay that can sleep, use the wrong protocol, or add
-// unnecessary latency.
-const SERVER_WS_URL = (() => {
-    const protocol =
-        window.location.protocol === 'https:'
-            ? 'wss:'
-            : 'ws:';
+const ONLINE_WS_URL = 'wss://sumo-server.onrender.com';
 
-    return window.location.host
-        ? `${protocol}//${window.location.host}`
-        : 'ws://localhost:3000';
-})();
+function isLocalHostname(hostname) {
+    return (
+        !hostname ||
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '[::1]'
+    );
+}
+
+function getServerWsUrl() {
+    const hostname = window.location.hostname;
+
+    if (isLocalHostname(hostname)) {
+        const protocol =
+            window.location.protocol === 'https:'
+                ? 'wss:'
+                : 'ws:';
+
+        return window.location.host
+            ? `${protocol}//${window.location.host}`
+            : 'ws://localhost:3000';
+    }
+
+    return ONLINE_WS_URL;
+}
+
+const SERVER_WS_URL = getServerWsUrl();
 
 let ws = null;
 let isHost = false;
@@ -18,6 +34,7 @@ let currentRoomCode = "";
 let p2pArenaRadius = 240;
 let netInterval = null;
 let wsCallbacks = [];
+let connectTimer = null;
 let p2pInput = {
     dx: 0,
     dy: 0
@@ -59,17 +76,66 @@ let p2pScores = {
     guest: 0
 };
 
-function connectWS(callback) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        callback();
+function resetJoinButton() {
+    const button = document.getElementById('btn-join');
+
+    if (button) {
+        button.innerText = "🚀 Join Room";
+    }
+}
+
+function clearConnectTimer() {
+    if (connectTimer) {
+        clearTimeout(connectTimer);
+        connectTimer = null;
+    }
+}
+
+function handleSocketClosed() {
+    clearConnectTimer();
+    ws = null;
+    wsCallbacks = [];
+    resetJoinButton();
+
+    if (leavingOnlineRoom) {
+        leavingOnlineRoom = false;
         return;
     }
 
-    wsCallbacks.push(callback);
+    const inOnlineMatch =
+        typeof gameMode !== 'undefined' &&
+        gameMode === 'p2p';
+
+    const lobby = document.getElementById('menu-lobby');
+    const waitingInLobby =
+        lobby &&
+        !lobby.classList.contains('hidden');
+
+    if (inOnlineMatch || waitingInLobby) {
+        alert("انقطع الاتصال بالسيرفر");
+
+        if (typeof exitToMenu === 'function') {
+            exitToMenu();
+        }
+    }
+}
+
+function connectWS(callback) {
+    if (typeof callback === 'function') {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            callback();
+            return;
+        }
+
+        wsCallbacks.push(callback);
+    }
 
     if (
         ws &&
-        ws.readyState === WebSocket.CONNECTING
+        (
+            ws.readyState === WebSocket.CONNECTING ||
+            ws.readyState === WebSocket.OPEN
+        )
     ) {
         return;
     }
@@ -77,9 +143,21 @@ function connectWS(callback) {
     leavingOnlineRoom = false;
     ws = new WebSocket(SERVER_WS_URL);
 
+    clearConnectTimer();
+    connectTimer = setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.CONNECTING) {
+            ws.close();
+        }
+    }, 45000);
+
     ws.onopen = () => {
+        clearConnectTimer();
         const callbacks = wsCallbacks.splice(0);
-        callbacks.forEach(fn => fn());
+        callbacks.forEach(fn => {
+            if (typeof fn === 'function') {
+                fn();
+            }
+        });
     };
 
     ws.onmessage = event => {
@@ -91,12 +169,20 @@ function connectWS(callback) {
             return;
         }
 
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
         if (data.type === 'created') {
-            currentRoomCode = data.room;
+            currentRoomCode = data.room || "";
             isHost = data.role === 'host';
 
-            document.getElementById('lobby-code').innerText =
-                data.room;
+            const lobbyCode =
+                document.getElementById('lobby-code');
+
+            if (lobbyCode) {
+                lobbyCode.innerText = data.room || "";
+            }
         } else if (
             data.type === 'player_joined' ||
             data.type === 'joined'
@@ -115,7 +201,10 @@ function connectWS(callback) {
                 ...(data.scores || {})
             };
 
-            if (gameMode !== 'p2p') {
+            if (
+                typeof gameMode === 'undefined' ||
+                gameMode !== 'p2p'
+            ) {
                 startOnlineGame();
             }
 
@@ -142,64 +231,90 @@ function connectWS(callback) {
                 'Unable to join room.'
             );
 
-            const button =
-                document.getElementById('btn-join');
-
-            if (button) {
-                button.innerText = "🚀 Join Room";
-            }
+            resetJoinButton();
         } else if (data.type === 'opponent_left') {
             alert("خرج الخصم من الغرفة");
-            exitToMenu();
+            leavingOnlineRoom = true;
+
+            if (typeof exitToMenu === 'function') {
+                exitToMenu();
+            }
         }
     };
 
-    ws.onclose = () => {
-        ws = null;
-        wsCallbacks = [];
-
-        if (
-            !leavingOnlineRoom &&
-            gameMode === 'p2p'
-        ) {
-            alert("انقطع الاتصال بالسيرفر");
-            exitToMenu();
-        }
-    };
+    ws.onclose = handleSocketClosed;
 
     ws.onerror = () => {
         // onclose presents the user-facing message.
-        // Keeping this handler prevents an uncaught browser
-        // WebSocket error in the console.
     };
+}
+
+function disconnectWS() {
+    leavingOnlineRoom = true;
+    clearConnectTimer();
+
+    if (netInterval) {
+        clearInterval(netInterval);
+        netInterval = null;
+    }
+
+    if (!ws) {
+        leavingOnlineRoom = false;
+        return;
+    }
+
+    if (ws.readyState === WebSocket.OPEN) {
+        try {
+            ws.send(JSON.stringify({ type: 'leave' }));
+        } catch (_error) {
+            // Ignore send failures while closing.
+        }
+    }
+
+    try {
+        ws.close();
+    } catch (_error) {
+        // Ignore close failures.
+    }
+
+    ws = null;
 }
 
 function createOnlineRoom() {
     hideAllMenus();
-    bannerAd.style.display = 'none';
+
+    if (typeof bannerAd !== 'undefined' && bannerAd) {
+        bannerAd.style.display = 'none';
+    }
+
     isHost = true;
 
-    document.getElementById('lobby-code').innerText =
-        "جاري الإنشاء...";
+    const lobbyCode =
+        document.getElementById('lobby-code');
 
-    document
-        .getElementById('menu-lobby')
-        .classList
-        .remove('hidden');
+    if (lobbyCode) {
+        lobbyCode.innerText = "جاري الإنشاء...";
+    }
+
+    const lobby = document.getElementById('menu-lobby');
+
+    if (lobby) {
+        lobby.classList.remove('hidden');
+    }
 
     connectWS(() => {
-        ws.send(
-            JSON.stringify({
-                type: 'create'
-            })
-        );
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'create' }));
+        }
     });
 }
 
 function joinOnlineRoom(code) {
+    const input = document.getElementById('room-input');
     const room = String(
         code ||
-        document.getElementById('room-input').value
+        (input && input.value) ||
+        ''
     )
         .trim()
         .toUpperCase();
@@ -218,16 +333,22 @@ function joinOnlineRoom(code) {
     }
 
     hideAllMenus();
-    bannerAd.style.display = 'none';
+
+    if (typeof bannerAd !== 'undefined' && bannerAd) {
+        bannerAd.style.display = 'none';
+    }
+
     isHost = false;
 
     connectWS(() => {
-        ws.send(
-            JSON.stringify({
-                type: 'join',
-                room
-            })
-        );
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(
+                JSON.stringify({
+                    type: 'join',
+                    room
+                })
+            );
+        }
     });
 }
 
@@ -235,12 +356,15 @@ function startOnlineGame() {
     gameMode = 'p2p';
     hideAllMenus();
 
-    document
-        .getElementById('hud')
-        .classList
-        .remove('hidden');
+    const hud = document.getElementById('hud');
 
-    touchBox.style.display = 'block';
+    if (hud) {
+        hud.classList.remove('hidden');
+    }
+
+    if (typeof touchBox !== 'undefined' && touchBox) {
+        touchBox.style.display = 'block';
+    }
 
     resetP2PRound();
 
@@ -248,9 +372,6 @@ function startOnlineGame() {
         clearInterval(netInterval);
     }
 
-    // Inputs are sent frequently enough for responsive server
-    // simulation, while snapshots arrive independently at the
-    // server's fixed tick rate.
     netInterval = setInterval(() => {
         if (
             !ws ||
@@ -263,6 +384,10 @@ function startOnlineGame() {
         const me = isHost
             ? p2pPlayers.host
             : p2pPlayers.guest;
+
+        if (!me) {
+            return;
+        }
 
         ws.send(
             JSON.stringify({
@@ -277,10 +402,13 @@ function startOnlineGame() {
 }
 
 function applyOnlineState(data) {
-    p2pArenaRadius =
-        Number.isFinite(data.arenaRadius)
-            ? data.arenaRadius
-            : p2pArenaRadius;
+    if (!data || typeof data !== 'object') {
+        return;
+    }
+
+    if (Number.isFinite(data.arenaRadius) && data.arenaRadius > 0) {
+        p2pArenaRadius = data.arenaRadius;
+    }
 
     p2pScores = {
         ...p2pScores,
@@ -298,15 +426,32 @@ function applyOnlineState(data) {
             continue;
         }
 
-        local.serverX = Number(incoming.x);
-        local.serverY = Number(incoming.y);
-        local.targetX = local.serverX;
-        local.targetY = local.serverY;
-        local.vx = Number(incoming.vx) || 0;
-        local.vy = Number(incoming.vy) || 0;
-        local.radius =
-            Number(incoming.radius) ||
-            local.radius;
+        const serverX = Number(incoming.x);
+        const serverY = Number(incoming.y);
+
+        if (
+            !Number.isFinite(serverX) ||
+            !Number.isFinite(serverY)
+        ) {
+            continue;
+        }
+
+        local.serverX = serverX;
+        local.serverY = serverY;
+        local.targetX = serverX;
+        local.targetY = serverY;
+
+        const vx = Number(incoming.vx);
+        const vy = Number(incoming.vy);
+        local.vx = Number.isFinite(vx) ? vx : 0;
+        local.vy = Number.isFinite(vy) ? vy : 0;
+
+        const radius = Number(incoming.radius);
+
+        if (Number.isFinite(radius) && radius > 0) {
+            local.radius = radius;
+        }
+
         local.alive = incoming.alive !== false;
 
         const isMe =
@@ -314,22 +459,25 @@ function applyOnlineState(data) {
             (!isHost && role === 'guest');
 
         if (isMe) {
-            // Preserve prediction for low input latency,
-            // but continuously remove server error so pushes
-            // and ring-outs cannot ghost apart.
-            const errorX =
-                local.serverX - local.x;
+            const errorX = local.serverX - local.x;
+            const errorY = local.serverY - local.y;
 
-            const errorY =
-                local.serverY - local.y;
-
-            if (Math.hypot(errorX, errorY) > 70) {
+            if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) {
+                local.x = local.serverX;
+                local.y = local.serverY;
+            } else if (Math.hypot(errorX, errorY) > 70) {
                 local.x = local.serverX;
                 local.y = local.serverY;
             } else {
-                local.x += errorX * 0.3;
-                local.y += errorY * 0.3;
+                local.x += errorX * 0.35;
+                local.y += errorY * 0.35;
             }
+        } else if (
+            !Number.isFinite(local.x) ||
+            !Number.isFinite(local.y)
+        ) {
+            local.x = local.serverX;
+            local.y = local.serverY;
         }
     }
 
@@ -374,19 +522,26 @@ function resetP2PRound() {
     stageEnded = false;
     hideAllMenus();
 
-    document
-        .getElementById('hud')
-        .classList
-        .remove('hidden');
+    const hud = document.getElementById('hud');
 
-    touchBox.style.display = 'block';
+    if (hud) {
+        hud.classList.remove('hidden');
+    }
+
+    if (typeof touchBox !== 'undefined' && touchBox) {
+        touchBox.style.display = 'block';
+    }
+
     updateP2PHud();
 }
 
 function setP2PInput(dx, dy) {
+    const safeDx = Number(dx);
+    const safeDy = Number(dy);
+
     p2pInput = {
-        dx,
-        dy
+        dx: Number.isFinite(safeDx) ? safeDx : 0,
+        dy: Number.isFinite(safeDy) ? safeDy : 0
     };
 }
 
@@ -396,13 +551,15 @@ function showOnlineEnd(won) {
     const title =
         document.getElementById('round-title');
 
-    title.innerText = won
-        ? "ROUND WON! 🏆"
-        : "ROUND LOST! 💀";
+    if (title) {
+        title.innerText = won
+            ? "ROUND WON! 🏆"
+            : "ROUND LOST! 💀";
 
-    title.style.color = won
-        ? "#00ff66"
-        : "#ff3366";
+        title.style.color = won
+            ? "#00ff66"
+            : "#ff3366";
+    }
 
     const myScore = isHost
         ? p2pScores.host
@@ -412,16 +569,25 @@ function showOnlineEnd(won) {
         ? p2pScores.guest
         : p2pScores.host;
 
-    document.getElementById('round-score').innerText =
-        `${myScore}  -  ${opponentScore}`;
+    const scoreEl =
+        document.getElementById('round-score');
+
+    if (scoreEl) {
+        scoreEl.innerText =
+            `${myScore || 0}  -  ${opponentScore || 0}`;
+    }
 
     hideAllMenus();
-    bannerAd.style.display = 'none';
 
-    document
-        .getElementById('modal-round')
-        .classList
-        .remove('hidden');
+    if (typeof bannerAd !== 'undefined' && bannerAd) {
+        bannerAd.style.display = 'none';
+    }
+
+    const modal = document.getElementById('modal-round');
+
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
 }
 
 function restartOnlineRound() {
@@ -444,6 +610,12 @@ function restartOnlineRound() {
 }
 
 function updateP2PHud() {
+    const hudLeft = document.getElementById('hud-left');
+
+    if (!hudLeft) {
+        return;
+    }
+
     const myScore = isHost
         ? p2pScores.host
         : p2pScores.guest;
@@ -452,8 +624,8 @@ function updateP2PHud() {
         ? p2pScores.guest
         : p2pScores.host;
 
-    document.getElementById('hud-left').innerText =
-        `YOU: ${myScore} | OPP: ${opponentScore}`;
+    hudLeft.innerText =
+        `YOU: ${myScore || 0} | OPP: ${opponentScore || 0}`;
 }
 
 function shareRoomWhatsApp() {
