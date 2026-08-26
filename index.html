@@ -172,7 +172,10 @@
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
         let counters = { free_coins: 0, revive: 0, double: 0 }, limits = { free_coins: 10, revive: 5, double: 10 };
-        
+
+        function isOnlineSession() {
+            return document.body.classList.contains('online-mode') || gameMode === 'p2p';
+        }
 
         function setOnlineAdsOff(off) {
             document.body.classList.toggle('online-mode', !!off);
@@ -352,29 +355,47 @@
                     : 'flex';
         }
 
-        function showMainMenu() {
-            hideAllMenus();
+        function stopPlaySession() {
             gameMode = 'none';
-            if (typeof setOnlineAdsOff === 'function') {
-                setOnlineAdsOff(false);
+            stageEnded = false;
+            bots = [];
+            particles = [];
+            player.alive = true;
+            player.vx = 0;
+            player.vy = 0;
+
+            if (typeof clearMoveVector === 'function') {
+                clearMoveVector();
             }
 
             if (typeof disconnectWS === 'function') {
-                disconnectWS();
-            } else {
-                if (netInterval) {
-                    clearInterval(netInterval);
-                    netInterval = null;
-                }
-
-                if (ws) {
-                    try {
-                        ws.close();
-                    } catch (_error) {}
-                    ws = null;
-                }
+                try { disconnectWS(); } catch (_error) {}
             }
 
+            if (typeof netInterval !== 'undefined' && netInterval) {
+                clearInterval(netInterval);
+                netInterval = null;
+            }
+
+            if (typeof ws !== 'undefined' && ws) {
+                try { ws.close(); } catch (_error) {}
+                ws = null;
+            }
+        }
+
+        function showMainMenu() {
+            try {
+                stopPlaySession();
+
+                if (typeof setOnlineAdsOff === 'function') {
+                    setOnlineAdsOff(false);
+                }
+            } catch (_error) {
+                gameMode = 'none';
+            }
+
+            hideAllMenus();
+            bannerAd.style.display = 'flex';
             updateDisplays();
             document
                 .getElementById('menu-main')
@@ -482,6 +503,36 @@
             showMainMenu();
         }
 
+        function offlineEnemyCount(level) {
+            if (level < 8) return 1;
+            if (level < 22) return 2;
+            return 3;
+        }
+
+        function offlineBotStats(level) {
+            const curve = Math.sqrt(level);
+
+            return {
+                radius: 18 + Math.min(7, curve * 0.85),
+                mass: 0.85 + Math.min(1.4, level * 0.011),
+                speed: 0.30 + Math.min(0.16, curve * 0.016),
+                power: 4.2 + Math.min(8.5, curve * 0.9)
+            };
+        }
+
+        function offlineBossStats(level, playerRadius) {
+            const curve = Math.sqrt(level);
+            const wave = Math.max(1, Math.floor(level / 5));
+
+            return {
+                radius: Math.max(40, playerRadius * 1.5 + Math.min(8, curve)),
+                mass: 5.2 + Math.min(3.8, curve * 0.38),
+                speed: 0.33 + Math.min(0.2, curve * 0.018),
+                power: 13 + Math.min(15, curve * 1.45),
+                maxHp: 6 + Math.min(9, Math.floor(wave * 0.4))
+            };
+        }
+
         function startOfflineStage(level) {
             gameMode = 'offline';
             currentPlayingStage = level;
@@ -511,29 +562,30 @@
             let isBoss = level % 5 === 0;
 
             if (isBoss) {
+                const stats = offlineBossStats(level, player.radius);
+
                 bots.push({
                     x: 400,
-                    y: 140,
+                    y: 130,
                     vx: 0,
                     vy: 0,
-                    radius: Math.max(
-                        34,
-                        player.radius * 1.35
-                    ),
-                    mass: 3.2,
-                    speed: 0.42,
-                    power: 14,
+                    radius: stats.radius,
+                    mass: stats.mass,
+                    speed: stats.speed,
+                    power: stats.power,
                     color: '#ff0055',
                     isBoss: true,
                     alive: true,
-                    cd: 0
+                    cd: 0,
+                    slamCd: 90,
+                    phase: 1,
+                    hp: stats.maxHp,
+                    maxHp: stats.maxHp,
+                    hurtCd: 0
                 });
             } else {
-                let count =
-                    Math.min(
-                        1 + Math.floor(level / 3),
-                        3
-                    );
+                const count = offlineEnemyCount(level);
+                const stats = offlineBotStats(level);
 
                 for (let i = 0; i < count; i++) {
                     let angle =
@@ -551,14 +603,10 @@
                             140,
                         vx: 0,
                         vy: 0,
-                        radius:
-                            19 +
-                            Math.min(10, level * 0.2),
-                        mass:
-                            0.8 +
-                            level * 0.04,
-                        speed: 0.38,
-                        power: 5 + level * 0.3,
+                        radius: stats.radius,
+                        mass: stats.mass,
+                        speed: stats.speed,
+                        power: stats.power,
                         color: '#ffaa00',
                         isBoss: false,
                         alive: true,
@@ -692,7 +740,7 @@
                 dy /= magnitude;
             }
 
-            if (gameMode === 'p2p') {
+            if (gameMode === 'p2p' && typeof p2pPlayers !== 'undefined') {
                 let me =
                     isHost
                         ? p2pPlayers.host
@@ -766,8 +814,8 @@
                 player.x += player.vx;
                 player.y += player.vy;
 
-                if (offlineArenaRadius > 156) {
-                    offlineArenaRadius -= 0.015;
+                if (offlineArenaRadius > 160) {
+                    offlineArenaRadius -= 0.012;
                 }
 
                 if (
@@ -801,12 +849,34 @@
                     bot.cd =
                         (bot.cd || 0) + 1;
 
-                    let speed =
-                        bot.cd > 75
-                            ? bot.speed * 2.8
-                            : bot.speed;
+                    if (bot.hurtCd > 0) {
+                        bot.hurtCd -= 1;
+                    }
 
-                    if (bot.cd > 105) {
+                    let raging =
+                        bot.isBoss &&
+                        bot.hp <= bot.maxHp * 0.5;
+
+                    if (raging && bot.phase === 1) {
+                        bot.phase = 2;
+                        bot.color = '#ff3366';
+                        spawnImpact(bot.x, bot.y, '#ff3366');
+                    }
+
+                    let speed = bot.speed * (raging ? 1.35 : 1);
+                    let dashAt = bot.isBoss
+                        ? (raging ? 48 : 68)
+                        : 80;
+                    let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
+                    let dashMul = bot.isBoss
+                        ? (raging ? 3.1 : 2.35)
+                        : 1.85;
+
+                    if (bot.cd > dashAt) {
+                        speed *= dashMul;
+                    }
+
+                    if (bot.cd > dashEnd) {
                         bot.cd = 0;
                     }
 
@@ -818,18 +888,30 @@
                         Math.sin(angle) *
                         speed;
 
-                    bot.vx *= 0.9;
-                    bot.vy *= 0.9;
+                    bot.vx *= bot.isBoss ? 0.92 : 0.9;
+                    bot.vy *= bot.isBoss ? 0.92 : 0.9;
 
                     bot.x += bot.vx;
                     bot.y += bot.vy;
 
-                    if (
+                    let fromCenter =
                         Math.hypot(
                             bot.x - 400,
                             bot.y - 300
-                        ) > offlineArenaRadius
+                        );
+
+                    if (
+                        bot.isBoss &&
+                        bot.hp > 0 &&
+                        fromCenter > offlineArenaRadius - 10
                     ) {
+                        let nx = (bot.x - 400) / fromCenter;
+                        let ny = (bot.y - 300) / fromCenter;
+                        bot.x = 400 + nx * (offlineArenaRadius - 12);
+                        bot.y = 300 + ny * (offlineArenaRadius - 12);
+                        bot.vx *= 0.25;
+                        bot.vy *= 0.25;
+                    } else if (fromCenter > offlineArenaRadius) {
                         bot.alive = false;
                     }
 
@@ -838,6 +920,27 @@
                             bot.x - player.x,
                             bot.y - player.y
                         );
+
+                    if (bot.isBoss) {
+                        bot.slamCd = (bot.slamCd || 0) + 1;
+
+                        if (
+                            bot.slamCd > (raging ? 110 : 150) &&
+                            distance < bot.radius + player.radius + 55
+                        ) {
+                            let slam =
+                                (raging ? 18 : 13) +
+                                bot.power * 0.22;
+                            player.vx -= Math.cos(angle) * slam;
+                            player.vy -= Math.sin(angle) * slam;
+                            bot.slamCd = 0;
+                            spawnImpact(
+                                player.x,
+                                player.y,
+                                '#ff0055'
+                            );
+                        }
+                    }
 
                     if (
                         distance <
@@ -886,13 +989,30 @@
                             Math.sin(collisionAngle) *
                             (bot.power / playerMass);
 
+                        let armor =
+                            bot.isBoss && bot.hp > 0
+                                ? 0.22
+                                : 1;
+
+                        if (
+                            bot.isBoss &&
+                            bot.hp > 0 &&
+                            (bot.hurtCd || 0) <= 0 &&
+                            Math.hypot(player.vx, player.vy) > 3.5
+                        ) {
+                            bot.hp -= 1;
+                            bot.hurtCd = 22;
+                        }
+
                         bot.vx +=
                             Math.cos(collisionAngle) *
-                            (playerPower / bot.mass);
+                            (playerPower / bot.mass) *
+                            armor;
 
                         bot.vy +=
                             Math.sin(collisionAngle) *
-                            (playerPower / bot.mass);
+                            (playerPower / bot.mass) *
+                            armor;
 
                         spawnImpact(
                             (player.x + bot.x) / 2,
@@ -979,7 +1099,7 @@
                     ctx.globalAlpha = 1;
                 }
 
-                if (gameMode === 'p2p') {
+                if (gameMode === 'p2p' && typeof p2pPlayers !== 'undefined') {
                     for (let role of ['host', 'guest']) {
                         let playerState =
                             p2pPlayers &&
@@ -1057,6 +1177,34 @@
 
                         ctx.strokeStyle = '#fff';
                         ctx.stroke();
+
+                        if (bot.isBoss && bot.maxHp) {
+                            let ratio =
+                                Math.max(0, bot.hp) / bot.maxHp;
+                            ctx.lineWidth = 5;
+                            ctx.strokeStyle = '#1a1f2e';
+                            ctx.beginPath();
+                            ctx.arc(
+                                bot.x,
+                                bot.y - bot.radius - 12,
+                                16,
+                                0,
+                                Math.PI * 2
+                            );
+                            ctx.stroke();
+                            ctx.strokeStyle =
+                                ratio < 0.4 ? '#ff3366' : '#ffbb00';
+                            ctx.beginPath();
+                            ctx.arc(
+                                bot.x,
+                                bot.y - bot.radius - 12,
+                                16,
+                                -Math.PI / 2,
+                                -Math.PI / 2 +
+                                    Math.PI * 2 * ratio
+                            );
+                            ctx.stroke();
+                        }
                     }
 
                     if (player.alive) {
@@ -1101,7 +1249,7 @@
                     window.location.hash
                         .split('room=')[1];
 
-                if (room) {
+                if (room && typeof joinOnlineRoom === 'function') {
                     setTimeout(
                         () => joinOnlineRoom(room),
                         500
