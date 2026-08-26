@@ -280,13 +280,25 @@ function disconnectWS() {
     ws = null;
 }
 
-function createOnlineRoom() {
-    hideAllMenus();
-
-    if (typeof bannerAd !== 'undefined' && bannerAd) {
-        bannerAd.style.display = 'none';
+function enableOnlineSession() {
+    if (typeof setOnlineAdsOff === 'function') {
+        setOnlineAdsOff(true);
     }
+}
 
+function showOnlineControls() {
+    const hud = document.getElementById('hud');
+    if (hud) hud.classList.remove('hidden');
+    if (typeof touchBox !== 'undefined' && touchBox) {
+        touchBox.style.display = 'block';
+        touchBox.style.pointerEvents = 'auto';
+        touchBox.style.zIndex = '40';
+    }
+}
+
+function createOnlineRoom() {
+    enableOnlineSession();
+    hideAllMenus();
     isHost = true;
 
     const lobbyCode =
@@ -333,11 +345,7 @@ function joinOnlineRoom(code) {
     }
 
     hideAllMenus();
-
-    if (typeof bannerAd !== 'undefined' && bannerAd) {
-        bannerAd.style.display = 'none';
-    }
-
+    enableOnlineSession();
     isHost = false;
 
     connectWS(() => {
@@ -354,18 +362,9 @@ function joinOnlineRoom(code) {
 
 function startOnlineGame() {
     gameMode = 'p2p';
+    enableOnlineSession();
     hideAllMenus();
-
-    const hud = document.getElementById('hud');
-
-    if (hud) {
-        hud.classList.remove('hidden');
-    }
-
-    if (typeof touchBox !== 'undefined' && touchBox) {
-        touchBox.style.display = 'block';
-    }
-
+    showOnlineControls();
     resetP2PRound();
 
     if (netInterval) {
@@ -521,17 +520,8 @@ function resetP2PRound() {
 
     stageEnded = false;
     hideAllMenus();
-
-    const hud = document.getElementById('hud');
-
-    if (hud) {
-        hud.classList.remove('hidden');
-    }
-
-    if (typeof touchBox !== 'undefined' && touchBox) {
-        touchBox.style.display = 'block';
-    }
-
+    enableOnlineSession();
+    showOnlineControls();
     updateP2PHud();
 }
 
@@ -578,10 +568,7 @@ function showOnlineEnd(won) {
     }
 
     hideAllMenus();
-
-    if (typeof bannerAd !== 'undefined' && bannerAd) {
-        bannerAd.style.display = 'none';
-    }
+    enableOnlineSession();
 
     const modal = document.getElementById('modal-round');
 

@@ -16,6 +16,15 @@
         html, body { width: 100%; height: 100%; background: #08090f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         #banner-ad { width: 100%; height: 35px; background: #111420; border-bottom: 1px dashed #00e5ff; display: flex; align-items: center; justify-content: center; color: #00e5ff; font-size: 11px; letter-spacing: 1px; flex-shrink: 0; cursor: pointer; }
         #game-box { position: relative; flex: 1; width: 100%; height: calc(100% - 35px); display: flex; align-items: center; justify-content: center; background: #07080d; }
+        body.online-mode #banner-ad { display: none !important; pointer-events: none !important; }
+        body.online-mode #game-box { height: 100%; }
+        body.online-mode iframe,
+        body.online-mode [id*="ad-"],
+        body.online-mode [class*="adsbox"] {
+            display: none !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
         canvas { display: block; width: 100%; height: 100%; max-width: 800px; max-height: 600px; aspect-ratio: 4 / 3; object-fit: contain; }
         .overlay { position: absolute; inset: 0; background: rgba(6, 7, 12, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); padding: 15px; text-align: center; }
         .hidden { display: none !important; }
@@ -44,7 +53,7 @@
         .stat-val { font-weight: bold; color: #00e5ff; }
         .shop-card { background: #0f121d; border: 1px solid #20263a; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
         .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        #touch-controller { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); width: 130px; height: 130px; background: rgba(255, 255, 255, 0.04); border: 2px solid rgba(0, 229, 255, 0.3); border-radius: 50%; touch-action: none; z-index: 8; display: none; }
+        #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
         #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     </style>
 </head>
@@ -158,11 +167,32 @@
             else { t.innerText = "💻 التثبيت على الكمبيوتر"; b.innerHTML = "اضغط على أيقونة <b>التثبيت (🖥️)</b> في شريط العنوان بالأعلى."; }
             document.getElementById('modal-install-guide').classList.remove('hidden');
         }
-        function closeInstallGuide() { document.getElementById('modal-install-guide').classList.add('hidden'); bannerAd.style.display = 'flex'; }
+        function closeInstallGuide() {
+            document.getElementById('modal-install-guide').classList.add('hidden');
+            if (!isOnlineSession()) bannerAd.style.display = 'flex';
+        }
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
         let counters = { free_coins: 0, revive: 0, double: 0 }, limits = { free_coins: 10, revive: 5, double: 10 };
+        function isOnlineSession() {
+            return document.body.classList.contains('online-mode') || gameMode === 'p2p';
+        }
+
+        function setOnlineAdsOff(off) {
+            document.body.classList.toggle('online-mode', !!off);
+            if (bannerAd) {
+                bannerAd.style.display = off ? 'none' : 'flex';
+                bannerAd.style.pointerEvents = off ? 'none' : 'auto';
+            }
+            document.querySelectorAll('iframe').forEach(frame => {
+                if (!off) return;
+                frame.style.display = 'none';
+                frame.style.pointerEvents = 'none';
+            });
+        }
+
         function handleAdClickWithCounter(type) {
+            if (isOnlineSession()) return;
             window.open(SMARTLINK, '_blank'); counters[type]++;
             let el = document.getElementById(`count-${type}`);
             if (el) el.innerText = `${counters[type]}/${limits[type]}`;
@@ -173,47 +203,89 @@
                 else if (type === 'double') { coins += 10; saveData(); nextStageOffline(); }
             }
         }
-        function triggerSmartlinkDirect() { window.open(SMARTLINK, '_blank'); }
+        function triggerSmartlinkDirect() {
+            if (isOnlineSession()) return;
+            window.open(SMARTLINK, '_blank');
+        }
 
         const canvas = document.getElementById('c'), ctx = canvas.getContext('2d', { alpha: false });
+        const gameBox = document.getElementById('game-box');
         const touchBox = document.getElementById('touch-controller'), stick = document.getElementById('stick'), bannerAd = document.getElementById('banner-ad');
-        let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0;
+        let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0, pointerActive = false;
+
+        function applyMoveVector(dx, dy) {
+            const m = 45;
+            const dist = Math.hypot(dx, dy);
+            if (dist > m) {
+                dx = (dx / dist) * m;
+                dy = (dy / dist) * m;
+            }
+            stick.style.transform =
+                `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            touchVec.x = dx / m;
+            touchVec.y = dy / m;
+            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
+                setP2PInput(touchVec.x, touchVec.y);
+            }
+        }
+
+        function clearMoveVector() {
+            activeTouchId = null;
+            pointerActive = false;
+            touchVec = { x: 0, y: 0 };
+            stick.style.transform = 'translate(-50%, -50%)';
+            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
+                setP2PInput(0, 0);
+            }
+        }
+
+        function isPlayTouchTarget(target) {
+            return !target.closest('button') && !target.closest('.overlay:not(.hidden)');
+        }
+
+        function isPlayingNow() {
+            return gameMode === 'p2p' || gameMode === 'offline';
+        }
 
         touchBox.addEventListener('touchstart', e => {
-            let t = e.changedTouches[0]; activeTouchId = t.identifier;
-            let r = touchBox.getBoundingClientRect(); startX = r.left + r.width / 2; startY = r.top + r.height / 2;
+            if (window.PointerEvent) return;
+            const t = e.changedTouches[0];
+            activeTouchId = t.identifier;
+            const r = touchBox.getBoundingClientRect();
+            startX = r.left + r.width / 2;
+            startY = r.top + r.height / 2;
         }, { passive: true });
 
+        gameBox.addEventListener('pointerdown', e => {
+            if (!isPlayingNow() || !isPlayTouchTarget(e.target)) return;
+            pointerActive = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            try { gameBox.setPointerCapture(e.pointerId); } catch (_error) {}
+            applyMoveVector(0, 0);
+        });
+
+        gameBox.addEventListener('pointermove', e => {
+            if (!pointerActive) return;
+            applyMoveVector(e.clientX - startX, e.clientY - startY);
+        });
+
+        gameBox.addEventListener('pointerup', clearMoveVector);
+        gameBox.addEventListener('pointercancel', clearMoveVector);
+
         window.addEventListener('touchmove', e => {
-            if (activeTouchId === null) return;
-
-            for (let t of e.changedTouches) {
+            if (pointerActive || activeTouchId === null) return;
+            for (const t of e.changedTouches) {
                 if (t.identifier === activeTouchId) {
-                    let dx = t.clientX - startX;
-                    let dy = t.clientY - startY;
-                    let dist = Math.hypot(dx, dy);
-                    let m = 45;
-
-                    if (dist > m) {
-                        dx = (dx / dist) * m;
-                        dy = (dy / dist) * m;
-                    }
-
-                    stick.style.transform =
-                        `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-
-                    touchVec.x = dx / m;
-                    touchVec.y = dy / m;
+                    applyMoveVector(t.clientX - startX, t.clientY - startY);
                 }
             }
         }, { passive: true });
 
         const resetTouch = e => {
-            for (let t of e.changedTouches) {
+            for (const t of e.changedTouches) {
                 if (t.identifier === activeTouchId) {
-                    activeTouchId = null;
-                    touchVec = { x: 0, y: 0 };
-                    stick.style.transform = `translate(-50%, -50%)`;
+                    clearMoveVector();
                 }
             }
         };
@@ -278,12 +350,18 @@
                 .add('hidden');
 
             touchBox.style.display = 'none';
-            bannerAd.style.display = 'flex';
+            bannerAd.style.display =
+                document.body.classList.contains('online-mode')
+                    ? 'none'
+                    : 'flex';
         }
 
         function showMainMenu() {
             hideAllMenus();
             gameMode = 'none';
+            if (typeof setOnlineAdsOff === 'function') {
+                setOnlineAdsOff(false);
+            }
 
             if (typeof disconnectWS === 'function') {
                 disconnectWS();
@@ -396,9 +474,8 @@
         }
 
         function showMultiMenu() {
+            setOnlineAdsOff(true);
             hideAllMenus();
-            bannerAd.style.display = 'none';
-
             document
                 .getElementById('menu-multi')
                 .classList
