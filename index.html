@@ -114,10 +114,10 @@
         <div id="menu-multi" class="overlay hidden">
             <h2>ONLINE 1v1 (FRANKFURT EU)</h2>
             <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">Ultra Low Latency | Dedicated Relay</p>
-            <button class="btn btn-cyan" onclick="createOnlineRoom()">➕ Create Room</button>
+            
             <p style="margin: 8px 0; color: #888;">--- OR ---</p>
             <input type="text" id="room-input" placeholder="4-DIGIT CODE" maxlength="4">
-            <button id="btn-join" class="btn btn-magenta" onclick="joinOnlineRoom()">🚀 Join Room</button>
+            
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
@@ -132,7 +132,7 @@
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
-            <button class="btn btn-cyan" onclick="restartOnlineRound()">Next Round ➔</button>
+            
             <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
@@ -173,9 +173,7 @@
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
         let counters = { free_coins: 0, revive: 0, double: 0 }, limits = { free_coins: 10, revive: 5, double: 10 };
-        function isOnlineSession() {
-            return document.body.classList.contains('online-mode') || gameMode === 'p2p';
-        }
+        
 
         function setOnlineAdsOff(off) {
             document.body.classList.toggle('online-mode', !!off);
