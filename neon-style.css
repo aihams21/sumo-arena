@@ -140,3 +140,68 @@ button:hover, .neon-btn:hover {
 div[style*="Coins"], span, div {
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
+
+@media (max-width: 600px) {
+  #qhqabts { pointer-events: none !important; }
+  #qhqabts a { pointer-events: none !important; }
+  body > div[style*="z-index: 2147483647"] { pointer-events: none !important; }
+  html, body { min-height: 100%; }
+  #banner-ad { height: 30px; min-height: 30px; font-size: 9px; padding: 0 8px; text-align: center; }
+  #game-box { min-height: calc(100dvh - 30px); height: calc(100dvh - 30px); align-items: center; }
+  canvas { width: 100vw; height: auto; max-height: 75dvh; aspect-ratio: 4 / 3; }
+
+  #neon-menu-btn {
+    top: max(12px, env(safe-area-inset-top)) !important;
+    right: max(12px, env(safe-area-inset-right)) !important;
+    width: 62px !important;
+    height: 56px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 14px !important;
+    z-index: 10001 !important;
+    background: rgba(3, 12, 22, .96) !important;
+    box-shadow: 0 0 18px rgba(0, 243, 255, .7), inset 0 0 12px rgba(0, 243, 255, .2) !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #neon-menu-btn::before, #neon-menu-btn::after,
+  #neon-menu-btn span::before { content: ''; display: block; width: 27px; height: 3px; margin: 4px auto; background: #00f3ff; border-radius: 3px; box-shadow: 0 0 8px #00f3ff; }
+  #neon-menu-btn span { width: 100%; font-size: 0 !important; line-height: 0; }
+  #neon-menu-btn span::before { position: absolute; left: 17px; top: 19px; }
+
+  .overlay { justify-content: flex-start; overflow-y: auto; overscroll-behavior: contain; padding: 76px 14px 24px; -webkit-overflow-scrolling: touch; }
+  #menu-main { justify-content: flex-start; padding-top: 70px; }
+  h1 { font-size: clamp(20px, 7vw, 30px); line-height: 1.15; margin-bottom: 12px; max-width: 95vw; }
+  h2 { font-size: clamp(16px, 5vw, 21px); }
+  .btn { width: min(100%, 390px); min-height: 48px; margin: 5px 0; padding: 13px 14px; font-size: 14px; }
+  .menu-metrics, .daily-mission, .mode-grid { width: min(100%, 390px); }
+  .menu-metrics { gap: 6px; }
+  .menu-metrics div { min-height: 58px; padding: 9px 3px; }
+  .menu-metrics span { font-size: 8px; }
+  .menu-metrics strong { font-size: 13px; }
+  .daily-mission { margin-bottom: 8px; }
+  .mode-grid { grid-template-columns: 1fr; gap: 8px; }
+  .mode-btn { min-height: 54px; padding: 10px 14px; text-align: left; }
+  .mode-btn small { display: block; margin: 4px 0 0; }
+
+  #stage-grid { width: 100%; max-height: none; grid-template-columns: repeat(4, minmax(58px, 1fr)); gap: 8px; padding: 9px; }
+  .stage-card { min-height: 54px; display: flex; align-items: center; justify-content: center; padding: 8px 4px; font-size: 13px; }
+  .shop-container { width: 100%; max-width: 390px; }
+  .shop-card { min-height: 54px; }
+  .skin-grid { grid-template-columns: 1fr; }
+  .skin-card { min-height: 70px; grid-template-columns: 48px 1fr; }
+  .skin-card .shop-btn { min-height: 40px; }
+
+  #touch-controller { width: 164px; height: 164px; bottom: max(18px, env(safe-area-inset-bottom)); }
+  #stick { width: 54px; height: 54px; }
+  #hud { top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; gap: 6px; }
+  .hud-card { padding: 7px 9px; font-size: 10px; }
+  .btn-exit { min-height: 36px; padding: 7px 10px; }
+
+  #neon-sidebar { width: min(86vw, 330px) !important; right: min(-86vw, -330px) !important; padding: max(22px, env(safe-area-inset-top)) 16px 24px !important; }
+  #neon-sidebar[style*="right: 0px"] { right: 0 !important; }
+  #account-modal, #leaderboard-modal { padding: 12px !important; }
+  #account-modal > div, #leaderboard-modal > div { width: min(100%, 430px) !important; max-height: calc(100dvh - 24px) !important; overflow-y: auto !important; padding: 18px !important; }
+  #modal-players-list { max-height: 45dvh !important; }
+}
