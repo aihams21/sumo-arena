@@ -56,29 +56,30 @@
         #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
         #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     </style>
-<link rel="stylesheet" href="neon-style.css">
-<style>
-:root {
-  --neon-cyan: #00f3ff;
-  --neon-pink: #ff0055;
-  --bg-dark: #05050a;
-}
-body, html {
-  background-color: var(--bg-dark) !important;
-  color: #ffffff !important;
-}
-.neon-btn-cyan, button {
-  border: 2px solid var(--neon-cyan) !important;
-  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4) !important;
-  transition: all 0.3s ease !important;
-}
-.neon-btn-cyan:hover {
-  background: var(--neon-cyan) !important;
-  color: #05050a !important;
-  box-shadow: 0 0 30px var(--neon-cyan) !important;
-}
-</style>
-<link rel="stylesheet" href="neon-style.css"></head>
+    <link rel="stylesheet" href="neon-style.css">
+    <style>
+    :root {
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff0055;
+      --bg-dark: #05050a;
+    }
+    body, html {
+      background-color: var(--bg-dark) !important;
+      color: #ffffff !important;
+    }
+    .neon-btn-cyan, button {
+      border: 2px solid var(--neon-cyan) !important;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.4) !important;
+      transition: all 0.3s ease !important;
+    }
+    .neon-btn-cyan:hover {
+      background: var(--neon-cyan) !important;
+      color: #05050a !important;
+      box-shadow: 0 0 30px var(--neon-cyan) !important;
+    }
+    </style>
+    <link rel="stylesheet" href="neon-style.css">
+</head>
 <body>
     <div id="banner-ad" onclick="triggerSmartlinkDirect('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
     <div id="game-box">
@@ -241,8 +242,7 @@ body, html {
                 dx = (dx / dist) * m;
                 dy = (dy / dist) * m;
             }
-            stick.style.transform =
-                `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
             touchVec.x = dx / m;
             touchVec.y = dy / m;
             if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
@@ -352,29 +352,14 @@ body, html {
         let particles = [];
         let keys = {};
 
-        window.onkeydown = e => {
-            keys[e.key.toLowerCase()] = true;
-        };
-
-        window.onkeyup = e => {
-            keys[e.key.toLowerCase()] = false;
-        };
+        window.onkeydown = e => { keys[e.key.toLowerCase()] = true; };
+        window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
 
         function hideAllMenus() {
-            document
-                .querySelectorAll('.overlay')
-                .forEach(el => el.classList.add('hidden'));
-
-            document
-                .getElementById('hud')
-                .classList
-                .add('hidden');
-
+            document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+            document.getElementById('hud').classList.add('hidden');
             touchBox.style.display = 'none';
-            bannerAd.style.display =
-                document.body.classList.contains('online-mode')
-                    ? 'none'
-                    : 'flex';
+            bannerAd.style.display = document.body.classList.contains('online-mode') ? 'none' : 'flex';
         }
 
         function stopPlaySession() {
@@ -385,123 +370,58 @@ body, html {
             player.alive = true;
             player.vx = 0;
             player.vy = 0;
-
-            if (typeof clearMoveVector === 'function') {
-                clearMoveVector();
-            }
-
-            if (typeof disconnectWS === 'function') {
-                try { disconnectWS(); } catch (_error) {}
-            }
-
-            if (typeof netInterval !== 'undefined' && netInterval) {
-                clearInterval(netInterval);
-                netInterval = null;
-            }
-
-            if (typeof ws !== 'undefined' && ws) {
-                try { ws.close(); } catch (_error) {}
-                ws = null;
-            }
+            if (typeof clearMoveVector === 'function') clearMoveVector();
+            if (typeof disconnectWS === 'function') { try { disconnectWS(); } catch (_error) {} }
+            if (typeof netInterval !== 'undefined' && netInterval) { clearInterval(netInterval); netInterval = null; }
+            if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch (_error) {} ws = null; }
         }
 
         function showMainMenu() {
             try {
                 stopPlaySession();
-
-                if (typeof setOnlineAdsOff === 'function') {
-                    setOnlineAdsOff(false);
-                }
-            } catch (_error) {
-                gameMode = 'none';
-            }
-
+                if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false);
+            } catch (_error) { gameMode = 'none'; }
             hideAllMenus();
             bannerAd.style.display = 'flex';
             updateDisplays();
-            document
-                .getElementById('menu-main')
-                .classList
-                .remove('hidden');
+            document.getElementById('menu-main').classList.remove('hidden');
         }
 
         function showStageSelect() {
             hideAllMenus();
-            document.getElementById('unlocked-count').innerText =
-                maxUnlockedStage;
-
-            const grid =
-                document.getElementById('stage-grid');
-
+            document.getElementById('unlocked-count').innerText = maxUnlockedStage;
+            const grid = document.getElementById('stage-grid');
             grid.innerHTML = '';
-
-            for (
-                let i = 1;
-                i <= Math.min(1000, maxUnlockedStage + 12);
-                i++
-            ) {
-                let stage =
-                    document.createElement('div');
-
+            for (let i = 1; i <= Math.min(1000, maxUnlockedStage + 12); i++) {
+                let stage = document.createElement('div');
                 stage.className = 'stage-card';
-
-                if (i % 5 === 0) {
-                    stage.classList.add('boss');
-                }
-
+                if (i % 5 === 0) stage.classList.add('boss');
                 if (i <= maxUnlockedStage) {
                     stage.classList.add('unlocked');
-
-                    if (i === maxUnlockedStage) {
-                        stage.classList.add('current');
-                    }
-
-                    stage.innerText =
-                        i % 5 === 0
-                            ? `👑 ${i}`
-                            : `${i}`;
-
-                    stage.onclick =
-                        () => startOfflineStage(i);
+                    if (i === maxUnlockedStage) stage.classList.add('current');
+                    stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`;
+                    stage.onclick = () => startOfflineStage(i);
                 } else {
                     stage.classList.add('locked');
                     stage.innerText = '🔒';
                 }
-
                 grid.appendChild(stage);
             }
-
-            document
-                .getElementById('menu-stages')
-                .classList
-                .remove('hidden');
+            document.getElementById('menu-stages').classList.remove('hidden');
         }
 
         function showShop() {
             hideAllMenus();
             updateDisplays();
-
-            document.getElementById('stat-weight').innerText =
-                `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
-
-            document.getElementById('stat-power').innerText =
-                `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
-
-            document.getElementById('buy-weight').innerText =
-                `Buy (${upgrades.weight * 20}🪙)`;
-
-            document.getElementById('buy-power').innerText =
-                `Buy (${upgrades.power * 20}🪙)`;
-
-            document
-                .getElementById('menu-shop')
-                .classList
-                .remove('hidden');
+            document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
+            document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
+            document.getElementById('buy-weight').innerText = `Buy (${upgrades.weight * 20}🪙)`;
+            document.getElementById('buy-power').innerText = `Buy (${upgrades.power * 20}🪙)`;
+            document.getElementById('menu-shop').classList.remove('hidden');
         }
 
         function buyUpgrade(type) {
             let cost = upgrades[type] * 20;
-
             if (coins >= cost) {
                 coins -= cost;
                 upgrades[type]++;
@@ -515,15 +435,10 @@ body, html {
         function showMultiMenu() {
             setOnlineAdsOff(true);
             hideAllMenus();
-            document
-                .getElementById('menu-multi')
-                .classList
-                .remove('hidden');
+            document.getElementById('menu-multi').classList.remove('hidden');
         }
 
-        function exitToMenu() {
-            showMainMenu();
-        }
+        function exitToMenu() { showMainMenu(); }
 
         function offlineEnemyCount(level) {
             if (level < 8) return 1;
@@ -533,7 +448,6 @@ body, html {
 
         function offlineBotStats(level) {
             const curve = Math.sqrt(level);
-
             return {
                 radius: 18 + Math.min(7, curve * 0.85),
                 mass: 0.85 + Math.min(1.4, level * 0.011),
@@ -545,7 +459,6 @@ body, html {
         function offlineBossStats(level, playerRadius) {
             const curve = Math.sqrt(level);
             const wave = Math.max(1, Math.floor(level / 5));
-
             return {
                 radius: Math.max(40, playerRadius * 1.5 + Math.min(8, curve)),
                 mass: 5.2 + Math.min(3.8, curve * 0.38),
@@ -559,513 +472,150 @@ body, html {
             gameMode = 'offline';
             currentPlayingStage = level;
             hideAllMenus();
-
-            document
-                .getElementById('hud')
-                .classList
-                .remove('hidden');
-
+            document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
-
             stageEnded = false;
             offlineArenaRadius = 240;
-
-            player.x = 400;
-            player.y = 300;
-            player.vx = 0;
-            player.vy = 0;
-            player.alive = true;
-
-            player.radius =
-                22 + (upgrades.weight * 1.5);
-
+            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+            player.radius = 22 + (upgrades.weight * 1.5);
             bots = [];
-
             let isBoss = level % 5 === 0;
-
             if (isBoss) {
                 const stats = offlineBossStats(level, player.radius);
-
                 bots.push({
-                    x: 400,
-                    y: 130,
-                    vx: 0,
-                    vy: 0,
-                    radius: stats.radius,
-                    mass: stats.mass,
-                    speed: stats.speed,
-                    power: stats.power,
-                    color: '#ff0055',
-                    isBoss: true,
-                    alive: true,
-                    cd: 0,
-                    slamCd: 90,
-                    phase: 1,
-                    hp: stats.maxHp,
-                    maxHp: stats.maxHp,
-                    hurtCd: 0
+                    x: 400, y: 130, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
+                    speed: stats.speed, power: stats.power, color: '#ff0055', isBoss: true,
+                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp, hurtCd: 0
                 });
             } else {
                 const count = offlineEnemyCount(level);
                 const stats = offlineBotStats(level);
-
                 for (let i = 0; i < count; i++) {
-                    let angle =
-                        (i / count) *
-                        Math.PI *
-                        2 +
-                        Math.PI / 4;
-
+                    let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
                     bots.push({
-                        x: 400 +
-                            Math.cos(angle) *
-                            140,
-                        y: 300 +
-                            Math.sin(angle) *
-                            140,
-                        vx: 0,
-                        vy: 0,
-                        radius: stats.radius,
-                        mass: stats.mass,
-                        speed: stats.speed,
-                        power: stats.power,
-                        color: '#ffaa00',
-                        isBoss: false,
-                        alive: true,
-                        cd: 0
+                        x: 400 + Math.cos(angle) * 140, y: 300 + Math.sin(angle) * 140,
+                        vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
+                        power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
                     });
                 }
             }
-
-            document.getElementById('hud-left').innerText =
-                isBoss
-                    ? `👑 BOSS: ${level}`
-                    : `STAGE: ${level}`;
-
+            document.getElementById('hud-left').innerText = isBoss ? `👑 BOSS: ${level}` : `STAGE: ${level}`;
             updateDisplays();
         }
 
-        function retryStageDirectly() {
-            startOfflineStage(currentPlayingStage);
-        }
-
-        function nextStageOffline() {
-            startOfflineStage(currentPlayingStage + 1);
-        }
+        function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
+        function nextStageOffline() { startOfflineStage(currentPlayingStage + 1); }
 
         function reviveInPlaceOffline() {
             stageEnded = false;
-
-            player.x = 400;
-            player.y = 300;
-            player.vx = 0;
-            player.vy = 0;
-            player.alive = true;
-
+            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             hideAllMenus();
-
-            document
-                .getElementById('hud')
-                .classList
-                .remove('hidden');
-
+            document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
         }
 
         function spawnImpact(x, y, color) {
             for (let i = 0; i < 6; i++) {
-                let angle =
-                    Math.random() *
-                    Math.PI *
-                    2;
-
-                let speed =
-                    3 +
-                    Math.random() * 4;
-
-                particles.push({
-                    x,
-                    y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    a: 1,
-                    c: color
-                });
+                let angle = Math.random() * Math.PI * 2;
+                let speed = 3 + Math.random() * 4;
+                particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
             }
         }
 
-        // ================= Responsive 60FPS Synchronized Physics =================
         function updatePhysics() {
-            if (gameMode === 'none') {
-                return;
+            if (gameMode === 'none') return;
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;
+                if (p.a <= 0) particles.splice(i, 1);
             }
+            let dx = 0, dy = 0;
+            if (keys['arrowup'] || keys['w']) dy -= 1;
+            if (keys['arrowdown'] || keys['s']) dy += 1;
+            if (keys['arrowleft'] || keys['a']) dx -= 1;
+            if (keys['arrowright'] || keys['d']) dx += 1;
+            if (touchVec.x || touchVec.y) { dx = touchVec.x; dy = touchVec.y; }
+            let magnitude = Math.hypot(dx, dy);
+            if (magnitude > 1) { dx /= magnitude; dy /= magnitude; }
 
-            for (
-                let i = particles.length - 1;
-                i >= 0;
-                i--
-            ) {
-                let particle = particles[i];
-
-                particle.x += particle.vx;
-                particle.y += particle.vy;
-                particle.vx *= 0.9;
-                particle.vy *= 0.9;
-                particle.a -= 0.06;
-
-                if (particle.a <= 0) {
-                    particles.splice(i, 1);
-                }
-            }
-
-            let dx = 0;
-            let dy = 0;
-
-            if (
-                keys['arrowup'] ||
-                keys['w']
-            ) {
-                dy -= 1;
-            }
-
-            if (
-                keys['arrowdown'] ||
-                keys['s']
-            ) {
-                dy += 1;
-            }
-
-            if (
-                keys['arrowleft'] ||
-                keys['a']
-            ) {
-                dx -= 1;
-            }
-
-            if (
-                keys['arrowright'] ||
-                keys['d']
-            ) {
-                dx += 1;
-            }
-
-            if (touchVec.x || touchVec.y) {
-                dx = touchVec.x;
-                dy = touchVec.y;
-            }
-
-            let magnitude =
-                Math.hypot(dx, dy);
-
-            if (magnitude > 1) {
-                dx /= magnitude;
-                dy /= magnitude;
-            }
-
-            if (gameMode === 'p2p' && typeof p2pPlayers !== 'undefined') {
-                let me =
-                    isHost
-                        ? p2pPlayers.host
-                        : p2pPlayers.guest;
-
-                let opponent =
-                    isHost
-                        ? p2pPlayers.guest
-                        : p2pPlayers.host;
-
-                if (!me || !opponent) {
-                    return;
-                }
-
-                if (!stageEnded) {
-                    // Predict only our own movement. The server is the single
-                    // authority for collisions, pushes, and ring-outs.
-                    if (
-                        typeof setP2PInput === 'function'
-                    ) {
-                        setP2PInput(dx, dy);
-                    }
-
-                    me.vx += dx * 1.4;
-                    me.vy += dy * 1.4;
-                    me.vx *= 0.88;
-                    me.vy *= 0.88;
-                    me.x += me.vx;
-                    me.y += me.vy;
-
-                    if (
-                        !Number.isFinite(me.x) ||
-                        !Number.isFinite(me.y)
-                    ) {
-                        me.x = Number.isFinite(me.serverX)
-                            ? me.serverX
-                            : 400;
-                        me.y = Number.isFinite(me.serverY)
-                            ? me.serverY
-                            : 300;
-                        me.vx = 0;
-                        me.vy = 0;
-                    }
-
-                    // Render the opponent from server snapshots. The server
-                    // resolves the same collision once for both clients.
-                    if (
-                        Number.isFinite(opponent.targetX) &&
-                        Number.isFinite(opponent.targetY)
-                    ) {
-                        opponent.x +=
-                            (opponent.targetX -
-                                opponent.x) *
-                            0.45;
-
-                        opponent.y +=
-                            (opponent.targetY -
-                                opponent.y) *
-                            0.45;
-                    }
-                }
-            } else if (
-                gameMode === 'offline' &&
-                player.alive &&
-                !stageEnded
-            ) {
-                player.vx += dx * 1.6;
-                player.vy += dy * 1.6;
-                player.vx *= 0.88;
-                player.vy *= 0.88;
-                player.x += player.vx;
-                player.y += player.vy;
-
-                if (offlineArenaRadius > 160) {
-                    offlineArenaRadius -= 0.012;
-                }
-
-                if (
-                    Math.hypot(
-                        player.x - 400,
-                        player.y - 300
-                    ) > offlineArenaRadius
-                ) {
-                    player.alive = false;
-                    stageEnded = true;
+            if (gameMode === 'offline' && player.alive && !stageEnded) {
+                player.vx += dx * 1.6; player.vy += dy * 1.6;
+                player.vx *= 0.88; player.vy *= 0.88;
+                player.x += player.vx; player.y += player.vy;
+                if (offlineArenaRadius > 160) offlineArenaRadius -= 0.012;
+                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
+                    player.alive = false; stageEnded = true;
                     hideAllMenus();
-
-                    document
-                        .getElementById('modal-death')
-                        .classList
-                        .remove('hidden');
-
+                    document.getElementById('modal-death').classList.remove('hidden');
                     return;
                 }
-
-                let active =
-                    bots.filter(bot => bot.alive);
-
+                let active = bots.filter(bot => bot.alive);
                 for (let bot of active) {
-                    let angle =
-                        Math.atan2(
-                            player.y - bot.y,
-                            player.x - bot.x
-                        );
-
-                    bot.cd =
-                        (bot.cd || 0) + 1;
-
-                    if (bot.hurtCd > 0) {
-                        bot.hurtCd -= 1;
-                    }
-
-                    let raging =
-                        bot.isBoss &&
-                        bot.hp <= bot.maxHp * 0.5;
-
+                    let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+                    bot.cd = (bot.cd || 0) + 1;
+                    if (bot.hurtCd > 0) bot.hurtCd -= 1;
+                    let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
                     if (raging && bot.phase === 1) {
-                        bot.phase = 2;
-                        bot.color = '#ff3366';
+                        bot.phase = 2; bot.color = '#ff3366';
                         spawnImpact(bot.x, bot.y, '#ff3366');
                     }
-
                     let speed = bot.speed * (raging ? 1.35 : 1);
-                    let dashAt = bot.isBoss
-                        ? (raging ? 48 : 68)
-                        : 80;
+                    let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
                     let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
-                    let dashMul = bot.isBoss
-                        ? (raging ? 3.1 : 2.35)
-                        : 1.85;
-
-                    if (bot.cd > dashAt) {
-                        speed *= dashMul;
-                    }
-
-                    if (bot.cd > dashEnd) {
-                        bot.cd = 0;
-                    }
-
-                    bot.vx +=
-                        Math.cos(angle) *
-                        speed;
-
-                    bot.vy +=
-                        Math.sin(angle) *
-                        speed;
-
+                    let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
+                    if (bot.cd > dashAt) speed *= dashMul;
+                    if (bot.cd > dashEnd) bot.cd = 0;
+                    bot.vx += Math.cos(angle) * speed;
+                    bot.vy += Math.sin(angle) * speed;
                     bot.vx *= bot.isBoss ? 0.92 : 0.9;
                     bot.vy *= bot.isBoss ? 0.92 : 0.9;
-
-                    bot.x += bot.vx;
-                    bot.y += bot.vy;
-
-                    let fromCenter =
-                        Math.hypot(
-                            bot.x - 400,
-                            bot.y - 300
-                        );
-
-                    if (
-                        bot.isBoss &&
-                        bot.hp > 0 &&
-                        fromCenter > offlineArenaRadius - 10
-                    ) {
+                    bot.x += bot.vx; bot.y += bot.vy;
+                    let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
+                    if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
                         let nx = (bot.x - 400) / fromCenter;
                         let ny = (bot.y - 300) / fromCenter;
                         bot.x = 400 + nx * (offlineArenaRadius - 12);
                         bot.y = 300 + ny * (offlineArenaRadius - 12);
-                        bot.vx *= 0.25;
-                        bot.vy *= 0.25;
+                        bot.vx *= 0.25; bot.vy *= 0.25;
                     } else if (fromCenter > offlineArenaRadius) {
                         bot.alive = false;
                     }
-
-                    let distance =
-                        Math.hypot(
-                            bot.x - player.x,
-                            bot.y - player.y
-                        );
-
+                    let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
                     if (bot.isBoss) {
                         bot.slamCd = (bot.slamCd || 0) + 1;
-
-                        if (
-                            bot.slamCd > (raging ? 110 : 150) &&
-                            distance < bot.radius + player.radius + 55
-                        ) {
-                            let slam =
-                                (raging ? 18 : 13) +
-                                bot.power * 0.22;
+                        if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
+                            let slam = (raging ? 18 : 13) + bot.power * 0.22;
                             player.vx -= Math.cos(angle) * slam;
                             player.vy -= Math.sin(angle) * slam;
                             bot.slamCd = 0;
-                            spawnImpact(
-                                player.x,
-                                player.y,
-                                '#ff0055'
-                            );
+                            spawnImpact(player.x, player.y, '#ff0055');
                         }
                     }
-
-                    if (
-                        distance <
-                        player.radius + bot.radius
-                    ) {
-                        let overlap =
-                            player.radius +
-                            bot.radius -
-                            distance;
-
-                        let collisionAngle =
-                            Math.atan2(
-                                bot.y - player.y,
-                                bot.x - player.x
-                            );
-
-                        player.x -=
-                            Math.cos(collisionAngle) *
-                            (overlap * 0.45);
-
-                        player.y -=
-                            Math.sin(collisionAngle) *
-                            (overlap * 0.45);
-
-                        bot.x +=
-                            Math.cos(collisionAngle) *
-                            (overlap * 0.55);
-
-                        bot.y +=
-                            Math.sin(collisionAngle) *
-                            (overlap * 0.55);
-
-                        let playerMass =
-                            1.0 +
-                            upgrades.weight * 0.25;
-
-                        let playerPower =
-                            6.0 +
-                            upgrades.power * 1.5;
-
-                        player.vx -=
-                            Math.cos(collisionAngle) *
-                            (bot.power / playerMass);
-
-                        player.vy -=
-                            Math.sin(collisionAngle) *
-                            (bot.power / playerMass);
-
-                        let armor =
-                            bot.isBoss && bot.hp > 0
-                                ? 0.22
-                                : 1;
-
-                        if (
-                            bot.isBoss &&
-                            bot.hp > 0 &&
-                            (bot.hurtCd || 0) <= 0 &&
-                            Math.hypot(player.vx, player.vy) > 3.5
-                        ) {
-                            bot.hp -= 1;
-                            bot.hurtCd = 22;
+                    if (distance < player.radius + bot.radius) {
+                        let overlap = player.radius + bot.radius - distance;
+                        let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
+                        player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
+                        player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
+                        bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
+                        bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
+                        let playerMass = 1.0 + upgrades.weight * 0.25;
+                        let playerPower = 6.0 + upgrades.power * 1.5;
+                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass);
+                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass);
+                        let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
+                        if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
+                            bot.hp -= 1; bot.hurtCd = 22;
                         }
-
-                        bot.vx +=
-                            Math.cos(collisionAngle) *
-                            (playerPower / bot.mass) *
-                            armor;
-
-                        bot.vy +=
-                            Math.sin(collisionAngle) *
-                            (playerPower / bot.mass) *
-                            armor;
-
-                        spawnImpact(
-                            (player.x + bot.x) / 2,
-                            (player.y + bot.y) / 2,
-                            bot.color
-                        );
+                        bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
+                        bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
+                        spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
                     }
                 }
-
-                if (
-                    active.length === 0 &&
-                    !stageEnded
-                ) {
-                    stageEnded = true;
-                    coins += 5;
-
-                    if (
-                        currentPlayingStage ===
-                            maxUnlockedStage &&
-                        maxUnlockedStage < 1000
-                    ) {
-                        maxUnlockedStage++;
-                    }
-
-                    saveData();
-                    hideAllMenus();
-
-                    document
-                        .getElementById('modal-win-stage')
-                        .classList
-                        .remove('hidden');
+                if (active.length === 0 && !stageEnded) {
+                    stageEnded = true; coins += 5;
+                    if (currentPlayingStage === maxUnlockedStage && maxUnlockedStage < 1000) maxUnlockedStage++;
+                    saveData(); hideAllMenus();
+                    document.getElementById('modal-win-stage').classList.remove('hidden');
                 }
             }
         }
@@ -1073,616 +623,251 @@ body, html {
         function render() {
             ctx.fillStyle = '#08090f';
             ctx.fillRect(0, 0, 800, 600);
-
             if (gameMode !== 'none') {
-                let radius =
-                    gameMode === 'p2p'
-                        ? p2pArenaRadius
-                        : offlineArenaRadius;
-
-                if (!Number.isFinite(radius) || radius <= 0) {
-                    radius = 240;
-                }
-
+                let radius = offlineArenaRadius;
                 ctx.beginPath();
-                ctx.arc(
-                    400,
-                    300,
-                    radius,
-                    0,
-                    Math.PI * 2
-                );
+                ctx.arc(400, 300, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0f121d'; ctx.fill();
+                ctx.lineWidth = 4; ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff'; ctx.stroke();
 
-                ctx.fillStyle = '#0f121d';
-                ctx.fill();
-
-                ctx.lineWidth = 4;
-                ctx.strokeStyle =
-                    radius < 170
-                        ? '#ff0055'
-                        : '#00e5ff';
-
-                ctx.stroke();
-
-                for (let particle of particles) {
-                    ctx.beginPath();
-
-                    ctx.arc(
-                        particle.x,
-                        particle.y,
-                        3,
-                        0,
-                        Math.PI * 2
-                    );
-
-                    ctx.fillStyle = particle.c;
-                    ctx.globalAlpha = particle.a;
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
+                for (let p of particles) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
                 }
-
-                if (gameMode === 'p2p' && typeof p2pPlayers !== 'undefined') {
-                    for (let role of ['host', 'guest']) {
-                        let playerState =
-                            p2pPlayers &&
-                            p2pPlayers[role];
-
-                        if (
-                            !playerState ||
-                            !playerState.alive ||
-                            !Number.isFinite(playerState.x) ||
-                            !Number.isFinite(playerState.y) ||
-                            !Number.isFinite(playerState.radius)
-                        ) {
-                            continue;
-                        }
-
-                        ctx.beginPath();
-
-                        ctx.arc(
-                            playerState.x,
-                            playerState.y,
-                            playerState.radius,
-                            0,
-                            Math.PI * 2
-                        );
-
-                        ctx.fillStyle =
-                            playerState.color;
-
-                        ctx.fill();
-
-                        ctx.lineWidth = 2.5;
-                        ctx.strokeStyle = '#fff';
-                        ctx.stroke();
-
-                        let isMe =
-                            (isHost && role === 'host') ||
-                            (!isHost && role === 'guest');
-
-                        ctx.fillStyle = '#fff';
-                        ctx.font =
-                            'bold 12px Segoe UI, sans-serif';
-                        ctx.textAlign = 'center';
-
-                        ctx.fillText(
-                            isMe
-                                ? 'YOU'
-                                : 'OPPONENT',
-                            playerState.x,
-                            playerState.y -
-                                playerState.radius -
-                                8
-                        );
-                    }
-                } else {
-                    for (let bot of bots) {
-                        if (!bot.alive) {
-                            continue;
-                        }
-
-                        ctx.beginPath();
-
-                        ctx.arc(
-                            bot.x,
-                            bot.y,
-                            bot.radius,
-                            0,
-                            Math.PI * 2
-                        );
-
-                        ctx.fillStyle = bot.color;
-                        ctx.fill();
-
-                        ctx.lineWidth =
-                            bot.isBoss ? 4 : 2;
-
-                        ctx.strokeStyle = '#fff';
-                        ctx.stroke();
-
-                        if (bot.isBoss && bot.maxHp) {
-                            let ratio =
-                                Math.max(0, bot.hp) / bot.maxHp;
-                            ctx.lineWidth = 5;
-                            ctx.strokeStyle = '#1a1f2e';
-                            ctx.beginPath();
-                            ctx.arc(
-                                bot.x,
-                                bot.y - bot.radius - 12,
-                                16,
-                                0,
-                                Math.PI * 2
-                            );
-                            ctx.stroke();
-                            ctx.strokeStyle =
-                                ratio < 0.4 ? '#ff3366' : '#ffbb00';
-                            ctx.beginPath();
-                            ctx.arc(
-                                bot.x,
-                                bot.y - bot.radius - 12,
-                                16,
-                                -Math.PI / 2,
-                                -Math.PI / 2 +
-                                    Math.PI * 2 * ratio
-                            );
-                            ctx.stroke();
-                        }
-                    }
-
-                    if (player.alive) {
-                        ctx.beginPath();
-
-                        ctx.arc(
-                            player.x,
-                            player.y,
-                            player.radius,
-                            0,
-                            Math.PI * 2
-                        );
-
-                        ctx.fillStyle = player.color;
-                        ctx.fill();
-
-                        ctx.lineWidth = 2.5;
-                        ctx.strokeStyle = '#fff';
-                        ctx.stroke();
-                    }
+                for (let bot of bots) {
+                    if (!bot.alive) continue;
+                    ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = bot.color; ctx.fill();
+                    ctx.lineWidth = bot.isBoss ? 4 : 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+                }
+                if (player.alive) {
+                    ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = player.color; ctx.fill();
+                    ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
                 }
             }
         }
 
         function gameLoop() {
-            try {
-                updatePhysics();
-                render();
-            } catch (_error) {
-                // Keep the loop alive so a bad network snapshot
-                // cannot freeze the canvas on a black frame.
-            }
-
+            try { updatePhysics(); render(); } catch (_error) {}
             requestAnimationFrame(gameLoop);
         }
-
         requestAnimationFrame(gameLoop);
-
-        window.addEventListener('load', () => {
-            if (window.location.hash.includes('room=')) {
-                let room =
-                    window.location.hash
-                        .split('room=')[1];
-
-                if (room && typeof joinOnlineRoom === 'function') {
-                    setTimeout(
-                        () => joinOnlineRoom(room),
-                        500
-                    );
-                }
-            }
-        });
     </script>
 
-
-
-<!-- زر القائمة الجانبية النيون - نازل لتحت وأنيق -->
-<div id="neon-menu-btn" onclick="toggleNeonMenu()" style="position: fixed; top: 110px; right: 30px; z-index: 9999; cursor: pointer; background: rgba(5,5,15,0.95); border: 2px solid #00f3ff; border-radius: 12px; padding: 12px 18px; box-shadow: 0 0 20px rgba(0,243,255,0.5); transition: 0.3s;">
-  <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ MENU</span>
-</div>
-
-<!-- القائمة الجانبية المتقدمة -->
-
-
-
-<div id="neon-sidebar" style="position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: rgba(3, 3, 8, 0.98); border-left: 2px solid #00f3ff; box-shadow: -15px 0 40px rgba(0, 243, 255, 0.4); z-index: 10000; transition: right 0.4s ease; padding: 30px 20px; backdrop-filter: blur(20px); font-family: 'Orbitron', sans-serif; color: #fff; box-sizing: border-box; overflow-y: auto;">
-  
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid rgba(0,243,255,0.2); padding-bottom: 15px;">
-    <h2 style="color: #00f3ff; font-size: 18px; text-shadow: 0 0 10px #00f3ff; margin: 0;">CYBER MENU</h2>
-    <span onclick="toggleNeonMenu()" style="color: #ff0055; font-size: 26px; cursor: pointer; text-shadow: 0 0 10px #ff0055;">&times;</span>
-  </div>
-
-  <!-- صورة وحساب اللاعب -->
-  <div style="text-align: center; margin-bottom: 25px;">
-    <label for="avatar-input" style="cursor: pointer;">
-      <img id="sidebar-avatar" src="https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff" style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f3ff; object-fit: cover; box-shadow: 0 0 15px rgba(0,243,255,0.4); margin-bottom: 8px;" title="اضغط لتغيير الصورة">
-    </label>
-    <input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="loadAvatar(event)">
-    <div id="sidebar-name" style="font-size: 16px; font-weight: bold; color: #00f3ff; text-shadow: 0 0 8px #00f3ff;">RASHID</div>
-    <div id="sidebar-flag" style="font-size: 14px; color: #aaa; margin-top: 4px;">🇯🇴 Jordan</div>
-  </div>
-
-  <!-- أزرار التنقل -->
-  <div style="display: flex; flex-direction: column; gap: 12px;">
-    <button onclick="openHome()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏠 الشاشة الرئيسية (Home)</button>
-    <button onclick="openAccountModal()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">⚙️ تعديل الحساب (My Account)</button>
-    <button onclick="console.log('Opening Leaderboard...'); document.getElementById('leaderboard-modal').style.display = 'flex'; renderFullLeaderboard(); toggleNeonMenu();" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
-    <a href="https://www.instagram.com/nn1v4/" target="_blank" style="text-decoration: none;">
-      <button style="width: 100%; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">💬 الدعم الفني (Instagram)</button>
-    </a>
-  </div>
-</div>
-
-<!-- نافذة تعديل الحساب (Modal) -->
-<div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10005; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
-  <div style="background: #080812; border: 2px solid #00f3ff; padding: 30px; border-radius: 15px; width: 320px; box-shadow: 0 0 30px rgba(0,243,255,0.5); color: #fff;">
-    <h3 style="color: #00f3ff; margin-top: 0; text-shadow: 0 0 10px #00f3ff;">EDIT ACCOUNT</h3>
-    <label style="font-size: 12px; color: #aaa;">اسم اللاعب:</label>
-    <input type="text" id="input-name" placeholder="أدخل اسمك الجديد" style="width: 100%; padding: 10px; background: #111; border: 1px solid #00f3ff; color: #fff; border-radius: 6px; margin: 8px 0 15px 0; box-sizing: border-box;">
-    
-    <label style="font-size: 12px; color: #aaa;">علم الدولة / الايموجي:</label>
-    <input type="text" id="input-flag" placeholder="مثال: 🇯🇴 Jordan" style="width: 100%; padding: 10px; background: #111; border: 1px solid #00f3ff; color: #fff; border-radius: 6px; margin: 8px 0 20px 0; box-sizing: border-box;">
-    
-    <div style="display: flex; gap: 10px;">
-      <button onclick="saveAccount()" style="flex: 1; background: #00f3ff; color: #000; border: none; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
-      <button onclick="closeAccountModal()" style="flex: 1; background: transparent; border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إلغاء</button>
+    <!-- زر القائمة الجانبية النيون -->
+    <div id="neon-menu-btn" onclick="toggleNeonMenu()" style="position: fixed; top: 110px; right: 30px; z-index: 9999; cursor: pointer; background: rgba(5,5,15,0.95); border: 2px solid #00f3ff; border-radius: 12px; padding: 12px 18px; box-shadow: 0 0 20px rgba(0,243,255,0.5); transition: 0.3s;">
+      <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ MENU</span>
     </div>
-  </div>
 
-  <!-- لوحة الصدارة داخل القائمة الجانبية -->
-  <div 
-</div>
-
-<script>
-function updateLeaderboard() {
-  const currentName = localStorage.getItem('sumo_name') || 'aiham';
-  const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
-  
-  let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
-  let existingIndex = players.findIndex(p => p.name === currentName);
-  let currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
-  
-  if (existingIndex >= 0) {
-    players[existingIndex].coins = currentCoins;
-    players[existingIndex].avatar = currentAvatar;
-  } else {
-    players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
-  }
-  
-  players.sort((a, b) => b.coins - a.coins);
-  localStorage.setItem('sumo_global_players', JSON.stringify(players));
-  
-  const listContainer = document.getElementById('players-list');
-  if(!listContainer) return;
-  listContainer.innerHTML = '';
-  
-  players.forEach((player, index) => {
-    let rank = index + 1;
-    let glowStyle = '';
-    let rankBadge = `#${rank}`;
-    
-    if (rank === 1) {
-      glowStyle = 'border: 2px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.6); background: rgba(255,215,0,0.1);';
-      rankBadge = '👑 1';
-    } else if (rank === 2) {
-      glowStyle = 'border: 2px solid #c0c0c0; box-shadow: 0 0 10px rgba(192,192,192,0.5); background: rgba(192,192,192,0.1);';
-      rankBadge = '🥈 2';
-    } else if (rank === 3) {
-      glowStyle = 'border: 2px solid #cd7f32; box-shadow: 0 0 8px rgba(205,127,50,0.5); background: rgba(205,127,50,0.1);';
-      rankBadge = '🥉 3';
-    } else {
-      glowStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(5,5,15,0.5);';
-    }
-    
-    const item = document.createElement('div');
-    item.style.cssText = `display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 6px; font-size: 11px; ${glowStyle}`;
-    
-    item.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="font-weight: bold; width: 22px; color: ${rank <= 3 ? '#ff0055' : '#00f3ff'};">${rankBadge}</span>
-        <img src="${player.avatar}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid #00f3ff;">
-        <span style="color: #fff; font-weight: bold; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${player.name}</span>
+    <!-- القائمة الجانبية المتقدمة -->
+    <div id="neon-sidebar" style="position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: rgba(3, 3, 8, 0.98); border-left: 2px solid #00f3ff; box-shadow: -15px 0 40px rgba(0, 243, 255, 0.4); z-index: 10000; transition: right 0.4s ease; padding: 30px 20px; backdrop-filter: blur(20px); font-family: 'Orbitron', sans-serif; color: #fff; box-sizing: border-box; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid rgba(0,243,255,0.2); padding-bottom: 15px;">
+        <h2 style="color: #00f3ff; font-size: 18px; text-shadow: 0 0 10px #00f3ff; margin: 0;">CYBER MENU</h2>
+        <span onclick="toggleNeonMenu()" style="color: #ff0055; font-size: 26px; cursor: pointer; text-shadow: 0 0 10px #ff0055;">&times;</span>
       </div>
-      <span style="color: #00f3ff; font-weight: bold;">🪙 ${player.coins}</span>
-    `;
-    listContainer.appendChild(item);
-  });
-}
 
-setInterval(updateLeaderboard, 2000);
-window.addEventListener('load', updateLeaderboard);
-</script>
-
-</div>
-<script>
-function toggleNeonMenu() {
-  const sb = document.getElementById('neon-sidebar');
-  sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
-}
-
-function openHome() {
-  toggleNeonMenu();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function openAccountModal() {
-  toggleNeonMenu();
-  document.getElementById('account-modal').style.display = 'flex';
-  document.getElementById('input-name').value = localStorage.getItem('sumo_name') || 'RASHID';
-  document.getElementById('input-flag').value = localStorage.getItem('sumo_flag') || '🇯🇴 Jordan';
-}
-
-function closeAccountModal() {
-  document.getElementById('account-modal').style.display = 'none';
-}
-
-function saveAccount() {
-  const name = document.getElementById('input-name').value;
-  const flag = document.getElementById('input-flag').value;
-  if(name) localStorage.setItem('sumo_name', name);
-  if(flag) localStorage.setItem('sumo_flag', flag);
-  updateAccountUI();
-  closeAccountModal();
-}
-
-function loadAvatar(event) {
-  const reader = new FileReader();
-  reader.onload = function(){
-    localStorage.setItem('sumo_avatar', reader.result);
-    updateAccountUI();
-  };
-  reader.readAsDataURL(event.target.files[0]);
-}
-
-function updateAccountUI() {
-  const savedName = localStorage.getItem('sumo_name');
-  const savedFlag = localStorage.getItem('sumo_flag');
-  const savedAvatar = localStorage.getItem('sumo_avatar');
-  
-  if(savedName) document.getElementById('sidebar-name').innerText = savedName;
-  if(savedFlag) document.getElementById('sidebar-flag').innerText = savedFlag;
-  if(savedAvatar) document.getElementById('sidebar-avatar').src = savedAvatar;
-}
-
-window.onload = updateAccountUI;
-</script>
-
-<!-- محرك الخلفية السيبرانية الخارق (Matrix Cyber Rain & Interactive Canvas) -->
-<canvas id="matrix-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; z-index: -2; pointer-events: none; opacity: 0.25;"></canvas>
-
-<script>
-const canvas = document.getElementById('matrix-bg');
-const ctx = canvas.getContext('2d');
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ01010101KAILINUXCYBER';
-const fontSize = 16;
-let columns = canvas.width / fontSize;
-const drops = [];
-for (let i = 0; i < columns; i++) {
-  drops[i] = 1;
-}
-
-function drawMatrix() {
-  ctx.fillStyle = 'rgba(2, 2, 5, 0.1)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = '#00f3ff';
-  ctx.font = fontSize + 'px monospace';
-
-  for (let i = 0; i < drops.length; i++) {
-    const text = chars.charAt(Math.floor(Math.random() * chars.length));
-    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-
-    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-      drops[i] = 0;
-    }
-    drops[i]++;
-  }
-}
-setInterval(drawMatrix, 50);
-</script>
-
-<!-- نافذة لوحة الصدارة الشاملة (Leaderboard Modal) -->
-
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <div style="color: #ffd700; font-weight: bold; font-size: 13px;">🪙 ${player.coins}</div>
+      <!-- صورة وحساب اللاعب -->
+      <div style="text-align: center; margin-bottom: 25px;">
+        <label for="avatar-input" style="cursor: pointer;">
+          <img id="sidebar-avatar" src="https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff" style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f3ff; object-fit: cover; box-shadow: 0 0 15px rgba(0,243,255,0.4); margin-bottom: 8px;" title="اضغط لتغيير الصورة">
+        </label>
+        <input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="loadAvatar(event)">
+        <div id="sidebar-name" style="font-size: 16px; font-weight: bold; color: #00f3ff; text-shadow: 0 0 8px #00f3ff;">RASHID</div>
+        <div id="sidebar-flag" style="font-size: 14px; color: #aaa; margin-top: 4px;">🇯🇴 Jordan</div>
       </div>
-    `;
-    
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- ACCOUNT MODAL -->
-<div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
-  <div style="background: #060612; border: 2px solid #00f3ff; padding: 25px; border-radius: 14px; width: 380px; box-shadow: 0 0 40px rgba(0,243,255,0.3); color: #fff;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 10px;">
-      <h3 style="color: #00f3ff; margin: 0; font-size: 15px;">EDIT ACCOUNT</h3>
-      <span onclick="document.getElementById('account-modal').style.display='none'" style="color: #ff0055; font-size: 24px; cursor: pointer;">&times;</span>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
-      <label>اسم اللاعب:</label>
-      <input type="text" id="input-sumo-name" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-      <label>علم الدولة / الايموجي:</label>
-      <input type="text" id="input-sumo-country" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 20px;">
-      <button onclick="saveAccountSettings()" style="flex: 1; background: rgba(0,243,255,0.2); border: 1px solid #00f3ff; color: #00f3ff; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
-      <button onclick="document.getElementById('account-modal').style.display='none'" style="flex: 1; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إغلاق</button>
-    </div>
-  </div>
-</div>
-
-<!-- LEADERBOARD MODAL -->
-<div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif; backdrop-filter: blur(15px);">
-  <div style="background: #050510; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; width: 450px; max-height: 85vh; box-shadow: 0 0 60px rgba(255,215,0,0.5); color: #fff; display: flex; flex-direction: column; box-sizing: border-box;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 12px; margin-bottom: 15px;">
-      <div>
-        <h2 style="color: #ffd700; font-size: 16px; text-shadow: 0 0 10px #ffd700; margin: 0;">🏆 CYBER HALL OF FAME</h2>
-        <span style="font-size: 10px; color: #00f3ff;">Ultimate Global Rankings</span>
+      <!-- أزرار التنقل -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button onclick="openHome()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏠 الشاشة الرئيسية (Home)</button>
+        <button onclick="openAccountModal()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">⚙️ تعديل الحساب (My Account)</button>
+        <button onclick="openLeaderboardModalSafe()" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
+        <a href="https://www.instagram.com/nn1v4/" target="_blank" style="text-decoration: none;">
+          <button style="width: 100%; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">💬 الدعم الفني (Instagram)</button>
+        </a>
       </div>
-      <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
     </div>
-    <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
-    <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
-  </div>
-</div>
 
-
-
-
-
-
-<!-- ACCOUNT MODAL -->
-<div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
-  <div style="background: #060612; border: 2px solid #00f3ff; padding: 25px; border-radius: 14px; width: 380px; box-shadow: 0 0 40px rgba(0,243,255,0.3); color: #fff;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 10px;">
-      <h3 style="color: #00f3ff; margin: 0; font-size: 15px;">EDIT ACCOUNT</h3>
-      <span onclick="document.getElementById('account-modal').style.display='none'" style="color: #ff0055; font-size: 24px; cursor: pointer;">&times;</span>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
-      <label>اسم اللاعب:</label>
-      <input type="text" id="input-sumo-name" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-      <label>علم الدولة / الايموجي:</label>
-      <input type="text" id="input-sumo-country" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-    </div>
-    <div style="display: flex; gap: 10px; margin-top: 20px;">
-      <button onclick="saveAccountSettings()" style="flex: 1; background: rgba(0,243,255,0.2); border: 1px solid #00f3ff; color: #00f3ff; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
-      <button onclick="document.getElementById('account-modal').style.display='none'" style="flex: 1; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إغلاق</button>
-    </div>
-  </div>
-</div>
-
-<!-- LEADERBOARD MODAL -->
-<div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif; backdrop-filter: blur(15px);">
-  <div style="background: #050510; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; width: 450px; max-height: 85vh; box-shadow: 0 0 60px rgba(255,215,0,0.5); color: #fff; display: flex; flex-direction: column; box-sizing: border-box;">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 12px; margin-bottom: 15px;">
-      <div>
-        <h2 style="color: #ffd700; font-size: 16px; text-shadow: 0 0 10px #ffd700; margin: 0;">🏆 CYBER HALL OF FAME</h2>
-        <span style="font-size: 10px; color: #00f3ff;">Ultimate Global Rankings</span>
-      </div>
-      <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
-    </div>
-    <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
-    <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
-  </div>
-</div>
-
-<script>
-function openAccountModal() {
-  const sidebar = document.getElementById('neon-sidebar');
-  if (sidebar) sidebar.style.right = '-320px';
-  document.getElementById('leaderboard-modal').style.display = 'none';
-  const modal = document.getElementById('account-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    document.getElementById('input-sumo-name').value = localStorage.getItem('sumo_name') || 'aiham';
-    document.getElementById('input-sumo-country').value = localStorage.getItem('sumo_country') || 'Jordan 🇯🇴';
-  }
-}
-
-function saveAccountSettings() {
-  const name = document.getElementById('input-sumo-name').value;
-  const country = document.getElementById('input-sumo-country').value;
-  if(name) localStorage.setItem('sumo_name', name);
-  if(country) localStorage.setItem('sumo_country', country);
-  document.getElementById('account-modal').style.display = 'none';
-  location.reload();
-}
-
-function openLeaderboardModalSafe() {
-  const sidebar = document.getElementById('neon-sidebar');
-  if (sidebar) sidebar.style.right = '-320px';
-  document.getElementById('account-modal').style.display = 'none';
-  const modal = document.getElementById('leaderboard-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    renderFullLeaderboard();
-  }
-}
-
-function renderFullLeaderboard() {
-  const currentName = localStorage.getItem('sumo_name') || 'aiham';
-  const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
-  let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
-  let existingIndex = players.findIndex(p => p.name === currentName);
-  let currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
-  
-  if (existingIndex >= 0) {
-    players[existingIndex].coins = currentCoins;
-    players[existingIndex].avatar = currentAvatar;
-  } else {
-    players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
-  }
-  
-  players.sort((a, b) => b.coins - a.coins);
-  localStorage.setItem('sumo_global_players', JSON.stringify(players));
-  
-  const container = document.getElementById('modal-players-list');
-  if(!container) return;
-  container.innerHTML = '';
-  
-  players.forEach((player, index) => {
-    let rank = index + 1;
-    let rankStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(10,10,25,0.6);';
-    let rankBadge = '#' + rank;
-    let title = 'NetRunner 💻';
-    let trend = '🟢';
-    
-    if (rank === 1) {
-      rankStyle = 'background: rgba(255,215,0,0.15); border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.4);';
-      rankBadge = '👑 1';
-      title = 'Cyber Overlord 👑';
-      trend = '🔥';
-    } else if (rank === 2 || rank === 3) {
-      rankStyle = 'background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0;';
-      rankBadge = rank === 2 ? '🥈 2' : '🥉 3';
-      title = 'Neon Elite ⚡';
-      trend = '🚀';
-    }
-    
-    const row = document.createElement('div');
-    row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; " + rankStyle;
-    
-    row.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-weight: bold; font-size: 13px; width: 32px; color: ${rank <= 3 ? '#ffd700' : '#00f3ff'};">${rankBadge} ${trend}</span>
-        <img src="${player.avatar}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #00f3ff;">
-        <div>
-          <div style="color: #fff; font-weight: bold; font-size: 13px;">${player.name}</div>
-          <div style="color: ${rank === 1 ? '#ffd700' : '#00f3ff'}; font-size: 9px; opacity: 0.8;">${title}</div>
+    <!-- ACCOUNT MODAL -->
+    <div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
+      <div style="background: #060612; border: 2px solid #00f3ff; padding: 25px; border-radius: 14px; width: 380px; box-shadow: 0 0 40px rgba(0,243,255,0.3); color: #fff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 10px;">
+          <h3 style="color: #00f3ff; margin: 0; font-size: 15px;">EDIT ACCOUNT</h3>
+          <span onclick="closeAccountModal()" style="color: #ff0055; font-size: 24px; cursor: pointer;">&times;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
+          <label>اسم اللاعب:</label>
+          <input type="text" id="input-name" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
+          <label>علم الدولة / الايموجي:</label>
+          <input type="text" id="input-flag" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button onclick="saveAccount()" style="flex: 1; background: rgba(0,243,255,0.2); border: 1px solid #00f3ff; color: #00f3ff; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
+          <button onclick="closeAccountModal()" style="flex: 1; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إغلاق</button>
         </div>
       </div>
-      <div style="color: #ffd700; font-weight: bold; font-size: 13px;">🪙 ${player.coins}</div>
-    `;
-    container.appendChild(row);
-  });
-}
-</script>
+    </div>
 
+    <!-- LEADERBOARD MODAL -->
+    <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif; backdrop-filter: blur(15px);">
+      <div style="background: #050510; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; width: 450px; max-height: 85vh; box-shadow: 0 0 60px rgba(255,215,0,0.5); color: #fff; display: flex; flex-direction: column; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 12px; margin-bottom: 15px;">
+          <div>
+            <h2 style="color: #ffd700; font-size: 16px; text-shadow: 0 0 10px #ffd700; margin: 0;">🏆 CYBER HALL OF FAME</h2>
+            <span style="font-size: 10px; color: #00f3ff;">Ultimate Global Rankings</span>
+          </div>
+          <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
+        </div>
+        <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
+        <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
+      </div>
+    </div>
+
+    <!-- خلفية الماتريكس -->
+    <canvas id="matrix-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; z-index: -2; pointer-events: none; opacity: 0.25;"></canvas>
+
+    <script>
+    function toggleNeonMenu() {
+      const sb = document.getElementById('neon-sidebar');
+      sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
+    }
+
+    function openHome() {
+      toggleNeonMenu();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openAccountModal() {
+      toggleNeonMenu();
+      document.getElementById('leaderboard-modal').style.display = 'none';
+      document.getElementById('account-modal').style.display = 'flex';
+      document.getElementById('input-name').value = localStorage.getItem('sumo_name') || 'aiham';
+      document.getElementById('input-flag').value = localStorage.getItem('sumo_flag') || '🇯🇴 Jordan';
+    }
+
+    function closeAccountModal() {
+      document.getElementById('account-modal').style.display = 'none';
+    }
+
+    function saveAccount() {
+      const name = document.getElementById('input-name').value;
+      const flag = document.getElementById('input-flag').value;
+      if(name) localStorage.setItem('sumo_name', name);
+      if(flag) localStorage.setItem('sumo_flag', flag);
+      updateAccountUI();
+      closeAccountModal();
+      location.reload();
+    }
+
+    function loadAvatar(event) {
+      const reader = new FileReader();
+      reader.onload = function(){
+        localStorage.setItem('sumo_avatar', reader.result);
+        updateAccountUI();
+      };
+      reader.readAsDataURL(event.target.files[0]);
+    }
+
+    function updateAccountUI() {
+      const savedName = localStorage.getItem('sumo_name');
+      const savedFlag = localStorage.getItem('sumo_flag');
+      const savedAvatar = localStorage.getItem('sumo_avatar');
+      if(savedName) document.getElementById('sidebar-name').innerText = savedName;
+      if(savedFlag) document.getElementById('sidebar-flag').innerText = savedFlag;
+      if(savedAvatar) document.getElementById('sidebar-avatar').src = savedAvatar;
+    }
+
+    window.onload = updateAccountUI;
+
+    function openLeaderboardModalSafe() {
+      toggleNeonMenu();
+      document.getElementById('account-modal').style.display = 'none';
+      document.getElementById('leaderboard-modal').style.display = 'flex';
+      renderFullLeaderboard();
+    }
+
+    function renderFullLeaderboard() {
+      const currentName = localStorage.getItem('sumo_name') || 'aiham';
+      const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
+      let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
+      let existingIndex = players.findIndex(p => p.name === currentName);
+      let currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
+      
+      if (existingIndex >= 0) {
+        players[existingIndex].coins = currentCoins;
+        players[existingIndex].avatar = currentAvatar;
+      } else {
+        players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
+      }
+      
+      players.sort((a, b) => b.coins - a.coins);
+      localStorage.setItem('sumo_global_players', JSON.stringify(players));
+      
+      const container = document.getElementById('modal-players-list');
+      if(!container) return;
+      container.innerHTML = '';
+      
+      players.forEach((player, index) => {
+        let rank = index + 1;
+        let rankStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(10,10,25,0.6);';
+        let rankBadge = '#' + rank;
+        let title = 'NetRunner 💻';
+        let trend = '🟢';
+        
+        if (rank === 1) {
+          rankStyle = 'background: rgba(255,215,0,0.15); border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.4);';
+          rankBadge = '👑 1';
+          title = 'Cyber Overlord 👑';
+          trend = '🔥';
+        } else if (rank === 2 || rank === 3) {
+          rankStyle = 'background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0;';
+          rankBadge = rank === 2 ? '🥈 2' : '🥉 3';
+          title = 'Neon Elite ⚡';
+          trend = '🚀';
+        }
+        
+        const row = document.createElement('div');
+        row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; " + rankStyle;
+        
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: bold; font-size: 13px; width: 32px; color: ${rank <= 3 ? '#ffd700' : '#00f3ff'};">${rankBadge} ${trend}</span>
+            <img src="${player.avatar}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #00f3ff;">
+            <div>
+              <div style="color: #fff; font-weight: bold; font-size: 13px;">${player.name}</div>
+              <div style="color: ${rank === 1 ? '#ffd700' : '#00f3ff'}; font-size: 9px; opacity: 0.8;">${title}</div>
+            </div>
+          </div>
+          <div style="color: #ffd700; font-weight: bold; font-size: 13px;">🪙 ${player.coins}</div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    // تشغيل خلفية الماتريكس
+    const canvas = document.getElementById('matrix-bg');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ01010101KAILINUXCYBER';
+    const fontSize = 16;
+    let columns = canvas.width / fontSize;
+    const drops = [];
+    for (let i = 0; i < columns; i++) { drops[i] = 1; }
+    function drawMatrix() {
+      ctx.fillStyle = 'rgba(2, 2, 5, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00f3ff';
+      ctx.font = fontSize + 'px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) { drops[i] = 0; }
+        drops[i]++;
+      }
+    }
+    setInterval(drawMatrix, 50);
+    </script>
 </body>
 </html>
