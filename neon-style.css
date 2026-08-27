@@ -44,6 +44,15 @@ body::before {
 .menu-metrics span, .menu-metrics strong { display: block; }
 .menu-metrics span { color: #8aa1ae; font-size: 9px; letter-spacing: 1px; }
 .menu-metrics strong { color: #00f3ff; font-size: 15px; margin-top: 4px; }
+.mode-title { width: min(420px, 90vw); margin: 4px 0 6px; color: #8aa1ae; font-size: 10px; letter-spacing: 2px; text-align: left; }
+.mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; width: min(420px, 90vw); margin-bottom: 8px; }
+.mode-btn { min-height: 64px; width: 100%; margin: 0; padding: 8px 5px; border-radius: 8px !important; font-size: 10px; line-height: 1.25; }
+.mode-btn small { display: block; margin-top: 5px; color: #aebbc5; font-size: 8px; text-transform: none; }
+.mode-btn.chaos { border-color: #ff3366 !important; color: #ff7894 !important; }
+.mode-btn.time { border-color: #ffbb00 !important; color: #ffcf54 !important; }
+.mode-btn.shrink { border-color: #7dff00 !important; color: #baff73 !important; }
+.mode-btn:hover small { color: #071018; }
+.death-count-copy { color: #ffbb00; font-size: 11px; margin: -3px 0 8px; }
 .daily-mission {
   width: min(420px, 90vw);
   padding: 12px;
@@ -79,6 +88,9 @@ body::before {
 .leaderboard-self { min-height: 0; margin-bottom: 8px; color: #ffbb00; font-size: 11px; text-align: center; }
 
 @media (max-width: 480px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .mode-btn { min-height: 48px; text-align: left; padding-left: 14px; }
+  .mode-btn small { display: inline; margin-left: 5px; }
   .leaderboard-tools { flex-wrap: wrap; }
   .leaderboard-tools input { flex-basis: 100%; }
 }
