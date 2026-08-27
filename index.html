@@ -8,13 +8,10 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
     
-    <script src="https://pl31012283.profitableratecpmnetwork.com/57/8a/18/578a1867ba6f1dd3225b413221bd9b2c.js"></script>
-    <script src="https://infamouscomer.com/57/8a/18/578a1867ba6f1dd3225b413221bd9b2c.js"></script>
-
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
         html, body { width: 100%; height: 100%; background: #08090f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #banner-ad { width: 100%; height: 35px; background: #111420; border-bottom: 1px dashed #00e5ff; display: flex; align-items: center; justify-content: center; color: #00e5ff; font-size: 11px; letter-spacing: 1px; flex-shrink: 0; cursor: pointer; }
+        #banner-ad { display: none !important; }
         #game-box { position: relative; flex: 1; width: 100%; height: calc(100% - 35px); display: flex; align-items: center; justify-content: center; background: #07080d; }
         body.online-mode #banner-ad { display: none !important; pointer-events: none !important; }
         body.online-mode #game-box { height: 100%; }
@@ -81,7 +78,7 @@
     <link rel="stylesheet" href="neon-style.css">
 </head>
 <body>
-    <div id="banner-ad" onclick="triggerSmartlinkDirect('banner')">[ 🔥 SPONSORED: TAP HERE TO EXPLORE DEALS ]</div>
+    <div id="banner-ad" aria-hidden="true"></div>
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
         <div id="touch-controller"><div id="stick"></div></div>
@@ -115,6 +112,7 @@
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
+            <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
         </div>
 
         <div id="modal-install-guide" class="overlay hidden">
@@ -216,6 +214,7 @@
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
         let counters = { free_coins: 0, revive: 0, double: 0 }, limits = { free_coins: 10, revive: 5, double: 10 };
+        let stageEntryLinkShown = sessionStorage.getItem('sumo_stage_entry_link') === '1';
 
         function isOnlineSession() {
             return document.body.classList.contains('online-mode') || gameMode === 'p2p';
@@ -233,6 +232,14 @@
                 frame.style.pointerEvents = 'none';
             });
         }
+
+        function showStageEntryLinkOnce() {
+            if (stageEntryLinkShown || isOnlineSession()) return;
+            stageEntryLinkShown = true;
+            sessionStorage.setItem('sumo_stage_entry_link', '1');
+            window.open(SMARTLINK, '_blank', 'noopener,noreferrer');
+        }
+
         function handleAdClickWithCounter(type) {
             if (isOnlineSession()) return;
             window.open(SMARTLINK, '_blank');
@@ -248,8 +255,7 @@
             }
         }
         function triggerSmartlinkDirect() {
-            if (isOnlineSession()) return;
-            window.open(SMARTLINK, '_blank');
+            return false;
         }
 
         const canvas = document.getElementById('c'), ctx = canvas.getContext('2d', { alpha: false });
@@ -432,6 +438,7 @@
         let modeScore = 0;
         let modeSpawnTimer = 0;
         let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
+        let reviveSnapshot = { x: 400, y: 300, radius: 240 };
         let currentPlayingStage = 1;
         let offlineArenaRadius = 240;
         let stageEnded = false;
@@ -621,6 +628,7 @@
         function startOfflineStage(level) {
             gameMode = 'offline';
             activeMode = 'stage';
+            showStageEntryLinkOnce();
             currentPlayingStage = level;
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
@@ -686,7 +694,12 @@
 
         function reviveInPlaceOffline() {
             stageEnded = false;
-            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+            const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
+            const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
+            const scale = distance > safeDistance ? safeDistance / distance : 1;
+            player.x = 400 + (reviveSnapshot.x - 400) * scale;
+            player.y = 300 + (reviveSnapshot.y - 300) * scale;
+            player.vx = 0; player.vy = 0; player.alive = true;
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
@@ -736,6 +749,7 @@
                 player.x += player.vx; player.y += player.vy;
                 if (offlineArenaRadius > 160) offlineArenaRadius -= 0.012;
                 if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
+                    reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
                     player.alive = false; stageEnded = true;
                     registerPlayerDeath();
                     hideAllMenus();
@@ -912,7 +926,7 @@
 
     <!-- زر القائمة الجانبية النيون -->
     <div id="neon-menu-btn" onclick="toggleNeonMenu()" style="position: fixed; top: 110px; right: 30px; z-index: 9999; cursor: pointer; background: rgba(5,5,15,0.95); border: 2px solid #00f3ff; border-radius: 12px; padding: 12px 18px; box-shadow: 0 0 20px rgba(0,243,255,0.5); transition: 0.3s;">
-      <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ MENU</span>
+    <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ منيو</span>
     </div>
 
     <!-- القائمة الجانبية المتقدمة -->

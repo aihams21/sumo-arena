@@ -53,6 +53,12 @@ body::before {
 .mode-btn.shrink { border-color: #7dff00 !important; color: #baff73 !important; }
 .mode-btn:hover small { color: #071018; }
 .death-count-copy { color: #ffbb00; font-size: 11px; margin: -3px 0 8px; }
+.developer-credit { width: min(390px, 90vw); margin: 10px 0 4px; padding: 10px 14px; border-top: 1px solid rgba(0,243,255,.35); border-bottom: 1px solid rgba(255,0,85,.35); text-align: center; animation: credit-glow 3s ease-in-out infinite alternate; }
+.developer-credit span, .developer-credit strong, .developer-credit small { display: block; }
+.developer-credit span { color: #8195a3; font-size: 8px; letter-spacing: 3px; }
+.developer-credit strong { color: #fff; font-size: 18px; letter-spacing: 4px; text-shadow: 0 0 8px #00f3ff, 0 0 20px #ff0055; }
+.developer-credit small { color: #00f3ff; font-size: 8px; letter-spacing: 2px; margin-top: 4px; }
+@keyframes credit-glow { from { box-shadow: 0 0 8px rgba(0,243,255,.12); } to { box-shadow: 0 0 22px rgba(255,0,85,.28); } }
 .daily-mission {
   width: min(420px, 90vw);
   padding: 12px;
@@ -145,9 +151,9 @@ div[style*="Coins"], span, div {
   #qhqabts { pointer-events: none !important; }
   #qhqabts a { pointer-events: none !important; }
   body > div[style*="z-index: 2147483647"] { pointer-events: none !important; }
-  html, body { min-height: 100%; }
+  html, body { min-height: 100%; overflow-y: auto; overflow-x: hidden; }
   #banner-ad { height: 30px; min-height: 30px; font-size: 9px; padding: 0 8px; text-align: center; }
-  #game-box { min-height: calc(100dvh - 30px); height: calc(100dvh - 30px); align-items: center; }
+  #game-box { min-height: calc(100dvh - 30px); height: calc(100dvh - 30px); flex: none; align-items: center; }
   canvas { width: 100vw; height: auto; max-height: 75dvh; aspect-ratio: 4 / 3; }
 
   #neon-menu-btn {
