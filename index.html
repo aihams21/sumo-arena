@@ -115,10 +115,15 @@
             <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
         </div>
 
-        <div id="modal-install-guide" class="overlay hidden">
-            <h2 id="guide-device-title" style="color:#00e5ff;">📲 تثبيت اللعبة كتطبيق</h2>
-            <div id="guide-device-body" style="background:#111420; border:1px solid #20263a; border-radius:10px; padding:15px; width:min(340px, 90vw); text-align:right; font-size:13px; line-height:1.7; margin:10px 0; direction:rtl;"></div>
-            <button class="btn btn-cyan" onclick="closeInstallGuide()">فهمت 👍</button>
+        <div id="modal-install-guide" class="overlay hidden install-overlay">
+            <div class="install-card">
+                <span class="install-kicker">NEON SUMO ARENA / PWA</span>
+                <h2 id="guide-device-title">خذ الساحة معك 📱</h2>
+                <p id="guide-device-body">ثبّت اللعبة لتفتحها بسرعة، تلعب بملء الشاشة، وتحصل على تجربة لمس أكثر سلاسة.</p>
+                <div class="install-benefits"><span>⚡ تشغيل سريع</span><span>◈ ملء الشاشة</span><span>◎ لعب دون تبويب</span></div>
+                <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
+                <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
+            </div>
         </div>
 
         <div id="menu-stages" class="overlay hidden">
@@ -193,21 +198,43 @@
     <script>
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
         let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; });
+        const installModal = document.getElementById('modal-install-guide');
+        const installButton = document.getElementById('install-main-button');
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
+        if (isInstalled) {
+            installModal.classList.add('hidden');
+            document.querySelector('button[onclick="handleSmartInstall()"]')?.classList.add('hidden');
+        }
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.innerText = 'تثبيت التطبيق الآن 📱';
+        });
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            installModal.classList.add('hidden');
+            localStorage.setItem('neon_sumo_pwa_installed', '1');
+            document.querySelector('button[onclick="handleSmartInstall()"]')?.classList.add('hidden');
+        });
 
         function handleSmartInstall() {
-            bannerAd.style.display = 'none';
-            if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; return; }
+            if (isInstalled) return;
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.finally(() => { deferredPrompt = null; });
+                return;
+            }
             let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent), isAndroid = /Android/.test(navigator.userAgent);
-            let t = document.getElementById('guide-device-title'), b = document.getElementById('guide-device-body');
-            if (isIOS) { t.innerText = "🍏 التثبيت على الآيفون"; b.innerHTML = "1. اضغط زر <b>المشاركة (Share)</b> أسفل المتصفح.<br>2. اضغط <b>إضافة إلى الصفحة الرئيسية ➕</b>."; }
-            else if (isAndroid) { t.innerText = "🤖 التثبيت على أندرويد"; b.innerHTML = "1. اضغط النقاط الثلاث <b>(⋮)</b>.<br>2. اختر <b>تثبيت التطبيق</b>."; }
-            else { t.innerText = "💻 التثبيت على الكمبيوتر"; b.innerHTML = "اضغط على أيقونة <b>التثبيت (🖥️)</b> في شريط العنوان بالأعلى."; }
-            document.getElementById('modal-install-guide').classList.remove('hidden');
+            const title = document.getElementById('guide-device-title');
+            const body = document.getElementById('guide-device-body');
+            if (isIOS) { title.innerText = 'أضف الساحة إلى جهازك 🍏'; body.innerText = 'اضغط مشاركة ثم إضافة إلى الشاشة الرئيسية.'; }
+            else if (isAndroid) { title.innerText = 'ثبّت الساحة على أندرويد 🤖'; body.innerText = 'افتح قائمة المتصفح ثم اختر تثبيت التطبيق.'; }
+            else { title.innerText = 'ثبّت Neon Sumo Arena 💻'; body.innerText = 'استخدم أيقونة التثبيت في شريط عنوان المتصفح.'; }
+            installModal.classList.remove('hidden');
         }
         function closeInstallGuide() {
-            document.getElementById('modal-install-guide').classList.add('hidden');
-            if (!isOnlineSession()) bannerAd.style.display = 'flex';
+            installModal.classList.add('hidden');
         }
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";

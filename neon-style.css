@@ -59,6 +59,16 @@ body::before {
 .developer-credit strong { color: #fff; font-size: 18px; letter-spacing: 4px; text-shadow: 0 0 8px #00f3ff, 0 0 20px #ff0055; }
 .developer-credit small { color: #00f3ff; font-size: 8px; letter-spacing: 2px; margin-top: 4px; }
 @keyframes credit-glow { from { box-shadow: 0 0 8px rgba(0,243,255,.12); } to { box-shadow: 0 0 22px rgba(255,0,85,.28); } }
+.install-overlay { z-index: 60; background: radial-gradient(circle at 50% 20%, rgba(0,243,255,.12), rgba(3,4,12,.97) 58%); }
+.install-card { width: min(430px, 100%); padding: 30px 24px 22px; border: 1px solid rgba(0,243,255,.55); border-radius: 18px; background: linear-gradient(145deg, rgba(11,20,37,.98), rgba(5,7,18,.98)); box-shadow: 0 0 35px rgba(0,243,255,.24), inset 0 0 25px rgba(0,243,255,.05); text-align: center; }
+.install-kicker { display: block; color: #ffbb00; font-size: 9px; letter-spacing: 2px; margin-bottom: 13px; }
+.install-card h2 { color: #fff; font-size: clamp(20px, 5vw, 26px); text-shadow: 0 0 15px #00f3ff; margin-bottom: 10px; }
+.install-card p { max-width: 330px; margin: 0 auto; color: #b7c6d1; font-family: sans-serif; font-size: 14px; line-height: 1.65; }
+.install-benefits { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 18px 0 20px; }
+.install-benefits span { padding: 7px 9px; border: 1px solid rgba(0,243,255,.25); border-radius: 7px; color: #8feefa; background: rgba(0,243,255,.06); font-size: 9px; }
+.install-main-button { width: min(100%, 340px); min-height: 54px; margin: 0 auto 12px; font-size: 15px; box-shadow: 0 0 22px rgba(0,243,255,.5) !important; }
+.install-dismiss { display: block; color: #8999a5; cursor: pointer; font-family: sans-serif; font-size: 12px; padding: 5px; }
+.install-dismiss:hover { color: #fff; }
 .daily-mission {
   width: min(420px, 90vw);
   padding: 12px;
@@ -235,4 +245,8 @@ div[style*="Coins"], span, div {
   .leaderboard-player-avatar { width: 34px; height: 34px; }
   #matrix-bg { display: none !important; }
   .profile-panel { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .install-overlay { padding: 18px 14px; }
+  .install-card { padding: 25px 17px 18px; border-radius: 15px; }
+  .install-benefits span { flex: 1 1 30%; min-width: 86px; }
+  .install-card p { font-size: 13px; }
 }
