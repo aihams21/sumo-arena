@@ -213,7 +213,6 @@
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
         const counterLimits = { free_coins: 10, revive: 5 };
         let counters = JSON.parse(sessionStorage.getItem('sumo_reward_counters') || '{"free_coins":0,"revive":0}');
-        let stageEntryLinkShown = sessionStorage.getItem('sumo_stage_entry_link') === '1';
 
         function isOnlineSession() {
             return document.body.classList.contains('online-mode') || gameMode === 'p2p';
@@ -230,13 +229,6 @@
                 frame.style.display = 'none';
                 frame.style.pointerEvents = 'none';
             });
-        }
-
-        function showStageEntryLinkOnce() {
-            if (stageEntryLinkShown || isOnlineSession()) return;
-            stageEntryLinkShown = true;
-            sessionStorage.setItem('sumo_stage_entry_link', '1');
-            window.open(SMARTLINK, '_blank', 'noopener,noreferrer');
         }
 
         function handleAdClickWithCounter(type) {
@@ -266,6 +258,8 @@
         }
 
         const canvas = document.getElementById('c'), ctx = canvas.getContext('2d', { alpha: false });
+        const mobilePerformance = window.matchMedia('(max-width: 600px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (mobilePerformance) ctx.imageSmoothingEnabled = false;
         const gameBox = document.getElementById('game-box');
         const touchBox = document.getElementById('touch-controller'), stick = document.getElementById('stick'), bannerAd = document.getElementById('banner-ad');
         let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0, pointerActive = false;
@@ -635,7 +629,6 @@
         function startOfflineStage(level) {
             gameMode = 'offline';
             activeMode = 'stage';
-            showStageEntryLinkOnce();
             currentPlayingStage = level;
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
@@ -704,7 +697,7 @@
         }
 
         function spawnImpact(x, y, color) {
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
                 let angle = Math.random() * Math.PI * 2;
                 let speed = 3 + Math.random() * 4;
                 particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
@@ -996,6 +989,16 @@
       </div>
     </div>
 
+        <div id="profile-modal" class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name" style="display:none;">
+            <div class="profile-panel">
+                <button class="profile-close" onclick="closePlayerProfile()" aria-label="Close profile">&times;</button>
+                <div id="profile-avatar" class="profile-avatar"></div>
+                <h2 id="profile-name">Fighter</h2>
+                <p id="profile-title" class="profile-title"></p>
+                <div id="profile-stats" class="profile-stats"></div>
+            </div>
+        </div>
+
     <!-- خلفية الماتريكس -->
     <canvas id="matrix-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; z-index: -2; pointer-events: none; opacity: 0.25;"></canvas>
 
@@ -1129,6 +1132,7 @@
     const drops = [];
     for (let i = 0; i < columns; i++) { drops[i] = 1; }
     function drawMatrix() {
+            if (window.matchMedia('(max-width: 600px)').matches) return;
       ctx.fillStyle = 'rgba(2, 2, 5, 0.1)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#00f3ff';

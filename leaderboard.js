@@ -2,6 +2,13 @@ let leaderboardSort = 'coins';
 let leaderboardPlayers = [];
 let leaderboardAllPlayers = [];
 
+const leaderboardFallback = [
+  { name: 'NOVA JACKAL', level: 42, stage: 86, coins: 1280, skin: 'Void Samurai' },
+  { name: 'CYBER RIKISHI', level: 35, stage: 71, coins: 1045, skin: 'Toxic Fang' },
+  { name: 'MANGO TITAN', level: 28, stage: 54, coins: 790, skin: 'Ember Ring' },
+  { name: 'AIHAM AM', level: 12, stage: 24, coins: 420, skin: 'Pulse Core' }
+];
+
 function setLeaderboardSort(sort, button) {
   leaderboardSort = sort;
   document.querySelectorAll('.lb-tab').forEach(tab => tab.classList.remove('active'));
@@ -17,124 +24,79 @@ function filterLeaderboard(query) {
 function openLeaderboardModalSafe() {
   const sidebar = document.getElementById('neon-sidebar');
   if (sidebar) sidebar.style.right = '-320px';
-  
   const accountModal = document.getElementById('account-modal');
   if (accountModal) accountModal.style.display = 'none';
-
   const modal = document.getElementById('leaderboard-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    const search = document.getElementById('leaderboard-search');
-    if (search) search.value = '';
-    fetchRealLeaderboard();
-  }
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const search = document.getElementById('leaderboard-search');
+  if (search) search.value = '';
+  fetchRealLeaderboard();
 }
 
 async function fetchRealLeaderboard() {
   const container = document.getElementById('modal-players-list');
-  if(!container) return;
-  
-  container.innerHTML = '<div style="text-align: center; color: #00f3ff; padding: 25px; font-family: monospace; text-shadow: 0 0 10px rgba(0,243,255,0.5);">جاري مزامنة أساطير السيرفر... ⚡</div>';
-
+  if (!container) return;
+  container.innerHTML = '<div class="leaderboard-loading">SYNCING GLOBAL FIGHTERS...</div>';
   try {
-    let response = await fetch('/api/leaderboard');
-    let players = await response.json();
-    const currentName = localStorage.getItem('sumo_name') || 'aiham';
-    if (!players.some(player => player.name === currentName)) {
-      players.push({ name: currentName, coins: parseInt(localStorage.getItem('sumo_coins') || '0'), stage: parseInt(localStorage.getItem('sumo_stage') || '1'), avatar: localStorage.getItem('sumo_avatar') });
-    }
+    const response = await fetch('/api/leaderboard', { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`);
+    const players = await response.json();
+    if (!Array.isArray(players) || players.length === 0) throw new Error('Empty leaderboard');
     leaderboardAllPlayers = players;
-    renderPlayersList(players);
-  } catch (error) {
+  } catch (_error) {
     const currentName = localStorage.getItem('sumo_name') || 'aiham';
-    const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
-    const currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
-    
-    // جلب اللاعبين المحليين أو المحفوظين لتشكيل قائمة حية
-    let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
-    let existingIndex = players.findIndex(p => p.name === currentName);
-    if (existingIndex >= 0) {
-      players[existingIndex].coins = currentCoins;
-      players[existingIndex].stage = parseInt(localStorage.getItem('sumo_stage') || '1');
-      players[existingIndex].avatar = currentAvatar;
-    } else {
-      players.push({ name: currentName, coins: currentCoins, stage: parseInt(localStorage.getItem('sumo_stage') || '1'), avatar: currentAvatar });
-    }
-    
-    leaderboardAllPlayers = players;
-    renderPlayersList(players);
+    const current = { name: currentName, level: parseInt(localStorage.getItem('sumo_stage') || '1'), stage: parseInt(localStorage.getItem('sumo_stage') || '1'), coins: parseInt(localStorage.getItem('sumo_coins') || '0'), skin: 'Pulse Core' };
+    leaderboardAllPlayers = leaderboardFallback.filter(player => player.name !== currentName);
+    leaderboardAllPlayers.push(current);
   }
+  renderPlayersList(leaderboardAllPlayers);
 }
 
 function renderPlayersList(players) {
   const container = document.getElementById('modal-players-list');
-  if(!container) return;
+  if (!container) return;
+  leaderboardPlayers = players || [];
+  const ranked = leaderboardPlayers.map(player => ({
+    ...player,
+    level: Number(player.level) || Number(player.stage) || 1,
+    stage: Number(player.stage) || 1,
+    coins: Number(player.coins) || 0,
+    skin: player.skin || player.skinName || 'Pulse Core'
+  })).sort((a, b) => (b[leaderboardSort] - a[leaderboardSort]) || (b.coins - a.coins));
   container.innerHTML = '';
-  
-  if (!players || players.length === 0) {
-    container.innerHTML = '<div style="text-align: center; color: #ff0055; padding: 25px; font-family: monospace;">لا توجد بيانات متاحة حالياً بالسيرفر</div>';
-    return;
-  }
-
-  leaderboardPlayers = players;
-  players = players.map(player => ({ ...player, coins: Number(player.coins) || 0, stage: Number(player.stage) || 1 }));
-  players.sort((a, b) => (b[leaderboardSort] - a[leaderboardSort]) || (b.coins - a.coins));
-  localStorage.setItem('sumo_global_players', JSON.stringify(players));
-
   const currentName = localStorage.getItem('sumo_name') || 'aiham';
-  const rankedPlayers = leaderboardAllPlayers.map(player => ({ ...player, coins: Number(player.coins) || 0, stage: Number(player.stage) || 1 }));
-  rankedPlayers.sort((a, b) => (b[leaderboardSort] - a[leaderboardSort]) || (b.coins - a.coins));
-  const currentRank = rankedPlayers.findIndex(player => player.name === currentName) + 1;
+  const currentRank = ranked.findIndex(player => player.name === currentName) + 1;
   const self = document.getElementById('leaderboard-self');
-  const currentPlayer = currentRank ? rankedPlayers[currentRank - 1] : null;
-  if (self) self.innerText = currentPlayer ? `YOUR POSITION  #${currentRank}  •  ${currentPlayer[leaderboardSort]} ${leaderboardSort === 'stage' ? 'waves' : 'coins'}` : '';
+  if (self) self.innerText = currentRank ? `YOUR POSITION #${currentRank}` : '';
   const menuRank = document.getElementById('menu-rank');
   if (menuRank) menuRank.innerText = currentRank ? `#${currentRank}` : '--';
-  
-  players.forEach((player, index) => {
-    let rank = index + 1;
-    let rankStyle = 'background: rgba(10, 15, 35, 0.7); border: 1px solid rgba(0, 243, 255, 0.25); box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.05);';
-    let rankBadge = '#' + rank;
-    let title = 'NetRunner 💻';
-    let glowColor = '#00f3ff';
-    
-    if (rank === 1) {
-      rankStyle = 'background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(10,15,35,0.9)); border: 2px solid #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.3), inset 0 0 10px rgba(255,215,0,0.2);';
-      rankBadge = '👑 1';
-      title = 'CYBER OVERLORD 👑';
-      glowColor = '#ffd700';
-    } else if (rank === 2) {
-      rankStyle = 'background: linear-gradient(135deg, rgba(192,192,192,0.15), rgba(10,15,35,0.9)); border: 2px solid #c0c0c0; box-shadow: 0 0 15px rgba(192,192,192,0.2);';
-      rankBadge = '🥈 2';
-      title = 'NEON ELITE ⚡';
-      glowColor = '#c0c0c0';
-    } else if (rank === 3) {
-      rankStyle = 'background: linear-gradient(135deg, rgba(205,127,50,0.15), rgba(10,15,35,0.9)); border: 2px solid #cd7f32; box-shadow: 0 0 15px rgba(205,127,50,0.2);';
-      rankBadge = '🥉 3';
-      title = 'NEON MASTER ⚔️';
-      glowColor = '#cd7f32';
-    }
-    
-    const row = document.createElement('div');
-    row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 12px; margin-bottom: 8px; transition: all 0.3s ease; cursor: pointer; " + rankStyle;
-    
-    row.onmouseover = () => { row.style.transform = 'scale(1.02)'; row.style.borderColor = glowColor; };
-    row.onmouseout = () => { row.style.transform = 'scale(1)'; };
-
-    row.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-weight: 900; font-size: 14px; width: 40px; color: ${glowColor}; text-shadow: 0 0 8px ${glowColor};">${rankBadge}</span>
-        <img src="${player.avatar || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff'}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid ${glowColor}; box-shadow: 0 0 10px ${glowColor};">
-        <div>
-          <div style="color: #ffffff; font-weight: bold; font-size: 14px; letter-spacing: 0.5px;">${player.name}</div>
-          <div style="color: ${glowColor}; font-size: 10px; font-weight: bold; opacity: 0.9; text-transform: uppercase;">${title}</div>
-        </div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(255,215,0,0.3);">
-        <span style="font-size: 14px;">🪙</span>
-        <span style="color: #ffd700; font-weight: 900; font-size: 14px; text-shadow: 0 0 8px rgba(255,215,0,0.5);">${player.coins}</span>
-      </div>
-    `;
+  ranked.forEach((player, index) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = `leaderboard-row ${index < 3 ? `rank-${index + 1}` : ''}`;
+    row.innerHTML = `<span class="leaderboard-rank">#${index + 1}</span><span class="leaderboard-player-avatar"></span><span class="leaderboard-player-copy"><b>${escapeLeaderboardText(player.name)}</b><small>LVL ${player.level} • ${escapeLeaderboardText(player.skin)} • ${player.stage} STAGES</small></span><span class="leaderboard-player-value">${leaderboardSort === 'stage' ? `🌊 ${player.stage}` : `🪙 ${player.coins}`}</span>`;
+    row.addEventListener('click', () => openPlayerProfile(player, index + 1));
     container.appendChild(row);
   });
+}
+
+function openPlayerProfile(player, rank) {
+  const modal = document.getElementById('profile-modal');
+  if (!modal) return;
+  const skin = player.skin || player.skinName || 'Pulse Core';
+  document.getElementById('profile-name').innerText = player.name || 'Fighter';
+  document.getElementById('profile-title').innerText = `GLOBAL RANK #${rank} • ${skin}`;
+  document.getElementById('profile-avatar').style.backgroundColor = '#00f3ff';
+  document.getElementById('profile-stats').innerHTML = `<div>LEVEL<strong>${Number(player.level) || 1}</strong></div><div>STAGES<strong>${Number(player.stage) || 1}</strong></div><div>COINS<strong>${Number(player.coins) || 0}</strong></div><div>SKIN<strong>${escapeLeaderboardText(skin)}</strong></div>`;
+  modal.style.display = 'flex';
+}
+
+function closePlayerProfile() {
+  const modal = document.getElementById('profile-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function escapeLeaderboardText(value) {
+  return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
 }
