@@ -557,11 +557,11 @@
             const curve = Math.sqrt(level);
             const wave = Math.max(1, Math.floor(level / 5));
             return {
-                radius: Math.max(40, playerRadius * 1.5 + Math.min(8, curve)),
-                mass: 5.2 + Math.min(3.8, curve * 0.38),
-                speed: 0.33 + Math.min(0.2, curve * 0.018),
-                power: 13 + Math.min(15, curve * 1.45),
-                maxHp: 6 + Math.min(9, Math.floor(wave * 0.4))
+                radius: Math.max(38, playerRadius * 1.42 + Math.min(7, curve)),
+                mass: 4.8 + Math.min(2.8, curve * 0.28),
+                speed: 0.36 + Math.min(0.14, curve * 0.012),
+                power: 10.5 + Math.min(9, curve * 0.9),
+                maxHp: 5 + Math.min(4, Math.floor(wave * 0.25))
             };
         }
 
@@ -582,7 +582,8 @@
                 bots.push({
                     x: 400, y: 130, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
                     speed: stats.speed, power: stats.power, color: '#ff0055', isBoss: true,
-                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp, hurtCd: 0
+                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp, hurtCd: 0,
+                    attackCooldown: 105, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0
                 });
             } else {
                 const count = offlineEnemyCount(level);
@@ -618,6 +619,10 @@
                 let speed = 3 + Math.random() * 4;
                 particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
             }
+        }
+
+        function distanceToPlayer(bot) {
+            return Math.hypot(bot.x - player.x, bot.y - player.y);
         }
 
         function updatePhysics() {
@@ -657,14 +662,48 @@
                         bot.phase = 2; bot.color = '#ff3366';
                         spawnImpact(bot.x, bot.y, '#ff3366');
                     }
+                    if (bot.isBoss) {
+                        bot.attackCooldown -= 1;
+                        if (bot.telegraph > 0) {
+                            bot.telegraph -= 1;
+                            if (bot.telegraph === 0) {
+                                if (bot.attackType === 'wave') {
+                                    bot.pulseRadius = 12;
+                                    if (distanceToPlayer(bot) < 190) {
+                                        const waveForce = raging ? 9.5 : 7.5;
+                                        player.vx += Math.cos(angle) * waveForce;
+                                        player.vy += Math.sin(angle) * waveForce;
+                                    }
+                                } else {
+                                    bot.dashTimer = raging ? 20 : 16;
+                                    bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2);
+                                    bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
+                                }
+                                bot.attackType = null;
+                                bot.attackCooldown = raging ? 92 : 118;
+                            }
+                        } else if (bot.attackCooldown <= 0) {
+                            bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
+                            bot.attackCycle = (bot.attackCycle || 0) + 1;
+                            bot.telegraph = 42;
+                        }
+                        if (bot.pulseRadius > 0) bot.pulseRadius += 10;
+                        if (bot.pulseRadius > 210) bot.pulseRadius = 0;
+                    }
                     let speed = bot.speed * (raging ? 1.35 : 1);
                     let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
                     let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
                     let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
                     if (bot.cd > dashAt) speed *= dashMul;
                     if (bot.cd > dashEnd) bot.cd = 0;
-                    bot.vx += Math.cos(angle) * speed;
-                    bot.vy += Math.sin(angle) * speed;
+                    if (bot.isBoss && bot.dashTimer > 0) {
+                        bot.vx = bot.dashVx;
+                        bot.vy = bot.dashVy;
+                        bot.dashTimer -= 1;
+                    } else {
+                        bot.vx += Math.cos(angle) * speed;
+                        bot.vy += Math.sin(angle) * speed;
+                    }
                     bot.vx *= bot.isBoss ? 0.92 : 0.9;
                     bot.vy *= bot.isBoss ? 0.92 : 0.9;
                     bot.x += bot.vx; bot.y += bot.vy;
@@ -710,7 +749,8 @@
                     }
                 }
                 if (active.length === 0 && !stageEnded) {
-                    stageEnded = true; coins += 5;
+                    stageEnded = true;
+                    coins += bots.some(bot => bot.isBoss) ? 30 : 5;
                     const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
                     localStorage.setItem('sumo_streak', streak);
                     resetDailyMissionIfNeeded();
@@ -741,6 +781,24 @@
                     ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
                     ctx.fillStyle = bot.color; ctx.fill();
                     ctx.lineWidth = bot.isBoss ? 4 : 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+                    if (bot.isBoss) {
+                        if (bot.telegraph > 0) {
+                            const warningRadius = bot.attackType === 'wave' ? 190 : 64;
+                            ctx.beginPath(); ctx.arc(bot.x, bot.y, warningRadius, 0, Math.PI * 2);
+                            ctx.lineWidth = 3; ctx.strokeStyle = bot.attackType === 'wave' ? '#ffbb00' : '#ff0055';
+                            ctx.globalAlpha = 0.35 + (bot.telegraph % 10) / 20;
+                            ctx.stroke(); ctx.globalAlpha = 1;
+                        }
+                        if (bot.pulseRadius > 0) {
+                            ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.pulseRadius, 0, Math.PI * 2);
+                            ctx.lineWidth = 5; ctx.strokeStyle = '#ffbb00';
+                            ctx.globalAlpha = Math.max(0, 1 - bot.pulseRadius / 220);
+                            ctx.stroke(); ctx.globalAlpha = 1;
+                        }
+                        const barWidth = bot.radius * 2.2;
+                        ctx.fillStyle = '#351323'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth, 5);
+                        ctx.fillStyle = '#00ff66'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth * Math.max(0, bot.hp / bot.maxHp), 5);
+                    }
                 }
                 if (player.alive) {
                     ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
