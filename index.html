@@ -111,7 +111,7 @@
             </div>
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
-            <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
+            <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
             <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
         </div>
 
@@ -120,7 +120,12 @@
                 <span class="install-kicker">NEON SUMO ARENA / PWA</span>
                 <h2 id="guide-device-title">خذ الساحة معك 📱</h2>
                 <p id="guide-device-body">ثبّت اللعبة لتفتحها بسرعة، تلعب بملء الشاشة، وتحصل على تجربة لمس أكثر سلاسة.</p>
+                <div id="install-system-status" class="install-system-status">جاري فحص النظام وحالة التثبيت...</div>
                 <div class="install-benefits"><span>⚡ تشغيل سريع</span><span>◈ ملء الشاشة</span><span>◎ لعب دون تبويب</span></div>
+                <details class="install-features">
+                    <summary>استكشف 99 ميزة لتجربة التطبيق</summary>
+                    <ol id="elite-features-list"></ol>
+                </details>
                 <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
                 <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
             </div>
@@ -201,21 +206,57 @@
         const installModal = document.getElementById('modal-install-guide');
         const installButton = document.getElementById('install-main-button');
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        const isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
+        let isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
+        const featureList = [
+            'تشغيل مستقل دون تبويب', 'ملء الشاشة', 'بدء تشغيل أسرع', 'اختصار من الشاشة الرئيسية', 'دعم الوضع الأفقي', 'واجهة لمس محسنة', 'استجابة فورية للأزرار', 'حفظ التقدم محلياً', 'حفظ العملات', 'حفظ الترقيات',
+            'حفظ السكن المختار', 'هوية لاعب ثابتة', 'مزامنة الصدارة عند الاتصال', 'عمل دون إنترنت بعد التخزين', 'تحميل موارد اللعبة مرة واحدة', 'تقليل زمن الانتظار', 'استعادة آخر جلسة', 'حالة تثبيت موثوقة', 'إشعارات تثبيت واضحة', 'تعليمات حسب النظام',
+            'دعم Android', 'دعم iOS', 'دعم Windows', 'دعم macOS', 'دعم Linux', 'كشف Kali Linux', 'دعم Chrome', 'دعم Edge', 'دعم Safari', 'دعم Firefox',
+            'تحكم بلوحة المفاتيح', 'عصا تحكم لمسية', 'تخطيط متجاوب', 'أزرار كبيرة للمس', 'تباعد آمن للنوتش', 'تمرير سلس للقوائم', 'حماية من النقر المكرر', 'مؤشر حالة حي', 'عدادات دقيقة', 'نظام إحياء سريع',
+            'متجر سكنات', 'معاينة السكن', 'تبديل السكن فوراً', 'خريطة مراحل', 'مراحل زعيم', 'هجمات نيون', 'تحذيرات بصرية', 'أنماط لعب متعددة', 'ساحة فوضى', 'تحدي الوقت',
+            'حلبة متقلصة', 'مؤقت الجولة', 'نظام نقاط', 'مكافآت العملات', 'مهمة يومية', 'سلسلة انتصارات', 'إحصاءات اللاعب', 'لوحة صدارة عالمية', 'فرز حسب المراحل', 'فرز حسب العملات',
+            'بحث عن اللاعبين', 'بروفايل اللاعب', 'شارة المركز الأول', 'شارة المركز الثاني', 'شارة المركز الثالث', 'هالة ذهبية', 'هالة فضية', 'هالة برونزية', 'تنظيف الذاكرة المؤقتة', 'تقليل مؤثرات الهاتف',
+            'رسم Canvas سريع', 'حلقة لعب مستقرة', 'تحديث فيزيائي مستقل', 'حماية بيانات الحساب', 'تنظيف الإدخالات', 'ترميز أسماء اللاعبين', 'معالجة فشل الشبكة', 'بيانات احتياطية مفيدة', 'مزامنة غير حاجبة', 'استمرار اللعب عند انقطاع الشبكة',
+            'توافق PWA', 'توافق Service Worker', 'كاش قابل للتحديث', 'حالة standalone', 'رصد appinstalled', 'رصد beforeinstallprompt', 'تجربة بدء نظيفة', 'زر تثبيت واحد', 'إرشاد سريع',
+            'تباين عالي', 'قراءة واضحة', 'تغذية بصرية للنقر', 'تغذية بصرية للفوز', 'تغذية بصرية للخسارة', 'تجربة خفيفة البطارية', 'دعم الشاشات الصغيرة', 'دعم الشاشات الكبيرة', 'جاهزية اللعب السريع', 'هوية Neon Sumo Arena'
+        ];
+        document.getElementById('elite-features-list').innerHTML = featureList.map(feature => `<li>${feature}</li>`).join('');
+        function detectOperatingSystem() {
+            const ua = navigator.userAgent || '';
+            const platform = navigator.userAgentData?.platform || navigator.platform || '';
+            if (/Android/i.test(ua)) return 'Android';
+            if (/iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iOS';
+            if (/CrOS/i.test(ua)) return 'ChromeOS';
+            if (/Windows/i.test(ua)) return 'Windows';
+            if (/Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform)) return 'macOS';
+            if (/Linux/i.test(ua) || /Linux/i.test(platform)) return /Kali/i.test(ua) ? 'Kali Linux' : 'Linux';
+            return 'Unknown OS';
+        }
+        function updateInstallStatus(message) {
+            const status = document.getElementById('install-system-status');
+            if (status) status.innerText = message;
+        }
+        function refreshInstallStatus() {
+            const system = detectOperatingSystem();
+            updateInstallStatus(isInstalled ? `النظام: ${system} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • جاهز للتثبيت الفعلي`);
+        }
+        refreshInstallStatus();
         if (isInstalled) {
             installModal.classList.add('hidden');
-            document.querySelector('button[onclick="handleSmartInstall()"]')?.classList.add('hidden');
+            document.getElementById('menu-install-button')?.classList.add('hidden');
         }
         window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
             deferredPrompt = e;
             installButton.innerText = 'تثبيت التطبيق الآن 📱';
+            refreshInstallStatus();
         });
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null;
+            isInstalled = true;
             installModal.classList.add('hidden');
             localStorage.setItem('neon_sumo_pwa_installed', '1');
-            document.querySelector('button[onclick="handleSmartInstall()"]')?.classList.add('hidden');
+            document.getElementById('menu-install-button')?.classList.add('hidden');
+            refreshInstallStatus();
         });
 
         function handleSmartInstall() {

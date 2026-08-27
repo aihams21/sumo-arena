@@ -64,11 +64,16 @@ body::before {
 .install-kicker { display: block; color: #ffbb00; font-size: 9px; letter-spacing: 2px; margin-bottom: 13px; }
 .install-card h2 { color: #fff; font-size: clamp(20px, 5vw, 26px); text-shadow: 0 0 15px #00f3ff; margin-bottom: 10px; }
 .install-card p { max-width: 330px; margin: 0 auto; color: #b7c6d1; font-family: sans-serif; font-size: 14px; line-height: 1.65; }
+.install-system-status { margin: 15px auto 0; padding: 9px 10px; border: 1px solid rgba(255,187,0,.35); border-radius: 8px; color: #ffcf54; background: rgba(255,187,0,.07); font-family: sans-serif; font-size: 11px; line-height: 1.5; }
 .install-benefits { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 18px 0 20px; }
 .install-benefits span { padding: 7px 9px; border: 1px solid rgba(0,243,255,.25); border-radius: 7px; color: #8feefa; background: rgba(0,243,255,.06); font-size: 9px; }
 .install-main-button { width: min(100%, 340px); min-height: 54px; margin: 0 auto 12px; font-size: 15px; box-shadow: 0 0 22px rgba(0,243,255,.5) !important; }
 .install-dismiss { display: block; color: #8999a5; cursor: pointer; font-family: sans-serif; font-size: 12px; padding: 5px; }
 .install-dismiss:hover { color: #fff; }
+.install-features { margin: 0 auto 16px; width: min(100%, 360px); border: 1px solid rgba(0,243,255,.28); border-radius: 9px; background: rgba(0,243,255,.04); text-align: left; }
+.install-features summary { padding: 10px 12px; color: #8feefa; cursor: pointer; font-family: sans-serif; font-size: 12px; font-weight: 700; }
+.install-features ol { max-height: 150px; margin: 0; padding: 0 28px 12px 34px; overflow-y: auto; color: #a9bbc5; font-family: sans-serif; font-size: 10px; line-height: 1.65; columns: 2; column-gap: 24px; }
+.install-features li { break-inside: avoid; padding-left: 3px; }
 .daily-mission {
   width: min(420px, 90vw);
   padding: 12px;
@@ -249,4 +254,5 @@ div[style*="Coins"], span, div {
   .install-card { padding: 25px 17px 18px; border-radius: 15px; }
   .install-benefits span { flex: 1 1 30%; min-width: 86px; }
   .install-card p { font-size: 13px; }
+  .install-features ol { columns: 1; max-height: 145px; }
 }
