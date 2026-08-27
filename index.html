@@ -422,6 +422,7 @@
             localStorage.setItem('sumo_stage', maxUnlockedStage);
             localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades));
             updateDisplays();
+            if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer();
         }
 
         function updateDisplays() {
@@ -979,8 +980,8 @@
           <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
         </div>
                 <div class="leaderboard-tools">
-                    <button class="lb-tab active" data-sort="coins" onclick="setLeaderboardSort('coins', this)">🪙 Coins</button>
-                    <button class="lb-tab" data-sort="stage" onclick="setLeaderboardSort('stage', this)">🌊 Waves</button>
+                    <button class="lb-tab active" data-sort="stage" onclick="setLeaderboardSort('stage', this)">🌊 Waves</button>
+                    <button class="lb-tab" data-sort="coins" onclick="setLeaderboardSort('coins', this)">🪙 Coins</button>
                     <input id="leaderboard-search" type="search" placeholder="Search fighter" oninput="filterLeaderboard(this.value)">
                 </div>
                 <div id="leaderboard-self" class="leaderboard-self"></div>

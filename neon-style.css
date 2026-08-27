@@ -106,6 +106,9 @@ body::before {
 .leaderboard-player-value { color: #ffd700; font-size: 11px; font-weight: 900; white-space: nowrap; }
 .profile-modal { position: fixed; inset: 0; z-index: 100000; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 3, 8, .88); backdrop-filter: blur(12px); }
 .profile-panel { position: relative; width: min(360px, 100%); padding: 26px 20px 20px; border: 2px solid #00f3ff; border-radius: 14px; background: #070b16; box-shadow: 0 0 38px rgba(0,243,255,.32); text-align: center; }
+.profile-panel.profile-rank-1 { border-color: #ffd700; box-shadow: 0 0 42px rgba(255,215,0,.62), inset 0 0 18px rgba(255,215,0,.16); }
+.profile-panel.profile-rank-2 { border-color: #c0c0c0; box-shadow: 0 0 36px rgba(192,192,192,.5), inset 0 0 15px rgba(192,192,192,.12); }
+.profile-panel.profile-rank-3 { border-color: #cd7f32; box-shadow: 0 0 34px rgba(205,127,50,.5), inset 0 0 15px rgba(205,127,50,.12); }
 .profile-close { position: absolute; top: 8px; right: 10px; width: 34px; min-height: 34px; margin: 0; padding: 0; color: #ff0055 !important; border-color: #ff0055 !important; font-size: 22px; }
 .profile-avatar { width: 88px; height: 88px; margin: 0 auto 12px; border: 3px solid #00f3ff; border-radius: 50%; background: center/cover no-repeat; box-shadow: 0 0 22px #00f3ff; }
 .profile-panel h2 { margin-bottom: 5px; color: #fff; }

@@ -1,4 +1,4 @@
-let leaderboardSort = 'coins';
+let leaderboardSort = 'stage';
 let leaderboardPlayers = [];
 let leaderboardAllPlayers = [];
 
@@ -14,6 +14,22 @@ function setLeaderboardSort(sort, button) {
   document.querySelectorAll('.lb-tab').forEach(tab => tab.classList.remove('active'));
   if (button) button.classList.add('active');
   renderPlayersList(leaderboardPlayers);
+}
+
+function getLocalLeaderboardPlayer() {
+  const stage = Number(localStorage.getItem('sumo_stage')) || 1;
+  const skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"equipped":"cyan"}');
+  const skinNames = { cyan: 'Pulse Core', ember: 'Ember Ring', toxic: 'Toxic Fang', void: 'Void Samurai' };
+  return { name: localStorage.getItem('sumo_name') || 'aiham', level: stage, stage, coins: Number(localStorage.getItem('sumo_coins')) || 0, skin: skinNames[skinState.equipped] || 'Pulse Core', avatar: localStorage.getItem('sumo_avatar') || '' };
+}
+
+function refreshLeaderboardWithLocalPlayer() {
+  if (!leaderboardAllPlayers.length) return;
+  const localPlayer = getLocalLeaderboardPlayer();
+  const existingIndex = leaderboardAllPlayers.findIndex(player => player.name === localPlayer.name);
+  if (existingIndex >= 0) leaderboardAllPlayers[existingIndex] = { ...leaderboardAllPlayers[existingIndex], ...localPlayer };
+  else leaderboardAllPlayers.push(localPlayer);
+  renderPlayersList(leaderboardAllPlayers);
 }
 
 function filterLeaderboard(query) {
@@ -45,9 +61,8 @@ async function fetchRealLeaderboard() {
     if (!Array.isArray(players) || players.length === 0) throw new Error('Empty leaderboard');
     leaderboardAllPlayers = players;
   } catch (_error) {
-    const currentName = localStorage.getItem('sumo_name') || 'aiham';
-    const current = { name: currentName, level: parseInt(localStorage.getItem('sumo_stage') || '1'), stage: parseInt(localStorage.getItem('sumo_stage') || '1'), coins: parseInt(localStorage.getItem('sumo_coins') || '0'), skin: 'Pulse Core' };
-    leaderboardAllPlayers = leaderboardFallback.filter(player => player.name !== currentName);
+    const current = getLocalLeaderboardPlayer();
+    leaderboardAllPlayers = leaderboardFallback.filter(player => player.name !== current.name);
     leaderboardAllPlayers.push(current);
   }
   renderPlayersList(leaderboardAllPlayers);
@@ -75,7 +90,8 @@ function renderPlayersList(players) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = `leaderboard-row ${index < 3 ? `rank-${index + 1}` : ''}`;
-    row.innerHTML = `<span class="leaderboard-rank">#${index + 1}</span><span class="leaderboard-player-avatar"></span><span class="leaderboard-player-copy"><b>${escapeLeaderboardText(player.name)}</b><small>LVL ${player.level} • ${escapeLeaderboardText(player.skin)} • ${player.stage} STAGES</small></span><span class="leaderboard-player-value">${leaderboardSort === 'stage' ? `🌊 ${player.stage}` : `🪙 ${player.coins}`}</span>`;
+    const rankBadge = index === 0 ? '👑 1' : index === 1 ? '🥈 2' : index === 2 ? '🥉 3' : `#${index + 1}`;
+    row.innerHTML = `<span class="leaderboard-rank">${rankBadge}</span><span class="leaderboard-player-avatar"></span><span class="leaderboard-player-copy"><b>${escapeLeaderboardText(player.name)}</b><small>LVL ${player.level} • ${escapeLeaderboardText(player.skin)} • ${player.stage} STAGES</small></span><span class="leaderboard-player-value">${leaderboardSort === 'stage' ? `🌊 ${player.stage}` : `🪙 ${player.coins}`}</span>`;
     row.addEventListener('click', () => openPlayerProfile(player, index + 1));
     container.appendChild(row);
   });
@@ -85,9 +101,14 @@ function openPlayerProfile(player, rank) {
   const modal = document.getElementById('profile-modal');
   if (!modal) return;
   const skin = player.skin || player.skinName || 'Pulse Core';
+  const panel = modal.querySelector('.profile-panel');
+  if (panel) panel.className = `profile-panel profile-rank-${Math.min(rank, 3)}`;
   document.getElementById('profile-name').innerText = player.name || 'Fighter';
   document.getElementById('profile-title').innerText = `GLOBAL RANK #${rank} • ${skin}`;
-  document.getElementById('profile-avatar').style.backgroundColor = '#00f3ff';
+  const skinColors = { 'Void Samurai': '#ff2bd6', 'Toxic Fang': '#7dff00', 'Ember Ring': '#ff6b00', 'Pulse Core': '#00e5ff' };
+  const profileAvatar = document.getElementById('profile-avatar');
+  profileAvatar.style.backgroundColor = skinColors[skin] || '#00f3ff';
+  profileAvatar.style.boxShadow = `0 0 22px ${skinColors[skin] || '#00f3ff'}`;
   document.getElementById('profile-stats').innerHTML = `<div>LEVEL<strong>${Number(player.level) || 1}</strong></div><div>STAGES<strong>${Number(player.stage) || 1}</strong></div><div>COINS<strong>${Number(player.coins) || 0}</strong></div><div>SKIN<strong>${escapeLeaderboardText(skin)}</strong></div>`;
   modal.style.display = 'flex';
 }
