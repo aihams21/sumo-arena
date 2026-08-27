@@ -145,7 +145,7 @@
                 </div>
                 <div class="shop-section-title"><span>NEON SKINS</span><small>Own it once. Equip forever.</small></div>
                 <div id="skin-grid" class="skin-grid"></div>
-                <button class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">🎁 Sponsor: Visit 10x for +50🪙 (<span id="count-free_coins">0/10</span>)</button>
+                <button id="coin-reward-button" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">GET 50 COINS: VISIT (0/10)</button>
             </div>
             <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
@@ -178,15 +178,13 @@
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
             <p id="death-count-copy" class="death-count-copy"></p>
-            <button id="total-revive-btn" class="btn btn-gold hidden" onclick="reviveAfterTotalDeaths()">📺 Watch Ad: Instant Revive</button>
-            <button class="btn btn-green" onclick="handleAdClickWithCounter('revive')">📺 Revive: Visit 5x (<span id="count-revive">0/5</span>)</button>
+            <button id="revive-button" class="btn btn-green" onclick="handleAdClickWithCounter('revive')">REVIVE: VISIT (0/5)</button>
             <button class="btn btn-cyan" onclick="retryStageDirectly()">🔄 Retry Stage</button>
             <button class="btn btn-gray" onclick="exitToMenu()">🏠 Main Menu</button>
         </div>
 
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
-            <button class="btn btn-gold" onclick="handleAdClickWithCounter('double')">🪙 2x Bonus: Visit 10x for +10🪙 (<span id="count-double">0/10</span>)</button>
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
@@ -213,7 +211,8 @@
         }
 
         const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
-        let counters = { free_coins: 0, revive: 0, double: 0 }, limits = { free_coins: 10, revive: 5, double: 10 };
+        const counterLimits = { free_coins: 10, revive: 5 };
+        let counters = JSON.parse(sessionStorage.getItem('sumo_reward_counters') || '{"free_coins":0,"revive":0}');
         let stageEntryLinkShown = sessionStorage.getItem('sumo_stage_entry_link') === '1';
 
         function isOnlineSession() {
@@ -241,19 +240,27 @@
         }
 
         function handleAdClickWithCounter(type) {
-            if (isOnlineSession()) return;
+            if (!counterLimits[type] || isOnlineSession()) return;
             window.open(SMARTLINK, '_blank');
-            counters[type]++;
-            const el = document.getElementById(`count-${type}`);
-            if (el) el.innerText = `${counters[type]}/${limits[type]}`;
-            if (counters[type] >= limits[type]) {
+            counters[type] = Math.min(counterLimits[type], (Number(counters[type]) || 0) + 1);
+            sessionStorage.setItem('sumo_reward_counters', JSON.stringify(counters));
+            updateRewardButtons();
+            if (counters[type] >= counterLimits[type]) {
                 counters[type] = 0;
-                if (el) el.innerText = `0/${limits[type]}`;
+                sessionStorage.setItem('sumo_reward_counters', JSON.stringify(counters));
                 if (type === 'free_coins') { coins += 50; saveData(); showShop(); alert("🎉 +50 Coins!"); }
-                else if (type === 'revive') reviveInPlaceOffline();
-                else if (type === 'double') { coins += 10; saveData(); nextStageOffline(); }
+                else if (type === 'revive' && !player.alive) reviveInPlaceOffline();
+                updateRewardButtons();
             }
         }
+
+        function updateRewardButtons() {
+            const coinButton = document.getElementById('coin-reward-button');
+            const reviveButton = document.getElementById('revive-button');
+            if (coinButton) coinButton.innerText = `GET 50 COINS: VISIT (${counters.free_coins}/${counterLimits.free_coins})`;
+            if (reviveButton) reviveButton.innerText = `REVIVE: VISIT (${counters.revive}/${counterLimits.revive})`;
+        }
+        updateRewardButtons();
         function triggerSmartlinkDirect() {
             return false;
         }
@@ -679,17 +686,8 @@
         function registerPlayerDeath() {
             totalDeaths += 1;
             localStorage.setItem('sumo_total_deaths', totalDeaths);
-            const reviveButton = document.getElementById('total-revive-btn');
-            document.getElementById('death-count-copy').innerText = `Total ring-outs: ${totalDeaths} • ${totalDeaths >= 5 ? 'Revive unlocked' : `${5 - totalDeaths} more to unlock revive`}`;
-            reviveButton.classList.toggle('hidden', totalDeaths < 5);
-        }
-
-        function reviveAfterTotalDeaths() {
-            if (totalDeaths < 5 || isOnlineSession()) return;
-            window.open(SMARTLINK, '_blank');
-            totalDeaths = 0;
-            localStorage.setItem('sumo_total_deaths', '0');
-            reviveInPlaceOffline();
+            document.getElementById('death-count-copy').innerText = `Total ring-outs: ${totalDeaths} • ${counterLimits.revive - counters.revive} revive visits remaining`;
+            updateRewardButtons();
         }
 
         function reviveInPlaceOffline() {
