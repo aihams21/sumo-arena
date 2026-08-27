@@ -1,4 +1,3 @@
-// عرض كافة اللاعبين بالسيرفر من الأول ولحد الأخير بالكامل
 function openLeaderboardModalSafe() {
   const sidebar = document.getElementById('neon-sidebar');
   if (sidebar) sidebar.style.right = '-320px';
@@ -9,35 +8,42 @@ function openLeaderboardModalSafe() {
   const modal = document.getElementById('leaderboard-modal');
   if (modal) {
     modal.style.display = 'flex';
-    renderFullLeaderboard();
+    fetchRealLeaderboard();
   }
 }
 
-function renderFullLeaderboard() {
-  const currentName = localStorage.getItem('sumo_name') || 'aiham';
-  const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
-  const currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
+async function fetchRealLeaderboard() {
+  const container = document.getElementById('modal-players-list');
+  if(!container) return;
   
-  let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
-  
-  // التأكد من وجود اللاعب الحالي ضمن القائمة أو تحديثه
-  let existingIndex = players.findIndex(p => p.name === currentName);
-  if (existingIndex >= 0) {
-    players[existingIndex].coins = currentCoins;
-    players[existingIndex].avatar = currentAvatar;
-  } else {
-    players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
+  container.innerHTML = '<div style="text-align: center; color: #00f3ff; padding: 20px;">جلب بيانات اللاعبين الحقيقيين... 🔄</div>';
+
+  try {
+    let response = await fetch('/api/leaderboard');
+    let players = await response.json();
+    renderPlayersList(players);
+  } catch (error) {
+    const currentName = localStorage.getItem('sumo_name') || 'aiham';
+    const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
+    const currentCoins = parseInt(localStorage.getItem('sumo_coins') || '0');
+    
+    let realPlayer = [{ name: currentName, coins: currentCoins, avatar: currentAvatar }];
+    renderPlayersList(realPlayer);
   }
-  
-  // فرز اللاعبين تنازلياً حسب الكوينز (من الأعلى للأقل) لضمان دقة الترتيب
-  players.sort((a, b) => b.coins - a.coins);
-  localStorage.setItem('sumo_global_players', JSON.stringify(players));
-  
+}
+
+function renderPlayersList(players) {
   const container = document.getElementById('modal-players-list');
   if(!container) return;
   container.innerHTML = '';
   
-  // حلقة تكرارية تعرض كافة اللاعبين بدون إخفاء أي أحد
+  if (!players || players.length === 0) {
+    container.innerHTML = '<div style="text-align: center; color: #aaa; padding: 20px;">لا يوجد لاعبين متصلين حاليا</div>';
+    return;
+  }
+
+  players.sort((a, b) => b.coins - a.coins);
+  
   players.forEach((player, index) => {
     let rank = index + 1;
     let rankStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(10,10,25,0.6);';
@@ -50,14 +56,9 @@ function renderFullLeaderboard() {
       rankBadge = '👑 1';
       title = 'Cyber Overlord 👑';
       trend = '🔥';
-    } else if (rank === 2) {
+    } else if (rank === 2 || rank === 3) {
       rankStyle = 'background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0;';
-      rankBadge = '🥈 2';
-      title = 'Neon Elite ⚡';
-      trend = '🚀';
-    } else if (rank === 3) {
-      rankStyle = 'background: rgba(205,127,50,0.15); border: 2px solid #cd7f32;';
-      rankBadge = '🥉 3';
+      rankBadge = rank === 2 ? '🥈 2' : '🥉 3';
       title = 'Neon Elite ⚡';
       trend = '🚀';
     }
