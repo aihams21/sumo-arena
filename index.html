@@ -106,7 +106,7 @@
                 <button id="mission-claim" class="mission-claim hidden" onclick="claimDailyMission()">Claim +25 🪙</button>
             </div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
-            <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
+            <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
         </div>
@@ -133,11 +133,11 @@
                 </div>
                 <div class="shop-card">
                     <div><b>🏋️ Weight (الوزن)</b></div>
-                    <button class="shop-btn" id="buy-weight" onclick="buyUpgrade('weight')">Buy</button>
+                    <button class="shop-btn" id="buy-weight" data-upgrade="weight" type="button">Buy</button>
                 </div>
                 <div class="shop-card">
                     <div><b>💥 Power (القوة)</b></div>
-                    <button class="shop-btn" id="buy-power" onclick="buyUpgrade('power')">Buy</button>
+                    <button class="shop-btn" id="buy-power" data-upgrade="power" type="button">Buy</button>
                 </div>
                 <div class="shop-section-title"><span>NEON SKINS</span><small>Own it once. Equip forever.</small></div>
                 <div id="skin-grid" class="skin-grid"></div>
@@ -225,34 +225,15 @@
                 frame.style.pointerEvents = 'none';
             });
         }
-                    ctx.beginPath();
-                    if (player.skinShape === 'diamond') {
-                        ctx.moveTo(player.x, player.y - player.radius);
-                        ctx.lineTo(player.x + player.radius, player.y);
-                        ctx.lineTo(player.x, player.y + player.radius);
-                        ctx.lineTo(player.x - player.radius, player.y);
-                        ctx.closePath();
-                    } else if (player.skinShape === 'hex') {
-                        for (let side = 0; side < 6; side++) {
-                            const angle = side * Math.PI / 3 - Math.PI / 2;
-                            const x = player.x + Math.cos(angle) * player.radius;
-                            const y = player.y + Math.sin(angle) * player.radius;
-                            side === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                        }
-                        ctx.closePath();
-                    } else {
-                        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-                    }
-                    ctx.fillStyle = player.color; ctx.fill();
-                    ctx.shadowColor = player.color; ctx.shadowBlur = 18;
-                    ctx.strokeStyle = player.skinAccent || '#fff';
+        function handleAdClickWithCounter(type) {
             if (isOnlineSession()) return;
-                    ctx.shadowBlur = 0;
-            window.open(SMARTLINK, '_blank'); counters[type]++;
-            let el = document.getElementById(`count-${type}`);
+            window.open(SMARTLINK, '_blank');
+            counters[type]++;
+            const el = document.getElementById(`count-${type}`);
             if (el) el.innerText = `${counters[type]}/${limits[type]}`;
             if (counters[type] >= limits[type]) {
-                counters[type] = 0; if (el) el.innerText = `0/${limits[type]}`;
+                counters[type] = 0;
+                if (el) el.innerText = `0/${limits[type]}`;
                 if (type === 'free_coins') { coins += 50; saveData(); showShop(); alert("🎉 +50 Coins!"); }
                 else if (type === 'revive') reviveInPlaceOffline();
                 else if (type === 'double') { coins += 10; saveData(); nextStageOffline(); }
@@ -505,7 +486,11 @@
                     stage.classList.add('unlocked');
                     if (i === maxUnlockedStage) stage.classList.add('current');
                     stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`;
-                    stage.onclick = () => startOfflineStage(i);
+                    stage.dataset.stage = i;
+                    stage.addEventListener('click', event => {
+                        event.preventDefault();
+                        startOfflineStage(Number(event.currentTarget.dataset.stage));
+                    });
                 } else {
                     stage.classList.add('locked');
                     stage.innerText = '🔒';
@@ -527,16 +512,22 @@
         }
 
         function buyUpgrade(type) {
-            let cost = upgrades[type] * 20;
+            if (type !== 'weight' && type !== 'power') return;
+            const level = Number(upgrades[type]) || 1;
+            const cost = level * 20;
             if (coins >= cost) {
                 coins -= cost;
-                upgrades[type]++;
+                upgrades[type] = level + 1;
                 saveData();
                 showShop();
             } else {
-                alert("الكوينز غير كافية!");
+                alert(`الكوينز غير كافية! تحتاج ${cost} 🪙`);
             }
         }
+
+        document.querySelectorAll('[data-upgrade]').forEach(button => {
+            button.addEventListener('click', () => buyUpgrade(button.dataset.upgrade));
+        });
 
         function showMultiMenu() {
             setOnlineAdsOff(true);
