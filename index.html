@@ -231,13 +231,21 @@
             if (/Linux/i.test(ua) || /Linux/i.test(platform)) return /Kali/i.test(ua) ? 'Kali Linux' : 'Linux';
             return 'Unknown OS';
         }
+        function detectBrowser() {
+            const ua = navigator.userAgent || '';
+            if (/Firefox\//i.test(ua)) return 'Firefox';
+            if (/Edg\//i.test(ua)) return 'Edge';
+            if (/Chrome\//i.test(ua)) return 'Chrome';
+            if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'Safari';
+            return 'Browser';
+        }
         function updateInstallStatus(message) {
             const status = document.getElementById('install-system-status');
             if (status) status.innerText = message;
         }
         function refreshInstallStatus() {
             const system = detectOperatingSystem();
-            updateInstallStatus(isInstalled ? `النظام: ${system} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • جاهز للتثبيت الفعلي`);
+            updateInstallStatus(isInstalled ? `النظام: ${system} • ${detectBrowser()} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • المتصفح: ${detectBrowser()} • جاهز للتثبيت الفعلي`);
         }
         refreshInstallStatus();
         if (isInstalled) {
@@ -271,8 +279,36 @@
             const body = document.getElementById('guide-device-body');
             if (isIOS) { title.innerText = 'أضف الساحة إلى جهازك 🍏'; body.innerText = 'اضغط مشاركة ثم إضافة إلى الشاشة الرئيسية.'; }
             else if (isAndroid) { title.innerText = 'ثبّت الساحة على أندرويد 🤖'; body.innerText = 'افتح قائمة المتصفح ثم اختر تثبيت التطبيق.'; }
-            else { title.innerText = 'ثبّت Neon Sumo Arena 💻'; body.innerText = 'استخدم أيقونة التثبيت في شريط عنوان المتصفح.'; }
+            else {
+                title.innerText = `اختصار Neon Sumo Arena على ${detectOperatingSystem()} 💻`;
+                body.innerText = detectBrowser() === 'Firefox' ? 'تم تنزيل ملف الاختصار. افتحه ثم وافق على إضافته إلى سطح المكتب أو المفضلة.' : 'تم تنزيل ملف الاختصار. افتحه للوصول إلى اللعبة بسرعة من سطح المكتب.';
+                downloadDesktopShortcut();
+            }
             installModal.classList.remove('hidden');
+        }
+
+        function downloadDesktopShortcut() {
+            const system = detectOperatingSystem();
+            const target = window.location.href;
+            let fileName = 'Neon-Sumo-Arena.url';
+            let content = `[InternetShortcut]\nURL=${target}\nIconIndex=0\n`;
+            let type = 'application/internet-shortcut';
+            if (system === 'Linux' || system === 'Kali Linux') {
+                fileName = 'neon-sumo-arena.desktop';
+                content = `[Desktop Entry]\nType=Application\nName=Neon Sumo Arena\nComment=Launch Neon Sumo Arena\nExec=xdg-open ${target}\nTerminal=false\nCategories=Game;\n`;
+                type = 'application/x-desktop';
+            } else if (system === 'macOS') {
+                fileName = 'Neon-Sumo-Arena.webloc';
+                content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>URL</key><string>${target}</string></dict></plist>`;
+                type = 'application/xml';
+            }
+            const blob = new Blob([content], { type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            updateInstallStatus(`النظام: ${system} • ${detectBrowser()} • تم تنزيل اختصار ${fileName} ✓`);
         }
         function closeInstallGuide() {
             installModal.classList.add('hidden');
