@@ -1,0 +1,65 @@
+:root {
+  --neon-cyan: #00f3ff;
+  --neon-pink: #ff0055;
+  --bg-dark: #05050a;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: hidden;
+}
+
+.neon-btn-cyan {
+  background: transparent;
+  border: 2px solid var(--neon-cyan);
+  color: var(--neon-cyan);
+  padding: 12px 30px;
+  font-weight: bold;
+  text-transform: uppercase;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.3), inset 0 0 10px rgba(0, 243, 255, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.neon-btn-cyan:hover {
+  background: var(--neon-cyan);
+  color: var(--bg-dark);
+  box-shadow: 0 0 25px var(--neon-cyan), 0 0 50px var(--neon-cyan);
+  transform: scale(1.05);
+}
+
+.neon-btn-pink {
+  background: transparent;
+  border: 2px solid var(--neon-pink);
+  color: var(--neon-pink);
+  padding: 12px 30px;
+  font-weight: bold;
+  text-transform: uppercase;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.3), inset 0 0 10px rgba(255, 0, 85, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.neon-btn-pink:hover {
+  background: var(--neon-pink);
+  color: #fff;
+  box-shadow: 0 0 25px var(--neon-pink), 0 0 50px var(--neon-pink);
+  transform: scale(1.05);
+}
+
+.neon-card {
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 243, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.neon-title {
+  text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan);
+  letter-spacing: 2px;
+}
