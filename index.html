@@ -94,9 +94,20 @@
 
         <div id="menu-main" class="overlay">
             <h1>NEON SUMO ARENA</h1>
-            <div style="font-size: 14px; color:#ffbb00; margin-bottom: 12px; font-weight:bold;">🪙 Coins: <span id="menu-coins">0</span></div>
+            <div class="menu-metrics">
+                <div><span>COINS</span><strong id="menu-coins">0</strong></div>
+                <div><span>WIN STREAK</span><strong id="menu-streak">0 🔥</strong></div>
+                <div><span>RANK</span><strong id="menu-rank">--</strong></div>
+            </div>
+            <div id="daily-mission" class="daily-mission">
+                <div class="mission-heading"><span>⚡ DAILY RUSH</span><b id="mission-status">0 / 3 wins</b></div>
+                <div class="mission-track"><i id="mission-progress"></i></div>
+                <small id="mission-copy">Win 3 stages today for +25 coins</small>
+                <button id="mission-claim" class="mission-claim hidden" onclick="claimDailyMission()">Claim +25 🪙</button>
+            </div>
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <button class="btn btn-gold" onclick="showShop()">⚙️ Sumo Stats & Upgrades</button>
+            <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
         </div>
 
@@ -317,6 +328,33 @@
         let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
         let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
         let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1}');
+        let dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}');
+
+        function resetDailyMissionIfNeeded() {
+            const today = new Date().toISOString().slice(0, 10);
+            if (dailyMission.date !== today) dailyMission = { date: today, wins: 0, claimed: false };
+        }
+
+        function updateDailyMission() {
+            resetDailyMissionIfNeeded();
+            const wins = Math.min(3, dailyMission.wins || 0);
+            document.getElementById('mission-status').innerText = `${wins} / 3 wins`;
+            document.getElementById('mission-progress').style.width = `${wins / 3 * 100}%`;
+            const claim = document.getElementById('mission-claim');
+            claim.classList.toggle('hidden', wins < 3 || dailyMission.claimed);
+            document.getElementById('mission-copy').innerText = dailyMission.claimed ? 'Mission complete. Return tomorrow for a new rush.' : 'Win 3 stages today for +25 coins';
+            document.getElementById('menu-streak').innerText = `${parseInt(localStorage.getItem('sumo_streak') || '0')} 🔥`;
+            localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission));
+        }
+
+        function claimDailyMission() {
+            resetDailyMissionIfNeeded();
+            if (dailyMission.wins < 3 || dailyMission.claimed) return;
+            dailyMission.claimed = true;
+            coins += 25;
+            saveData();
+            updateDailyMission();
+        }
 
         function saveData() {
             localStorage.setItem('sumo_coins', coins);
@@ -329,6 +367,7 @@
             document.getElementById('menu-coins').innerText = coins;
             document.getElementById('hud-coins').innerText = coins;
             document.getElementById('shop-coins').innerText = coins;
+            if (document.getElementById('menu-streak')) updateDailyMission();
         }
 
         updateDisplays();
@@ -613,6 +652,10 @@
                 }
                 if (active.length === 0 && !stageEnded) {
                     stageEnded = true; coins += 5;
+                    const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+                    localStorage.setItem('sumo_streak', streak);
+                    resetDailyMissionIfNeeded();
+                    dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
                     if (currentPlayingStage === maxUnlockedStage && maxUnlockedStage < 1000) maxUnlockedStage++;
                     saveData(); hideAllMenus();
                     document.getElementById('modal-win-stage').classList.remove('hidden');
@@ -718,6 +761,12 @@
           </div>
           <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
         </div>
+                <div class="leaderboard-tools">
+                    <button class="lb-tab active" data-sort="coins" onclick="setLeaderboardSort('coins', this)">🪙 Coins</button>
+                    <button class="lb-tab" data-sort="stage" onclick="setLeaderboardSort('stage', this)">🌊 Waves</button>
+                    <input id="leaderboard-search" type="search" placeholder="Search fighter" oninput="filterLeaderboard(this.value)">
+                </div>
+                <div id="leaderboard-self" class="leaderboard-self"></div>
         <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
         <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
       </div>

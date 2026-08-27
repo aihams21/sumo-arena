@@ -1,3 +1,19 @@
+let leaderboardSort = 'coins';
+let leaderboardPlayers = [];
+let leaderboardAllPlayers = [];
+
+function setLeaderboardSort(sort, button) {
+  leaderboardSort = sort;
+  document.querySelectorAll('.lb-tab').forEach(tab => tab.classList.remove('active'));
+  if (button) button.classList.add('active');
+  renderPlayersList(leaderboardPlayers);
+}
+
+function filterLeaderboard(query) {
+  const needle = (query || '').trim().toLowerCase();
+  renderPlayersList(leaderboardAllPlayers.filter(player => (player.name || '').toLowerCase().includes(needle)));
+}
+
 function openLeaderboardModalSafe() {
   const sidebar = document.getElementById('neon-sidebar');
   if (sidebar) sidebar.style.right = '-320px';
@@ -8,6 +24,8 @@ function openLeaderboardModalSafe() {
   const modal = document.getElementById('leaderboard-modal');
   if (modal) {
     modal.style.display = 'flex';
+    const search = document.getElementById('leaderboard-search');
+    if (search) search.value = '';
     fetchRealLeaderboard();
   }
 }
@@ -21,6 +39,11 @@ async function fetchRealLeaderboard() {
   try {
     let response = await fetch('/api/leaderboard');
     let players = await response.json();
+    const currentName = localStorage.getItem('sumo_name') || 'aiham';
+    if (!players.some(player => player.name === currentName)) {
+      players.push({ name: currentName, coins: parseInt(localStorage.getItem('sumo_coins') || '0'), stage: parseInt(localStorage.getItem('sumo_stage') || '1'), avatar: localStorage.getItem('sumo_avatar') });
+    }
+    leaderboardAllPlayers = players;
     renderPlayersList(players);
   } catch (error) {
     const currentName = localStorage.getItem('sumo_name') || 'aiham';
@@ -32,11 +55,13 @@ async function fetchRealLeaderboard() {
     let existingIndex = players.findIndex(p => p.name === currentName);
     if (existingIndex >= 0) {
       players[existingIndex].coins = currentCoins;
+      players[existingIndex].stage = parseInt(localStorage.getItem('sumo_stage') || '1');
       players[existingIndex].avatar = currentAvatar;
     } else {
-      players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
+      players.push({ name: currentName, coins: currentCoins, stage: parseInt(localStorage.getItem('sumo_stage') || '1'), avatar: currentAvatar });
     }
     
+    leaderboardAllPlayers = players;
     renderPlayersList(players);
   }
 }
@@ -51,8 +76,20 @@ function renderPlayersList(players) {
     return;
   }
 
-  players.sort((a, b) => b.coins - a.coins);
+  leaderboardPlayers = players;
+  players = players.map(player => ({ ...player, coins: Number(player.coins) || 0, stage: Number(player.stage) || 1 }));
+  players.sort((a, b) => (b[leaderboardSort] - a[leaderboardSort]) || (b.coins - a.coins));
   localStorage.setItem('sumo_global_players', JSON.stringify(players));
+
+  const currentName = localStorage.getItem('sumo_name') || 'aiham';
+  const rankedPlayers = leaderboardAllPlayers.map(player => ({ ...player, coins: Number(player.coins) || 0, stage: Number(player.stage) || 1 }));
+  rankedPlayers.sort((a, b) => (b[leaderboardSort] - a[leaderboardSort]) || (b.coins - a.coins));
+  const currentRank = rankedPlayers.findIndex(player => player.name === currentName) + 1;
+  const self = document.getElementById('leaderboard-self');
+  const currentPlayer = currentRank ? rankedPlayers[currentRank - 1] : null;
+  if (self) self.innerText = currentPlayer ? `YOUR POSITION  #${currentRank}  •  ${currentPlayer[leaderboardSort]} ${leaderboardSort === 'stage' ? 'waves' : 'coins'}` : '';
+  const menuRank = document.getElementById('menu-rank');
+  if (menuRank) menuRank.innerText = currentRank ? `#${currentRank}` : '--';
   
   players.forEach((player, index) => {
     let rank = index + 1;
