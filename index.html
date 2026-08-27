@@ -869,5 +869,20 @@
     }
     setInterval(drawMatrix, 50);
     </script>
+
+<script>
+function toggleNeonMenu() {
+  const sb = document.getElementById('neon-sidebar');
+  if (sb) {
+    sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
+  }
+}
+
+function openHome() {
+  toggleNeonMenu();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
 </body>
+
 </html>
