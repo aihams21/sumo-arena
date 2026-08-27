@@ -1313,7 +1313,7 @@ body, html {
   <div style="display: flex; flex-direction: column; gap: 12px;">
     <button onclick="openHome()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏠 الشاشة الرئيسية (Home)</button>
     <button onclick="openAccountModal()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">⚙️ تعديل الحساب (My Account)</button>
-    <button onclick="openLeaderboardModal()" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
+    <button onclick="console.log('Opening Leaderboard...'); document.getElementById('leaderboard-modal').style.display = 'flex'; renderFullLeaderboard(); toggleNeonMenu();" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
     <a href="https://www.instagram.com/nn1v4/" target="_blank" style="text-decoration: none;">
       <button style="width: 100%; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">💬 الدعم الفني (Instagram)</button>
     </a>
