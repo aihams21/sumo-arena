@@ -828,6 +828,7 @@
         }
 
         function startOfflineStage(level) {
+            const config = window.NeonSystems.progression.getStageConfig(level);
             gameMode = 'offline';
             activeMode = 'stage';
             currentPlayingStage = level;
@@ -835,10 +836,11 @@
             document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block';
             stageEnded = false;
-            offlineArenaRadius = 240;
+            offlineArenaRadius = config.arenaRadius;
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
+            
             if (config.isBoss || config.isMiniBoss) {
                 const stats = offlineBossStats(level, player.radius);
                 bots.push({
@@ -851,8 +853,8 @@
                     minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
                 });
             } else {
-                const count = offlineEnemyCount(level);
-                const stats = offlineBotStats(level);
+                const count = config.botCount;
+                const stats = config.botStats;
                 for (let i = 0; i < count; i++) {
                     let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
                     bots.push({
