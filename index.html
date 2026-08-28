@@ -798,12 +798,14 @@
         function offlineBossStats(level, playerRadius) {
             const curve = Math.sqrt(level);
             const wave = Math.max(1, Math.floor(level / 5));
+            const tier = Math.min(3, Math.floor(wave / 10));
             return {
-                radius: Math.max(38, playerRadius * 1.42 + Math.min(7, curve)),
-                mass: 4.8 + Math.min(2.8, curve * 0.28),
-                speed: 0.36 + Math.min(0.14, curve * 0.012),
-                power: 10.5 + Math.min(9, curve * 0.9),
-                maxHp: 5 + Math.min(4, Math.floor(wave * 0.25))
+                radius: Math.max(38, playerRadius * 1.38 + Math.min(6, curve * .8)),
+                mass: 4.5 + Math.min(2.5, curve * 0.24),
+                speed: 0.34 + Math.min(0.13, curve * 0.011),
+                power: 9.5 + Math.min(8, curve * 0.8),
+                maxHp: 4 + Math.min(4, Math.floor(wave * 0.22)),
+                tier
             };
         }
 
@@ -826,7 +828,7 @@
                     x: 400, y: 130, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
                     speed: stats.speed, power: stats.power, color: '#ff0055', isBoss: true,
                     alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp, hurtCd: 0,
-                    attackCooldown: 105, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0
+                    attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0, tier: stats.tier
                 });
             } else {
                 const count = offlineEnemyCount(level);
@@ -905,6 +907,7 @@
                 let speed = 3 + Math.random() * 4;
                 particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
             }
+            if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
         }
 
         function distanceToPlayer(bot) {
@@ -988,12 +991,12 @@
                                     bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
                                 }
                                 bot.attackType = null;
-                                bot.attackCooldown = raging ? 92 : 118;
+                                bot.attackCooldown = Math.max(76, (raging ? 92 : 118) - bot.tier * 6);
                             }
                         } else if (bot.attackCooldown <= 0) {
                             bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
                             bot.attackCycle = (bot.attackCycle || 0) + 1;
-                            bot.telegraph = 42;
+                            bot.telegraph = 42 + bot.tier * 3;
                         }
                         if (bot.pulseRadius > 0) bot.pulseRadius += 10;
                         if (bot.pulseRadius > 210) bot.pulseRadius = 0;

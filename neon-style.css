@@ -268,3 +268,47 @@ div[style*="Coins"], span, div {
   .install-card p { font-size: 13px; }
   .install-features ol { columns: 1; max-height: 145px; }
 }
+
+/* Modern geometric neon system */
+:root {
+  --surface-0: #070b14;
+  --surface-1: #0d1422;
+  --surface-2: #121b2d;
+  --line-cyan: rgba(0, 243, 255, .42);
+  --line-violet: rgba(157, 0, 255, .38);
+  --cyber-green: #7dff00;
+  --text-soft: #a9bac8;
+}
+
+html, body { background: #050810 !important; color: #f4fbff !important; }
+body::before { opacity: .72; background-size: 32px 32px; background-image: linear-gradient(rgba(0,243,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(157,0,255,.035) 1px, transparent 1px); }
+#game-box { background: radial-gradient(circle at 50% 45%, rgba(0,243,255,.06), transparent 42%), #050810; }
+.overlay { background: rgba(3, 7, 15, .91); backdrop-filter: blur(12px) saturate(125%); }
+#menu-main { justify-content: center; }
+#menu-main > h1 { margin-bottom: 16px; color: #f4fbff !important; font-size: clamp(24px, 5vw, 38px); font-weight: 900; text-shadow: 0 0 12px rgba(0,243,255,.9), 0 0 30px rgba(157,0,255,.48) !important; }
+.menu-metrics div, .daily-mission, .shop-card, .stats-panel, .body-upgrade-card, .install-card { background: linear-gradient(145deg, rgba(18,27,45,.94), rgba(7,12,23,.96)); border-color: var(--line-cyan); box-shadow: 7px 7px 18px rgba(0,0,0,.36), -5px -5px 14px rgba(30,51,78,.14), inset 0 0 18px rgba(0,243,255,.035); }
+.mode-title { color: var(--text-soft); font-weight: 700; }
+.mode-grid { width: min(560px, 92vw); gap: 10px; }
+.mode-btn { min-height: 92px; border: 1px solid var(--line-cyan) !important; background: linear-gradient(145deg, rgba(18,27,45,.98), rgba(6,11,21,.98)) !important; box-shadow: 7px 7px 16px rgba(0,0,0,.4), inset 0 0 16px rgba(0,243,255,.06) !important; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease !important; }
+.mode-btn:hover { transform: translateY(-4px) !important; box-shadow: 0 10px 26px rgba(0,0,0,.5), 0 0 22px rgba(0,243,255,.22) !important; }
+.mode-btn.chaos { border-color: rgba(255,51,102,.72) !important; }
+.mode-btn.time { border-color: rgba(255,187,0,.72) !important; }
+.mode-btn.shrink { border-color: rgba(125,255,0,.72) !important; }
+.mode-icon { filter: drop-shadow(0 0 8px currentColor); }
+.btn, .shop-btn { border-radius: 6px !important; background: linear-gradient(135deg, rgba(12,24,39,.98), rgba(5,10,20,.98)) !important; box-shadow: 5px 5px 12px rgba(0,0,0,.36), inset 0 0 12px rgba(0,243,255,.08) !important; transition: transform .18s ease, box-shadow .18s ease, background .18s ease !important; }
+.btn:hover, .shop-btn:hover { transform: translateY(-2px) !important; box-shadow: 0 0 22px rgba(0,243,255,.36), inset 0 0 14px rgba(0,243,255,.12) !important; }
+.btn:active, .shop-btn:active, .mode-btn:active { transform: translateY(1px) scale(.98) !important; }
+.btn-cyan:hover, .shop-btn:hover { background: rgba(0,243,255,.14) !important; color: #fff !important; }
+.btn::after, .mode-btn::after, .shop-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.13) 50%, transparent 65%); transform: translateX(-120%); transition: transform .5s ease; pointer-events: none; }
+.btn:hover::after, .mode-btn:hover::after, .shop-btn:hover::after { transform: translateX(120%); }
+#hud .hud-card { border: 1px solid var(--line-cyan); border-radius: 6px; background: rgba(7,13,25,.88); box-shadow: 0 0 16px rgba(0,243,255,.14); }
+.install-features, .feature-report-item { border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+@media (max-width: 600px) {
+  #menu-main { justify-content: flex-start; }
+  #menu-main > h1 { font-size: clamp(22px, 7vw, 31px); }
+  .mode-grid { width: min(100%, 410px); gap: 8px; }
+  .mode-btn { min-height: 64px; }
+}
