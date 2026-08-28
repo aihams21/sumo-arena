@@ -110,7 +110,6 @@
                 <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
             </div>
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
-            <button class="btn btn-cyan feature-report-btn" onclick="openFeatureReport()">◈ 199 ELITE INNOVATIONS</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
             <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
@@ -129,17 +128,6 @@
                 </details>
                 <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
                 <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
-            </div>
-        </div>
-
-        <div id="modal-feature-report" class="overlay hidden feature-report-overlay">
-            <div class="feature-report-panel">
-                <div class="feature-report-header"><div><span class="install-kicker">NEON SUMO SYSTEMS / RELEASE INDEX</span><h2>199 ELITE INNOVATIONS</h2></div><button class="feature-close" type="button" onclick="closeFeatureReport()" aria-label="Close report">×</button></div>
-                <p class="feature-report-lead">A complete index of the experience: what each innovation does and why it exists.</p>
-                <div class="feature-report-tools"><input id="feature-search" type="search" placeholder="Search the 199 innovations" oninput="renderFeatureReport()"><select id="feature-category" onchange="renderFeatureReport()"><option value="all">All systems</option></select></div>
-                <div id="feature-report-count" class="feature-report-count"></div>
-                <div id="feature-report-list" class="feature-report-list"></div>
-                <button class="btn btn-gray" type="button" onclick="closeFeatureReport()">Close report</button>
             </div>
         </div>
 
@@ -262,22 +250,7 @@
             const [what, why] = innovationDetails[category];
             eliteFeatureCatalog.push({ id: eliteFeatureCatalog.length + 1, name, category, what: `${what}: ${name}.`, why });
         }));
-        const featureListElement = document.getElementById('elite-features-list');
-        featureListElement.innerHTML = eliteFeatureCatalog.map(feature => `<li>${feature.id}. ${feature.name}</li>`).join('');
-        function openFeatureReport() {
-            const categorySelect = document.getElementById('feature-category');
-            if (categorySelect.options.length === 1) [...new Set(eliteFeatureCatalog.map(feature => feature.category))].forEach(category => categorySelect.add(new Option(category, category)));
-            document.getElementById('modal-feature-report').classList.remove('hidden');
-            renderFeatureReport();
-        }
-        function closeFeatureReport() { document.getElementById('modal-feature-report').classList.add('hidden'); }
-        function renderFeatureReport() {
-            const query = (document.getElementById('feature-search')?.value || '').trim().toLowerCase();
-            const category = document.getElementById('feature-category')?.value || 'all';
-            const filtered = eliteFeatureCatalog.filter(feature => (category === 'all' || feature.category === category) && (!query || `${feature.name} ${feature.what} ${feature.why}`.toLowerCase().includes(query)));
-            document.getElementById('feature-report-count').innerText = `${filtered.length} of ${eliteFeatureCatalog.length} innovations indexed`;
-            document.getElementById('feature-report-list').innerHTML = filtered.map(feature => `<article class="feature-report-item"><div class="feature-report-item-head"><strong>#${feature.id} ${feature.name}</strong><span>${feature.category}</span></div><p><b>What:</b> ${feature.what}</p><p><b>Why:</b> ${feature.why}</p></article>`).join('') || '<p class="feature-empty">No innovations match this filter.</p>';
-        }
+        document.getElementById('elite-features-list').innerHTML = featureList.map((feature, index) => `<li>${index + 1}. ${feature}</li>`).join('');
         function detectOperatingSystem() {
             const ua = navigator.userAgent || '';
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
