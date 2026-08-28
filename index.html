@@ -1116,7 +1116,9 @@
                 const activeBoss = getActiveBoss();
                 const remainingBots = bots.filter(bot => bot.alive).length;
                 const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
-                if (((activeMode === 'stage' && !activeBoss && bossDefeated) || (activeMode !== 'stage' && remainingBots === 0)) && !stageEnded) {
+                const stageVictory = activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+                const arcadeVictory = activeMode !== 'stage' && remainingBots === 0;
+                if ((stageVictory || arcadeVictory) && !stageEnded) {
                     if (activeMode === 'stage') { finishOfflineStage(); return; }
                     modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
                     endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
