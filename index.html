@@ -153,6 +153,8 @@
                     <div><b>💥 Power (القوة)</b></div>
                     <button class="shop-btn" id="buy-power" data-upgrade="power" type="button">Buy</button>
                 </div>
+                <div class="shop-section-title"><span>BODY EVOLUTION</span><small>Story-linked modules</small></div>
+                <div id="body-upgrade-grid" class="body-upgrade-grid"></div>
                 <div class="shop-section-title"><span>NEON SKINS</span><small>Own it once. Equip forever.</small></div>
                 <div id="skin-grid" class="skin-grid"></div>
                 <button id="coin-reward-button" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">GET 50 COINS: VISIT (0/10)</button>
@@ -449,7 +451,14 @@
 
         let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
         let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
-        let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1}');
+        let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}');
+        upgrades = { weight: 1, power: 1, coreDensity: 0, neonMomentum: 0, hydroPusher: 0, voidArmor: 0, ...upgrades };
+        const bodyUpgrades = [
+            { id: 'coreDensity', name: 'Core Density', icon: '◈', unlock: 10, lore: 'Recovered from the Foundry. Adds mass against heavy bosses.', max: 3, cost: level => (level + 1) * 45 },
+            { id: 'neonMomentum', name: 'Neon Momentum', icon: '⚡', unlock: 12, lore: 'Charged in Wave 12. Builds faster movement and impact power.', max: 3, cost: level => (level + 1) * 55 },
+            { id: 'hydroPusher', name: 'Hydro-Pusher', icon: '◇', unlock: 25, lore: 'Abyssal coolant from Wave 25. Improves recovery after collisions.', max: 3, cost: level => (level + 1) * 65 },
+            { id: 'voidArmor', name: 'Void Armor', icon: '⬡', unlock: 50, lore: 'Boss-core plating from Wave 50. Reduces ring-out force.', max: 3, cost: level => (level + 1) * 80 }
+        ];
         const skinCatalog = [
             { id: 'cyan', name: 'Pulse Core', color: '#00e5ff', accent: '#ffffff', price: 0, shape: 'orb' },
             { id: 'ember', name: 'Ember Ring', color: '#ff6b00', accent: '#ffd166', price: 35, shape: 'orb' },
@@ -647,7 +656,7 @@
             hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
             touchBox.style.display = 'block'; offlineArenaRadius = radius;
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 22 + (upgrades.weight * 1.5); bots = []; particles = [];
+            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
             modeTime = ARCADE_MODES[mode]?.duration || 0;
             modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
             modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
@@ -687,8 +696,32 @@
             document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
             document.getElementById('buy-weight').innerText = `Buy (${upgrades.weight * 20}🪙)`;
             document.getElementById('buy-power').innerText = `Buy (${upgrades.power * 20}🪙)`;
+            renderBodyUpgrades();
             renderSkinShop();
             document.getElementById('menu-shop').classList.remove('hidden');
+        }
+
+        function renderBodyUpgrades() {
+            const grid = document.getElementById('body-upgrade-grid');
+            if (!grid) return;
+            grid.innerHTML = bodyUpgrades.map(item => {
+                const level = Number(upgrades[item.id]) || 0;
+                const unlocked = maxUnlockedStage >= item.unlock;
+                const cost = item.cost(level);
+                return `<div class="body-upgrade-card ${unlocked ? '' : 'locked'}"><div class="body-upgrade-heading"><b>${item.icon} ${item.name}</b><strong>LVL ${level}/${item.max}</strong></div><small>${item.lore}</small><button class="shop-btn" type="button" onclick="buyBodyUpgrade('${item.id}')" ${!unlocked || level >= item.max ? 'disabled' : ''}>${level >= item.max ? 'MAXED' : unlocked ? `Upgrade ${cost}🪙` : `Unlocks at Wave ${item.unlock}`}</button></div>`;
+            }).join('');
+        }
+
+        function buyBodyUpgrade(id) {
+            const item = bodyUpgrades.find(entry => entry.id === id);
+            if (!item) return;
+            const level = Number(upgrades[id]) || 0;
+            const cost = item.cost(level);
+            if (maxUnlockedStage < item.unlock || level >= item.max || coins < cost) return;
+            coins -= cost;
+            upgrades[id] = level + 1;
+            saveData();
+            showShop();
         }
 
         function buyUpgrade(type) {
@@ -755,7 +788,7 @@
             stageEnded = false;
             offlineArenaRadius = 240;
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 22 + (upgrades.weight * 1.5);
+            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
             let isBoss = level % 5 === 0;
             if (isBoss) {
@@ -784,7 +817,22 @@
         }
 
         function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
-        function nextStageOffline() { startOfflineStage(currentPlayingStage + 1); }
+        function nextStageOffline() { startOfflineStage(Math.min(1000, currentPlayingStage + 1)); }
+
+        function finishOfflineStage() {
+            if (stageEnded) return;
+            stageEnded = true;
+            const clearedStage = currentPlayingStage;
+            if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) maxUnlockedStage = clearedStage + 1;
+            coins += clearedStage % 5 === 0 ? 30 : 5;
+            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+            localStorage.setItem('sumo_streak', streak);
+            resetDailyMissionIfNeeded();
+            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
+            saveData();
+            hideAllMenus();
+            document.getElementById('modal-win-stage').classList.remove('hidden');
+        }
 
         function endArcadeMode(title, score) {
             if (modeRewarded) return;
@@ -869,8 +917,11 @@
                     offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
                     document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
                 }
-                player.vx += dx * 1.6; player.vy += dy * 1.6;
+                const momentum = 1.6 + upgrades.neonMomentum * 0.12;
+                player.vx += dx * momentum; player.vy += dy * momentum;
                 player.vx *= 0.88; player.vy *= 0.88;
+                const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
+                player.vx *= recovery; player.vy *= recovery;
                 player.x += player.vx; player.y += player.vy;
                 if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
                     reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
@@ -965,11 +1016,17 @@
                         bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
                         let playerMass = 1.0 + upgrades.weight * 0.25;
                         let playerPower = 6.0 + upgrades.power * 1.5;
-                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass);
-                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass);
+                        const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
+                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor;
                         let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
                         if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
                             bot.hp -= 1; bot.hurtCd = 22;
+                            if (bot.hp <= 0) {
+                                bot.hp = 0;
+                                bot.alive = false;
+                                spawnImpact(bot.x, bot.y, '#00ff66');
+                            }
                         }
                         bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
                         bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
@@ -984,9 +1041,9 @@
                 }
                 const remainingBots = bots.filter(bot => bot.alive).length;
                 if (remainingBots === 0 && !stageEnded) {
-                    modeScore = bots.length * 10;
-                    if (activeMode === 'timeAttack') modeScore = modeEliminations * 10;
-                    endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : activeMode === 'timeAttack' ? 'TIME ATTACK COMPLETE' : 'SHRINKING CLEARED', modeScore);
+                    if (activeMode === 'stage') { finishOfflineStage(); return; }
+                    modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
+                    endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
                     return;
                 }
             }
