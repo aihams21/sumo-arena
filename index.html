@@ -563,6 +563,7 @@
             localStorage.setItem('sumo_coins', coins);
             localStorage.setItem('sumo_stage', maxUnlockedStage);
             localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades));
+            if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; });
             updateDisplays();
             if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer();
         }
@@ -611,7 +612,12 @@
         let particles = [];
         let keys = {};
 
-        window.onkeydown = e => { keys[e.key.toLowerCase()] = true; };
+        window.onkeydown = e => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots);
+            if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots);
+        };
         window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
 
         function hideAllMenus() {
@@ -724,6 +730,10 @@
                 radius: 16, mass: 1.05, speed: .38, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
         }
 
+        function getActiveBoss() {
+            return bots.find(bot => bot.isBoss && bot.alive);
+        }
+
         function showShop() {
             hideAllMenus();
             updateDisplays();
@@ -802,6 +812,7 @@
         }
 
         function offlineBossStats(level, playerRadius) {
+            if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius);
             const curve = Math.sqrt(level);
             const wave = Math.max(1, Math.floor(level / 5));
             const tier = Math.min(3, Math.floor(wave / 10));
@@ -870,6 +881,7 @@
             resetDailyMissionIfNeeded();
             dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
             saveData();
+            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: clearedStage % 5 === 0 ? 1 : 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
             hideAllMenus();
             document.getElementById('modal-win-stage').classList.remove('hidden');
         }
@@ -885,6 +897,7 @@
             resetDailyMissionIfNeeded();
             dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
             saveData(); hideAllMenus();
+            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
             document.getElementById('round-title').innerText = title;
             document.getElementById('round-score').innerText = `${score} PTS • +${reward} 🪙`;
             document.getElementById('modal-round').classList.remove('hidden');
@@ -917,6 +930,7 @@
                 particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
             }
             if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
+            if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
         }
 
         function distanceToPlayer(bot) {
@@ -1099,8 +1113,10 @@
                     modeScore = modeEliminations * 10;
                     if (aliveCount === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
                 }
+                const activeBoss = getActiveBoss();
                 const remainingBots = bots.filter(bot => bot.alive).length;
-                if (remainingBots === 0 && !stageEnded) {
+                const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
+                if (((activeMode === 'stage' && !activeBoss && bossDefeated) || (activeMode !== 'stage' && remainingBots === 0)) && !stageEnded) {
                     if (activeMode === 'stage') { finishOfflineStage(); return; }
                     modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
                     endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
@@ -1158,6 +1174,7 @@
         }
 
         function gameLoop() {
+            if (window.NeonSystems?.performance) window.NeonSystems.performance.tick();
             try { updatePhysics(); render(); } catch (_error) {}
             requestAnimationFrame(gameLoop);
         }
@@ -1395,6 +1412,13 @@
     }
     setInterval(drawMatrix, 50);
     </script>
+    <script src="modules/storage.js"></script>
+    <script src="modules/physics.js"></script>
+    <script src="modules/abilities.js"></script>
+    <script src="modules/bosses.js"></script>
+    <script src="modules/achievements.js"></script>
+    <script src="modules/performance.js"></script>
+    <script src="modules/audio.js"></script>
 
 <script>
 function toggleNeonMenu() {
