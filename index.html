@@ -839,16 +839,16 @@
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
-            let isBoss = level % 5 === 0;
-            if (isBoss) {
+            if (config.isBoss || config.isMiniBoss) {
                 const stats = offlineBossStats(level, player.radius);
                 bots.push({
                     x: 400, y: 130, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                    speed: stats.speed, power: stats.power, color: '#ff0055', isBoss: true,
+                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00', 
+                    isBoss: true, isMiniBoss: config.isMiniBoss,
                     alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
                     shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
                     attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
-                    minionCooldown: 360, tier: stats.tier
+                    minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
                 });
             } else {
                 const count = offlineEnemyCount(level);
@@ -862,7 +862,7 @@
                     });
                 }
             }
-            document.getElementById('hud-left').innerText = isBoss ? `👑 BOSS: ${level}` : `STAGE: ${level}`;
+            document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
             updateDisplays();
             applyEquippedSkin();
         }
@@ -874,8 +874,19 @@
             if (stageEnded) return;
             stageEnded = true;
             const clearedStage = currentPlayingStage;
-            if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) maxUnlockedStage = clearedStage + 1;
-            coins += clearedStage % 5 === 0 ? 30 : 5;
+            if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) {
+                maxUnlockedStage = clearedStage + 1;
+                localStorage.setItem('sumo_stage', maxUnlockedStage);
+            }
+            
+            // Scaled coin rewards
+            let coinReward = 5;
+            if (clearedStage % 10 === 0) coinReward = 50; // Mega Boss
+            else if (clearedStage % 5 === 0) coinReward = 20; // Mini Boss
+            else if (clearedStage > 500) coinReward = 15;
+            else if (clearedStage > 100) coinReward = 10;
+            
+            coins += coinReward;
             const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
             localStorage.setItem('sumo_streak', streak);
             resetDailyMissionIfNeeded();
