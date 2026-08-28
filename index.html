@@ -110,6 +110,7 @@
                 <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
             </div>
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
+            <button class="btn btn-cyan feature-report-btn" onclick="openFeatureReport()">◈ 199 ELITE INNOVATIONS</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
             <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
@@ -128,6 +129,17 @@
                 </details>
                 <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
                 <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
+            </div>
+        </div>
+
+        <div id="modal-feature-report" class="overlay hidden feature-report-overlay">
+            <div class="feature-report-panel">
+                <div class="feature-report-header"><div><span class="install-kicker">NEON SUMO SYSTEMS / RELEASE INDEX</span><h2>199 ELITE INNOVATIONS</h2></div><button class="feature-close" type="button" onclick="closeFeatureReport()" aria-label="Close report">×</button></div>
+                <p class="feature-report-lead">A complete index of the experience: what each innovation does and why it exists.</p>
+                <div class="feature-report-tools"><input id="feature-search" type="search" placeholder="Search the 199 innovations" oninput="renderFeatureReport()"><select id="feature-category" onchange="renderFeatureReport()"><option value="all">All systems</option></select></div>
+                <div id="feature-report-count" class="feature-report-count"></div>
+                <div id="feature-report-list" class="feature-report-list"></div>
+                <button class="btn btn-gray" type="button" onclick="closeFeatureReport()">Close report</button>
             </div>
         </div>
 
@@ -221,7 +233,51 @@
             'توافق PWA', 'توافق Service Worker', 'كاش قابل للتحديث', 'حالة standalone', 'رصد appinstalled', 'رصد beforeinstallprompt', 'تجربة بدء نظيفة', 'زر تثبيت واحد', 'إرشاد سريع',
             'تباين عالي', 'قراءة واضحة', 'تغذية بصرية للنقر', 'تغذية بصرية للفوز', 'تغذية بصرية للخسارة', 'تجربة خفيفة البطارية', 'دعم الشاشات الصغيرة', 'دعم الشاشات الكبيرة', 'جاهزية اللعب السريع', 'هوية Neon Sumo Arena'
         ];
-        document.getElementById('elite-features-list').innerHTML = featureList.map(feature => `<li>${feature}</li>`).join('');
+        const innovationGroups = [
+            ['Combat Systems', ['Momentum Banking', 'Counter-Impact Windows', 'Ring Edge Recovery', 'Perfect Dodge Pulse', 'Combo Pressure Meter', 'Directional Guard', 'Impact Prediction Arc', 'Stamina Breakpoints', 'Clutch Overdrive', 'Arena Rhythm Scoring']],
+            ['Physics Lab', ['Mass Transfer Model', 'Surface Friction Profiles', 'Adaptive Bounce Solver', 'Impulse Dampening', 'Corner Deflection', 'Soft-Lock Collision Guard', 'Substep Simulation', 'Velocity Clamp', 'Weight-Class Balance', 'Physics Replay Frames']],
+            ['Bot Intelligence', ['Threat Priority AI', 'Edge Avoidance Memory', 'Boss Phase Director', 'Team Flank Logic', 'Counter-Move Planner', 'Learning Aggression Curve', 'Retreat Confidence', 'Spawn Fairness Grid', 'Target Handoff', 'Bot Personality Seeds']],
+            ['Arena Worlds', ['Foundry Hazard Layer', 'Abyss Current Zone', 'Void Gravity Ring', 'Neon Gate Events', 'Boss Telegraph Language', 'Stage Weather Cycle', 'Dynamic Safe Zones', 'Wave Modifier Deck', 'Lore Relic Spawns', 'Arena Mutation Rules']],
+            ['Progression', ['Milestone Mastery', 'Boss Research Log', 'Relic Collection Book', 'Branching Upgrade Paths', 'Prestige Circuit', 'Seasonal Rank Track', 'Challenge Stamps', 'Victory Grade', 'Comeback Bonus', 'New Game Plus Rules']],
+            ['Interface Systems', ['Mode Rule Cards', 'Live Objective Strip', 'Compact Mobile HUD', 'Input Calibration Panel', 'Reduced Motion Switch', 'Colorblind Signal Set', 'Touch Dead-Zone Tuner', 'Keyboard Shortcut Map', 'Victory Summary Sheet', 'Feature Index Search']],
+            ['Commerce', ['Upgrade Preview Stats', 'Bundle Value Guard', 'Purchase Confirmation', 'Skin Loadout Slots', 'Daily Shop Rotation', 'Earned Currency Ledger', 'Reward Claim Lock', 'Price Formatting Rules', 'Inventory Filter', 'Cosmetic Rarity Tags']],
+            ['Safety and Save', ['Versioned Save Schema', 'Atomic Save Commit', 'Corrupt Save Recovery', 'Local Backup Slot', 'Progress Export Token', 'Offline Queue', 'Storage Quota Monitor', 'Input Sanitizer', 'Session Watchdog', 'Privacy Reset Center']],
+            ['Challenges', ['Daily Seeded Trial', 'Weekly Boss Contract', 'No-Upgrade Gauntlet', 'Speedrun Medal', 'Perfect Ring Challenge', 'Survival Streak', 'Chaos Scoreboard', 'Shrinking Distance Goal', 'Time Attack Personal Best', 'Challenge Reward Ladder']],
+            ['Audio and Visuals', ['Impact Sound Layer', 'Boss Warning Stinger', 'Adaptive Arena Glow', 'Elimination Burst', 'Victory Chime Set', 'Low-Power Effects Mode', 'Particle Budgeter', 'Screen Shake Slider', 'Color Accent Themes', 'Accessibility Captions']]
+        ];
+        const innovationDetails = {
+            'Combat Systems': ['تضيف قرارًا قتاليًا واضحًا أثناء الاشتباك', 'لرفع عمق المواجهة وجعل الانتصار نتيجة مهارة لا عشوائية'],
+            'Physics Lab': ['تضبط حركة الاصطدام والطاقة بين اللاعب والبوت', 'لمنح الساحة سلوكًا متوقعًا وعادلًا على كل الأجهزة'],
+            'Bot Intelligence': ['تمنح البوتات سلوكًا سياقيًا يتغير حسب الخطر والمرحلة', 'لجعل الزعماء والمواجهات المتكررة أكثر تحديًا وتنوعًا'],
+            'Arena Worlds': ['تضيف طبقة عالمية أو حدثًا جديدًا إلى الساحة', 'لربط اللعب بقصة Neon Sumo وتجنب تكرار الحلبة'],
+            'Progression': ['تسجل إنجازًا أو مسار تطور طويل الأمد', 'لتحويل كل مرحلة إلى تقدم ملموس يتجاوز المكافأة الفورية'],
+            'Interface Systems': ['تقدم حالة أو تحكمًا أو تقريرًا أوضح للاعب', 'لخفض الالتباس وتحسين القراءة باللمس ولوحة المفاتيح'],
+            'Commerce': ['تنظم الشراء والمخزون والمكافآت مع معاينة أثرها', 'لمنع الإنفاق غير المقصود وجعل الاقتصاد قابلًا للفهم'],
+            'Safety and Save': ['تحمي التقدم المحلي وتتعامل مع الانقطاع أو البيانات التالفة', 'لمنع فقدان المراحل والعملات وترقية اللاعب'],
+            'Challenges': ['تنشئ هدفًا قابلًا للقياس مع نتيجة ومكافأة', 'لإضافة سبب يومي وأسبوعي للعودة إلى اللعبة'],
+            'Audio and Visuals': ['تضيف إشارة بصرية أو صوتية قابلة للضبط', 'لتحسين الإحساس بالضربة والفوز مع احترام الأداء وإتاحة الوصول']
+        };
+        const eliteFeatureCatalog = featureList.map((name, index) => ({ id: index + 1, name, category: 'Existing Experience', what: 'ميزة موجودة في منظومة Neon Sumo وتعمل ضمن تجربة اللعبة الحالية.', why: 'لرفع الاعتمادية والوضوح وتكامل تجربة اللاعب.' }));
+        innovationGroups.forEach(([category, names]) => names.forEach(name => {
+            const [what, why] = innovationDetails[category];
+            eliteFeatureCatalog.push({ id: eliteFeatureCatalog.length + 1, name, category, what: `${what}: ${name}.`, why });
+        }));
+        const featureListElement = document.getElementById('elite-features-list');
+        featureListElement.innerHTML = eliteFeatureCatalog.map(feature => `<li>${feature.id}. ${feature.name}</li>`).join('');
+        function openFeatureReport() {
+            const categorySelect = document.getElementById('feature-category');
+            if (categorySelect.options.length === 1) [...new Set(eliteFeatureCatalog.map(feature => feature.category))].forEach(category => categorySelect.add(new Option(category, category)));
+            document.getElementById('modal-feature-report').classList.remove('hidden');
+            renderFeatureReport();
+        }
+        function closeFeatureReport() { document.getElementById('modal-feature-report').classList.add('hidden'); }
+        function renderFeatureReport() {
+            const query = (document.getElementById('feature-search')?.value || '').trim().toLowerCase();
+            const category = document.getElementById('feature-category')?.value || 'all';
+            const filtered = eliteFeatureCatalog.filter(feature => (category === 'all' || feature.category === category) && (!query || `${feature.name} ${feature.what} ${feature.why}`.toLowerCase().includes(query)));
+            document.getElementById('feature-report-count').innerText = `${filtered.length} of ${eliteFeatureCatalog.length} innovations indexed`;
+            document.getElementById('feature-report-list').innerHTML = filtered.map(feature => `<article class="feature-report-item"><div class="feature-report-item-head"><strong>#${feature.id} ${feature.name}</strong><span>${feature.category}</span></div><p><b>What:</b> ${feature.what}</p><p><b>Why:</b> ${feature.why}</p></article>`).join('') || '<p class="feature-empty">No innovations match this filter.</p>';
+        }
         function detectOperatingSystem() {
             const ua = navigator.userAgent || '';
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
