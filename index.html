@@ -105,9 +105,9 @@
             <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <div class="mode-title">NEON GAME MODES</div>
             <div class="mode-grid">
-                <button class="mode-btn chaos" onclick="startGameMode('chaos')">🌀 CHAOS ARENA<small>Last sumo standing</small></button>
-                <button class="mode-btn time" onclick="startGameMode('timeAttack')">⏱️ TIME ATTACK<small>60 seconds • score rush</small></button>
-                <button class="mode-btn shrink" onclick="startGameMode('shrinking')">🔻 SHRINKING ARENA<small>Survive the collapse</small></button>
+                <button class="mode-btn chaos" onclick="startGameMode('chaos')"><span class="mode-icon">🌀</span><span class="mode-name">CHAOS ARENA</span><small>6 bots • 185 radius</small></button>
+                <button class="mode-btn time" onclick="startGameMode('timeAttack')"><span class="mode-icon">⏱️</span><span class="mode-name">TIME ATTACK</span><small>60 seconds • score rush</small></button>
+                <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
             </div>
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
@@ -540,9 +540,18 @@
 
         let gameMode = 'none';
         let activeMode = 'stage';
+        const ARCADE_MODES = {
+            chaos: { radius: 185, bots: 6, botScale: 6, reward: 20 },
+            timeAttack: { radius: 235, bots: 2, botScale: 1, duration: 60, spawnEvery: 1.75, reward: 10 },
+            shrinking: { radius: 250, minRadius: 125, bots: 3, botScale: 2, shrinkPerSecond: 2, reward: 10 }
+        };
         let modeTime = 0;
+        let modeElapsedMs = 0;
+        let modeLastTick = 0;
         let modeScore = 0;
         let modeSpawnTimer = 0;
+        let modeEliminations = 0;
+        let modeRewarded = false;
         let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
         let reviveSnapshot = { x: 400, y: 300, radius: 240 };
         let currentPlayingStage = 1;
@@ -639,24 +648,29 @@
             touchBox.style.display = 'block'; offlineArenaRadius = radius;
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5); bots = []; particles = [];
-            modeTime = mode === 'timeAttack' ? 60 * 60 : 0; modeScore = 0; modeSpawnTimer = 0;
+            modeTime = ARCADE_MODES[mode]?.duration || 0;
+            modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
+            modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
             document.getElementById('hud-left').innerText = mode === 'chaos' ? '🌀 CHAOS ARENA' : mode === 'timeAttack' ? '⏱️ TIME ATTACK' : '🔻 SHRINKING ARENA';
             updateDisplays(); applyEquippedSkin();
         }
 
         function startChaosArena() {
-            startModeBase('chaos', 185);
-            for (let i = 0; i < 6; i++) addModeBot(i, 6, '#ff3366');
+            const config = ARCADE_MODES.chaos;
+            startModeBase('chaos', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, '#ff3366');
         }
 
         function startTimeAttack() {
-            startModeBase('timeAttack', 235);
-            addModeBot(0, 1, '#ffaa00'); addModeBot(1, 1, '#ff3366');
+            const config = ARCADE_MODES.timeAttack;
+            startModeBase('timeAttack', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, i % 2 ? '#ff3366' : '#ffaa00');
         }
 
         function startShrinkingArena() {
-            startModeBase('shrinking', 250);
-            addModeBot(0, 2, '#ff0055'); addModeBot(1, 2, '#ffaa00'); addModeBot(2, 2, '#7dff00');
+            const config = ARCADE_MODES.shrinking;
+            startModeBase('shrinking', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, ['#ff0055', '#ffaa00', '#7dff00'][i]);
         }
 
         function addModeBot(index, scale, color) {
@@ -773,11 +787,18 @@
         function nextStageOffline() { startOfflineStage(currentPlayingStage + 1); }
 
         function endArcadeMode(title, score) {
+            if (modeRewarded) return;
+            modeRewarded = true;
             stageEnded = true;
-            coins += Math.max(5, Math.floor(score / 3));
+            const reward = Math.max(5, ARCADE_MODES[activeMode]?.reward || 5) + Math.floor(score / 10);
+            coins += reward;
+            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+            localStorage.setItem('sumo_streak', streak);
+            resetDailyMissionIfNeeded();
+            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
             saveData(); hideAllMenus();
             document.getElementById('round-title').innerText = title;
-            document.getElementById('round-score').innerText = `${score} PTS • +${Math.max(5, Math.floor(score / 3))} 🪙`;
+            document.getElementById('round-score').innerText = `${score} PTS • +${reward} 🪙`;
             document.getElementById('modal-round').classList.remove('hidden');
         }
 
@@ -830,20 +851,27 @@
             if (magnitude > 1) { dx /= magnitude; dy /= magnitude; }
 
             if (gameMode === 'offline' && player.alive && !stageEnded) {
+                const now = performance.now();
+                const deltaSeconds = Math.min(0.1, Math.max(0, (now - modeLastTick) / 1000));
+                modeLastTick = now;
                 if (activeMode === 'timeAttack') {
-                    modeTime -= 1;
-                    if (modeTime <= 0) endArcadeMode('TIME UP', modeScore);
-                    modeSpawnTimer += 1;
-                    if (modeSpawnTimer >= 105) { modeSpawnTimer = 0; addModeBot(bots.length, 1, Math.random() > .5 ? '#ffaa00' : '#ff3366'); }
-                    document.getElementById('hud-left').innerText = `⏱️ ${Math.ceil(modeTime / 60)}s • ${modeScore} PTS`;
+                    modeElapsedMs += deltaSeconds * 1000;
+                    modeTime = Math.max(0, ARCADE_MODES.timeAttack.duration - modeElapsedMs / 1000);
+                    if (modeTime <= 0) { endArcadeMode('TIME UP', modeScore); return; }
+                    modeSpawnTimer += deltaSeconds;
+                    if (modeSpawnTimer >= ARCADE_MODES.timeAttack.spawnEvery) {
+                        modeSpawnTimer = 0;
+                        addModeBot(bots.length, 1, Math.random() > .5 ? '#ffaa00' : '#ff3366');
+                    }
+                    document.getElementById('hud-left').innerText = `⏱️ ${Math.ceil(modeTime)}s • ${modeScore} PTS`;
                 } else if (activeMode === 'shrinking') {
-                    offlineArenaRadius = Math.max(125, offlineArenaRadius - 0.035);
+                    modeElapsedMs += deltaSeconds * 1000;
+                    offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
                     document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
                 }
                 player.vx += dx * 1.6; player.vy += dy * 1.6;
                 player.vx *= 0.88; player.vy *= 0.88;
                 player.x += player.vx; player.y += player.vy;
-                if (offlineArenaRadius > 160) offlineArenaRadius -= 0.012;
                 if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
                     reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
                     player.alive = false; stageEnded = true;
@@ -949,20 +977,17 @@
                     }
                 }
                 if (activeMode === 'timeAttack') {
-                    modeScore += active.length - bots.filter(bot => bot.alive).length;
-                    if (bots.filter(bot => bot.alive).length === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
+                    const aliveCount = bots.filter(bot => bot.alive).length;
+                    modeEliminations += active.length - aliveCount;
+                    modeScore = modeEliminations * 10;
+                    if (aliveCount === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
                 }
-                if (active.length === 0 && !stageEnded) {
-                    stageEnded = true;
-                    if (activeMode === 'timeAttack') endArcadeMode('TIME ATTACK COMPLETE', modeScore);
-                    coins += activeMode === 'chaos' ? 25 : activeMode === 'shrinking' ? 20 : bots.some(bot => bot.isBoss) ? 30 : 5;
-                    const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
-                    localStorage.setItem('sumo_streak', streak);
-                    resetDailyMissionIfNeeded();
-                    dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
-                    if (currentPlayingStage === maxUnlockedStage && maxUnlockedStage < 1000) maxUnlockedStage++;
-                    saveData(); hideAllMenus();
-                    document.getElementById('modal-win-stage').classList.remove('hidden');
+                const remainingBots = bots.filter(bot => bot.alive).length;
+                if (remainingBots === 0 && !stageEnded) {
+                    modeScore = bots.length * 10;
+                    if (activeMode === 'timeAttack') modeScore = modeEliminations * 10;
+                    endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : activeMode === 'timeAttack' ? 'TIME ATTACK COMPLETE' : 'SHRINKING CLEARED', modeScore);
+                    return;
                 }
             }
         }
