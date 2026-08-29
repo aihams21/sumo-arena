@@ -413,6 +413,7 @@
         const gameBox = document.getElementById('game-box');
         const touchBox = document.getElementById('touch-controller'), stick = document.getElementById('stick'), bannerAd = document.getElementById('banner-ad');
         let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0, pointerActive = false;
+        let gameActive = false;
 
         function applyMoveVector(dx, dy) {
             const m = 45;
@@ -457,8 +458,6 @@
         /* Dual-touch: two-finger control for more precise movement */
         touchBox.addEventListener('touchstart', e => {
             if (window.PointerEvent) return;
-            /* Show touch controller on touch devices */
-            if (!touchBox.classList.contains('active')) touchBox.classList.add('active');
             const touches = e.touches;
             if (touches.length === 1) {
                 const t = touches[0];
@@ -671,6 +670,7 @@
         }
 
         function stopPlaySession() {
+            gameActive = false;
             gameMode = 'none';
             stageEnded = false;
             stageReady = false;
@@ -679,6 +679,8 @@
             player.alive = true;
             player.vx = 0;
             player.vy = 0;
+            touchBox.style.display = 'none';
+            touchBox.classList.remove('active');
             if (typeof clearMoveVector === 'function') clearMoveVector();
             if (typeof disconnectWS === 'function') { try { disconnectWS(); } catch (_error) {} }
             if (typeof netInterval !== 'undefined' && netInterval) { clearInterval(netInterval); netInterval = null; }
@@ -728,16 +730,12 @@
         }
 
         function startModeBase(mode, radius) {
+            gameActive = true;
             gameMode = 'offline'; activeMode = mode; stageEnded = false;
             stageReady = false;
             hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
-            /* Show touch controller on mobile */
-            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-                touchBox.style.display = 'block';
-                touchBox.classList.add('active');
-            } else {
-                touchBox.style.display = 'block';
-            }
+            touchBox.style.display = 'block';
+            touchBox.classList.add('active');
             touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
@@ -886,15 +884,11 @@
                 gameMode = 'offline';
                 activeMode = 'stage';
                 currentPlayingStage = level;
+                gameActive = true;
                 hideAllMenus();
                 document.getElementById('hud').classList.remove('hidden');
-                /* Show touch controller on mobile */
-                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-                    touchBox.style.display = 'block';
-                    touchBox.classList.add('active');
-                } else {
-                    touchBox.style.display = 'block';
-                }
+                touchBox.style.display = 'block';
+                touchBox.classList.add('active');
                 stageEnded = false;
                 stageReady = false;
                 offlineArenaRadius = config.arenaRadius;
@@ -989,6 +983,7 @@
         }
 
         function reviveInPlaceOffline() {
+            gameActive = true;
             stageEnded = false;
             const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
             const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
@@ -998,11 +993,8 @@
             player.vx = 0; player.vy = 0; player.alive = true;
             hideAllMenus();
             document.getElementById('hud').classList.remove('hidden');
-            /* Show touch controller on mobile */
-            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-                touchBox.style.display = 'block';
-                touchBox.classList.add('active');
-            }
+            touchBox.style.display = 'block';
+            touchBox.classList.add('active');
             reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
         }
 
@@ -1019,7 +1011,8 @@
         function distanceToPlayer(bot) { return Math.hypot(bot.x - player.x, bot.y - player.y); }
 
         function updatePhysics() {
-            if (gameMode === 'none') return;
+            if (gameMode === 'none') { gameActive = false; return; }
+            if (!gameActive) { touchBox.style.display = 'none'; touchBox.classList.remove('active'); return; }
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
                 p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;

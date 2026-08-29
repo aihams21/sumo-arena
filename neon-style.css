@@ -241,6 +241,11 @@ input {
   display: block;
 }
 
+/* Safety net: ensure controller stays hidden when not explicitly activated */
+#touch-controller:not(.active) {
+  display: none !important;
+}
+
 #stick {
   position: absolute;
   top: 50%;
@@ -1425,12 +1430,7 @@ body::before {
     height: min(42px, 10vmin);
   }
 
-  /* Touch controller visible on touch devices */
-  @media (hover: none) {
-    #touch-controller {
-      display: block !important;
-    }
-  }
+  /* Touch controller visible on touch devices — controlled by JS via .active class */
 
   #hud {
     top: max(6px, env(safe-area-inset-top));
@@ -1630,7 +1630,7 @@ body::before {
    ═══ TOUCH DEVICE OPTIMIZATIONS ═══
    ═══════════════════════════════════════════════ */
 @media (hover: none) and (pointer: coarse) {
-  #touch-controller { display: block !important; }
+  /* Touch controller visibility is controlled by JS via .active class */
   .btn { min-height: 48px; }
   .shop-btn { min-height: 44px; }
   .mode-btn { min-height: 64px; }
