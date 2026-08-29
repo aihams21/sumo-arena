@@ -197,6 +197,36 @@
     <canvas id="matrix-bg" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
 
     <script>
+        /* ═══════════════════════════════════════
+           UNIVERSAL BOOT FAILSAFE
+           Armed immediately so it can never be skipped by a later boot
+           exception. Force-dismisses the loading overlay and reveals the
+           main menu after 3s or on any global user gesture.
+           ═══════════════════════════════════════ */
+        window.NeonBoot = (function () {
+            let done = false;
+            function forceShowMenu() {
+                if (done) return;
+                const ls = document.getElementById('loading-screen');
+                const mm = document.getElementById('menu-main');
+                if (ls) ls.classList.add('hidden');
+                if (mm) mm.classList.remove('hidden');
+                done = true;
+                setTimeout(function () {
+                    const el = document.getElementById('loading-screen');
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                }, 650);
+            }
+            const timer = setTimeout(forceShowMenu, 3000);
+            window.addEventListener('load', function () { clearTimeout(timer); setTimeout(forceShowMenu, 100); });
+            ['click', 'touchstart', 'pointerdown', 'keydown'].forEach(function (ev) {
+                document.addEventListener(ev, forceShowMenu, { once: true, capture: true });
+            });
+            if (document.readyState === 'interactive' || document.readyState === 'complete') {
+                clearTimeout(timer); setTimeout(forceShowMenu, 50);
+            }
+            return { forceShowMenu: forceShowMenu };
+        })();
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
         let deferredPrompt = null;
         const installModal = document.getElementById('modal-install-guide');
@@ -477,8 +507,6 @@
         function claimDailyMission() { resetDailyMissionIfNeeded(); if (dailyMission.wins < 3 || dailyMission.claimed) return; dailyMission.claimed = true; coins += 25; saveData(); updateDailyMission(); }
         function saveData() { try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
         function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
-        updateDisplays();
-
         let gameMode = 'none', activeMode = 'stage';
         const ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
         let modeTime = 0, modeElapsedMs = 0, modeLastTick = 0, modeScore = 0, modeSpawnTimer = 0, modeEliminations = 0, modeRewarded = false;
@@ -489,6 +517,7 @@
         let player = { x:400, y:300, vx:0, vy:0, radius:24, color:'#00e5ff', alive:true };
         applyEquippedSkin();
         let bots = [], gameParticles = [], keys = {};
+        try { updateDisplays(); } catch(_e) {}
 
         window.onkeydown = e => { const key = e.key.toLowerCase(); keys[key] = true; if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots); if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots); };
         window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
@@ -545,23 +574,29 @@
         }
         function startChaosArena() {
             const mode = ARCADE_MODES.chaos; startModeBase('chaos', mode.radius);
+            const spawnR = Math.max(60, mode.radius * 0.65);
             for (let i = 0; i < mode.bots; i++) {
-                const bot = { x:100+Math.random()*600, y:100+Math.random()*400, radius:16*mode.botScale, color:'#ff3366', vx:0, vy:0, alive:true, team:i%2===0?'red':'blue', w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5+Math.random()*.5, aiAggression:Math.random(), edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = bot.team === 'red' ? 120 : 680; bots.push(bot);
+                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
+                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#ff3366', vx:0, vy:0, alive:true, team:i%2===0?'red':'blue', w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5+Math.random()*.5, aiAggression:Math.random(), edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
+                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
             }
         }
         function startTimeAttack() {
             const mode = ARCADE_MODES.timeAttack; startModeBase('timeAttack', mode.radius); modeElapsedMs = mode.duration * 1000;
+            const spawnR = Math.max(60, mode.radius * 0.65);
             for (let i = 0; i < mode.bots; i++) {
-                const bot = { x:100+Math.random()*600, y:100+Math.random()*400, radius:16*mode.botScale, color:'#ffbb00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.7, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = i % 2 === 0 ? 120 : 680; bots.push(bot);
+                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
+                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#ffbb00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.7, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
+                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
             }
         }
         function startShrinkingArena() {
             const mode = ARCADE_MODES.shrinking; startModeBase('shrinking', mode.radius); offlineArenaRadius = mode.radius; modeSpawnTimer = mode.spawnEvery * 1000;
+            const spawnR = Math.max(60, mode.radius * 0.65);
             for (let i = 0; i < mode.bots; i++) {
-                const bot = { x:100+Math.random()*600, y:100+Math.random()*400, radius:16*mode.botScale, color:'#7dff00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.6, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = i % 2 === 0 ? 120 : 680; bots.push(bot);
+                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
+                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#7dff00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.6, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
+                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
             }
         }
         function exitToMenu() { stopPlaySession(); hideAllMenus(); document.getElementById('menu-main').classList.remove('hidden'); if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false); bannerAd.style.display = 'flex'; updateDisplays(); }
@@ -582,30 +617,43 @@
 
         /* ═══════════════════════════════════════
            NAVIGATION BUTTON WIRING
+           Deferred until the DOM and all external scripts have loaded so
+           references to functions defined in later modules (leaderboard.js,
+           game.js) are always resolvable at bind time.
            ═══════════════════════════════════════ */
-        document.getElementById('btn-stage-map')?.addEventListener('click', showStageSelect);
-        document.getElementById('btn-chaos')?.addEventListener('click', () => startGameMode('chaos'));
-        document.getElementById('btn-time')?.addEventListener('click', () => startGameMode('timeAttack'));
-        document.getElementById('btn-shrink')?.addEventListener('click', () => startGameMode('shrinking'));
-        document.getElementById('btn-shop')?.addEventListener('click', showShop);
-        document.getElementById('btn-leaderboard')?.addEventListener('click', openLeaderboardModalSafe);
-        document.getElementById('btn-back-stages')?.addEventListener('click', showMainMenu);
-        document.getElementById('btn-back-shop')?.addEventListener('click', showMainMenu);
-        document.getElementById('btn-back-multi')?.addEventListener('click', showMainMenu);
-        document.getElementById('btn-leave-room')?.addEventListener('click', exitToMenu);
-        document.getElementById('btn-death-menu')?.addEventListener('click', exitToMenu);
-        document.getElementById('btn-retry')?.addEventListener('click', retryStageDirectly);
-        document.getElementById('btn-next-stage')?.addEventListener('click', nextStageOffline);
-        document.getElementById('btn-win-map')?.addEventListener('click', showStageSelect);
-        document.getElementById('btn-exit')?.addEventListener('click', exitToMenu);
-        document.getElementById('btn-whatsapp')?.addEventListener('click', shareRoomWhatsApp);
-        document.getElementById('btn-copy-link')?.addEventListener('click', copyRoomLink);
-        document.getElementById('btn-cancel-lobby')?.addEventListener('click', exitToMenu);
-        document.getElementById('mission-claim')?.addEventListener('click', claimDailyMission);
-        document.getElementById('buy-weight')?.addEventListener('click', () => buyUpgrade('weight'));
-        document.getElementById('buy-power')?.addEventListener('click', () => buyUpgrade('power'));
-        document.getElementById('install-dismiss')?.addEventListener('click', closeInstallGuide);
-        document.getElementById('install-dismiss')?.addEventListener('keydown', e => { if (e.key === 'Enter') closeInstallGuide(); });
+        function wireButtons() {
+            document.getElementById('btn-stage-map')?.addEventListener('click', showStageSelect);
+            document.getElementById('btn-chaos')?.addEventListener('click', () => startGameMode('chaos'));
+            document.getElementById('btn-time')?.addEventListener('click', () => startGameMode('timeAttack'));
+            document.getElementById('btn-shrink')?.addEventListener('click', () => startGameMode('shrinking'));
+            document.getElementById('btn-shop')?.addEventListener('click', showShop);
+            document.getElementById('btn-leaderboard')?.addEventListener('click', openLeaderboardModalSafe);
+            document.getElementById('btn-back-stages')?.addEventListener('click', showMainMenu);
+            document.getElementById('btn-back-shop')?.addEventListener('click', showMainMenu);
+            document.getElementById('btn-back-multi')?.addEventListener('click', showMainMenu);
+            document.getElementById('btn-leave-room')?.addEventListener('click', exitToMenu);
+            document.getElementById('btn-death-menu')?.addEventListener('click', exitToMenu);
+            document.getElementById('btn-retry')?.addEventListener('click', retryStageDirectly);
+            document.getElementById('btn-next-stage')?.addEventListener('click', nextStageOffline);
+            document.getElementById('btn-win-map')?.addEventListener('click', showStageSelect);
+            document.getElementById('btn-exit')?.addEventListener('click', exitToMenu);
+            document.getElementById('btn-whatsapp')?.addEventListener('click', shareRoomWhatsApp);
+            document.getElementById('btn-copy-link')?.addEventListener('click', copyRoomLink);
+            document.getElementById('btn-cancel-lobby')?.addEventListener('click', exitToMenu);
+            document.getElementById('mission-claim')?.addEventListener('click', claimDailyMission);
+            document.getElementById('buy-weight')?.addEventListener('click', () => buyUpgrade('weight'));
+            document.getElementById('buy-power')?.addEventListener('click', () => buyUpgrade('power'));
+            document.getElementById('install-dismiss')?.addEventListener('click', closeInstallGuide);
+            document.getElementById('install-dismiss')?.addEventListener('keydown', e => { if (e.key === 'Enter') closeInstallGuide(); });
+        }
+        function bootWiring() {
+            try { wireButtons(); } catch(_e) {}
+        }
+        if (document.readyState === 'complete' || document.readyState === 'interactive') { bootWiring(); }
+        else {
+            document.addEventListener('DOMContentLoaded', bootWiring);
+            window.addEventListener('load', bootWiring);
+        }
 
         /* ═══════════════════════════════════════
            NEON SIDEBAR & MENU TOGGLE
@@ -659,23 +707,11 @@
 
 /* ═══════════════════════════════════════
            LOADING SCREEN — Robust Dismiss
+           Delegates to the bulletproof failsafe armed at the top of the
+           script. Idempotent: repeated calls are no-ops.
            ═══════════════════════════════════════ */
-         function dismissLoading() {
-             const ls = document.getElementById('loading-screen');
-             if (!ls || ls.classList.contains('hidden')) return;
-             ls.classList.add('hidden');
-             setTimeout(() => { if (ls.parentNode) ls.remove(); }, 600);
-         }
-         /* Failsafe: auto-dismiss after 3 seconds regardless */
-         var _failsafeTimer = setTimeout(dismissLoading, 3000);
-         /* Window load fallback */
-         window.addEventListener('load', () => { clearTimeout(_failsafeTimer); setTimeout(dismissLoading, 100); });
-         /* Click / tap / keypress to skip instantly */
-         document.addEventListener('click', dismissLoading, { once: true });
-         document.addEventListener('touchstart', dismissLoading, { once: true, passive: true });
-         document.addEventListener('keydown', function(e) { dismissLoading(); }, { once: true });
-         /* Immediate fallback if DOM already ready */
-         if (document.readyState === 'complete' || document.readyState === 'interactive') { clearTimeout(_failsafeTimer); setTimeout(dismissLoading, 50); }
+         function dismissLoading() { window.NeonBoot.forceShowMenu(); }
+         dismissLoading();
      </script>
      <script src="modules/storage.js"></script>
     <script src="modules/progression.js"></script>
@@ -687,6 +723,7 @@
     <script src="modules/audio.js"></script>
     <script src="modules/particles.js"></script>
     <script src="account-manager.js"></script>
+    <script src="modules/game.js"></script>
     <script src="leaderboard.js"></script>
 </body>
 </html>
