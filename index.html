@@ -46,6 +46,7 @@
 
         <!-- HUD — Deep Glassmorphism -->
         <div id="hud" class="hidden">
+            <div class="hud-card" id="hud-left">STAGE: 1</div>
             <div class="hud-card"><span class="hud-icon">◆</span> STAGE: <span class="hud-value" id="hud-stage">1</span></div>
             <div class="hud-card" style="color:#ffbb00;"><span class="hud-icon">🪙</span> <span id="hud-coins" class="hud-value">0</span></div>
             <div class="hud-card" style="color:#7dff00;"><span class="hud-icon">⚡</span> <span id="hud-mode" class="hud-value">CHAOS</span></div>
@@ -554,54 +555,7 @@
             }
             document.getElementById('menu-stages').classList.remove('hidden');
         }
-        function startGameMode(mode) { activeMode = mode; if (mode === 'chaos') startChaosArena(); else if (mode === 'timeAttack') startTimeAttack(); else startShrinkingArena(); }
-        function startModeBase(mode, radius) {
-            gameActive = true; gameMode = 'offline'; activeMode = mode; stageEnded = false; stageReady = false;
-            hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block'; touchBox.classList.add('active');
-            touchBox.style.bottom = (28 + (window.matchMedia('(max-width:768px)').matches ? 0 : 28)) + 'px';
-            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 24; player.color = '#00e5ff'; applyEquippedSkin();
-            bots = []; gameParticles = []; modeTime = 0; modeElapsedMs = 0; modeLastTick = 0; modeScore = 0;
-            modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
-            if (mode === 'timeAttack') { modeTime = ARCADE_MODES.timeAttack.duration; }
-            if (typeof initializeGame === 'function') initializeGame(radius, mode);
-            if (typeof updateHUD === 'function') updateHUD();
-            if (typeof startGameLoop === 'function') startGameLoop();
-            /* Audio-visual startup cue */
-            if (typeof window.NeonSystems?.audio?.playClick === 'function') window.NeonSystems.audio.playClick();
-            screenFlash('rgba(0,243,255,.12)');
-        }
-        function startChaosArena() {
-            const mode = ARCADE_MODES.chaos; startModeBase('chaos', mode.radius);
-            const spawnR = Math.max(60, mode.radius * 0.65);
-            for (let i = 0; i < mode.bots; i++) {
-                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
-                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#ff3366', vx:0, vy:0, alive:true, team:i%2===0?'red':'blue', w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5+Math.random()*.5, aiAggression:Math.random(), edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
-            }
-        }
-        function startTimeAttack() {
-            const mode = ARCADE_MODES.timeAttack; startModeBase('timeAttack', mode.radius); modeElapsedMs = mode.duration * 1000;
-            const spawnR = Math.max(60, mode.radius * 0.65);
-            for (let i = 0; i < mode.bots; i++) {
-                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
-                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#ffbb00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.7, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
-            }
-        }
-        function startShrinkingArena() {
-            const mode = ARCADE_MODES.shrinking; startModeBase('shrinking', mode.radius); offlineArenaRadius = mode.radius; modeSpawnTimer = mode.spawnEvery * 1000;
-            const spawnR = Math.max(60, mode.radius * 0.65);
-            for (let i = 0; i < mode.bots; i++) {
-                const ang = (Math.PI * 2 * i) / Math.max(1, mode.bots) + Math.random() * 0.8;
-                const bot = { x:400+Math.cos(ang)*spawnR, y:300+Math.sin(ang)*spawnR, radius:16*mode.botScale, color:'#7dff00', vx:0, vy:0, alive:true, w:22, h:30, walkCycle:0, score:0, aiState:'patrol', aiTimer:0, aiTarget:null, baseSpeed:1.5, aiAggression:0.6, edgeAvoidTimer:0, lastHitTime:0, knockbackX:0, knockbackY:0 };
-                bot.x = 400+Math.cos(ang)*spawnR; bot.y = 300+Math.sin(ang)*spawnR; bots.push(bot);
-            }
-        }
         function exitToMenu() { stopPlaySession(); hideAllMenus(); document.getElementById('menu-main').classList.remove('hidden'); if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false); bannerAd.style.display = 'flex'; updateDisplays(); }
-        function retryStageDirectly() { document.getElementById('modal-death').classList.add('hidden'); startOfflineStage(currentPlayingStage); }
-        function nextStageOffline() { document.getElementById('modal-win-stage').classList.add('hidden'); startOfflineStage(currentPlayingStage + 1); }
         function showGameOverScreen(message) {
             document.getElementById('modal-death').classList.remove('hidden');
             document.getElementById('death-count-copy').innerText = message || `Deaths: ${totalDeaths}`;
@@ -662,40 +616,6 @@
         const neonMenuBtn = document.getElementById('neon-menu-btn');
         if (neonMenuBtn && neonSidebar) {
             neonMenuBtn.addEventListener('click', () => { const isOpen = neonSidebar.style.right === '0px' || neonSidebar.style.right === ''; neonSidebar.style.right = isOpen ? `min(-86vw,-330px)` : '0px'; });
-        }
-
-        /* ═══════════════════════════════════════
-           GAME LOOP — Enhanced with Audio-Visual
-           ═══════════════════════════════════════ */
-        let lastTime = 0;
-        function gameLoop(timestamp) {
-            if (!gameActive) return;
-            const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
-            lastTime = timestamp;
-
-            /* Screen shake */
-            const shake = (typeof window.NeonSystems?.audio?.getShake === 'function') ? window.NeonSystems.audio.getShake() : { x:0, y:0 };
-            ctx.save(); ctx.translate(shake.x, shake.y);
-
-            /* Particle bursts */
-            if (typeof window.NeonSystems?.particles?.renderBurst === 'function') window.NeonSystems.particles.renderBurst(ctx, gameParticles, dt);
-
-            /* Render game content */
-            if (typeof render === 'function') render();
-            if (typeof updatePhysics === 'function') updatePhysics(dt);
-            if (typeof updateBots === 'function') updateBots(dt);
-
-            ctx.restore();
-
-            /* Chromatic aberration overlay */
-            const overlay = document.getElementById('chromatic-overlay');
-            const chroma = (typeof window.NeonSystems?.audio?.updateChroma === 'function') ? window.NeonSystems.audio.updateChroma() : 0;
-            if (overlay) {
-                if (chroma > .005) { overlay.style.opacity = String(Math.min(.2, chroma)); const angle = Date.now() * .1; overlay.style.background = `linear-gradient(${angle}deg,rgba(255,0,85,${chroma*.5}),transparent 50%,rgba(0,243,255,${chroma*.5}))`; }
-                else overlay.style.opacity = '0';
-            }
-
-            requestAnimationFrame(gameLoop);
         }
 
         /* Ambient particle background render */

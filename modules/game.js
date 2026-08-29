@@ -1,639 +1,549 @@
 /* ═══════════════════════════════════════════════════════════════════════
    NEON SUMO ARENA — GAME CORE
-   Reconstructed as a standalone classic <script> that plugs into the
-   global state declared by index.html (player, bots, gameParticles, ctx,
-   coins, upgrades, ARCADE_MODES, offlineArenaRadius, etc.).
+   Original real-sumo gameplay restored from git history (443850d):
+   mass/power pushing, overlap resolution, boss AI, stage/arcade match
+   loops and ring-outs. Plugs into the global state declared by index.html.
 
-   Exposes the functions the menu/loop scaffolding already calls:
-     initializeGame(r, mode)  render()  updatePhysics(dt)
-     updateBots(dt)           startGameLoop()  updateHUD()
-     showShop()  buyUpgrade(type)  startOfflineStage(level)
-     handleSwipe(angle)       shareRoomWhatsApp()  copyRoomLink()
+   Adaptations for the current shell (Option A):
+     · hud-left is provided by index.html (status line card)
+     · particles array is module-declared (shared global)
+     · handleSwipe + P2P lobby share helpers retained from the shell
    ═══════════════════════════════════════════════════════════════════════ */
 
 'use strict';
 
-/* ---------------------------------------------------------------- *
- *  Tuning constants
- * ---------------------------------------------------------------- */
-const GAME_CENTER_X = 400;
-const GAME_CENTER_Y = 300;
-const GAME_LOGICAL_W = 800;
-const GAME_LOGICAL_H = 600;
-const PLAYER_SPEED = 260;
-const PLAYER_MAX_HP = 3;
-const BOSS_COLOR = '#ff2bd6';
-
-let _loopRunning = false;
-let playerHp = PLAYER_MAX_HP;
+let particles = [];
 
 /* ---------------------------------------------------------------- *
- *  Logical → canvas coordinate transform (responsive)
+ *  MODE / STAGE ENTRY
  * ---------------------------------------------------------------- */
-function computeScreenTransform() {
-    const cw = canvas.width || GAME_LOGICAL_W;
-    const ch = canvas.height || GAME_LOGICAL_H;
-    const scale = Math.min(cw / GAME_LOGICAL_W, ch / GAME_LOGICAL_H);
-    const ox = (cw - GAME_LOGICAL_W * scale) / 2;
-    const oy = (ch - GAME_LOGICAL_H * scale) / 2;
-    return { scale, ox, oy };
+function startGameMode(mode) {
+    activeMode = mode;
+    if (mode === 'chaos') startChaosArena();
+    else if (mode === 'timeAttack') startTimeAttack();
+    else startShrinkingArena();
 }
 
-/* ---------------------------------------------------------------- *
- *  initializeGame(radius, mode)
- *  Called by index.html startModeBase for arcade modes.
- * ---------------------------------------------------------------- */
-function initializeGame(radius, mode) {
-    offlineArenaRadius = (typeof radius === 'number' && radius > 0) ? radius : 240;
-    reviveSnapshot = { x: GAME_CENTER_X, y: GAME_CENTER_Y, radius: offlineArenaRadius };
-    stageEnded = false;
-    stageReady = true;
-    player.x = GAME_CENTER_X;
-    player.y = GAME_CENTER_Y;
-    player.vx = 0;
-    player.vy = 0;
-    player.alive = true;
-    playerHp = PLAYER_MAX_HP;
-    modeScore = 0;
-    modeEliminations = 0;
-    modeRewarded = false;
-    gameParticles = [];
-    applyEquippedSkin();
-}
-
-/* ---------------------------------------------------------------- *
- *  startGameLoop()
- *  Kicks off the shared rAF loop owned by index.html's gameLoop().
- * ---------------------------------------------------------------- */
-function startGameLoop() {
-    lastTime = performance.now();
-    if (!_loopRunning) {
-        _loopRunning = true;
-        requestAnimationFrame(gameLoop);
-    }
-}
-
-/* Called by index.html gameLoop when a run ends; allows rebinding. */
-function stopGameLoopBinding() {
-    _loopRunning = false;
-}
-
-/* ---------------------------------------------------------------- *
- *  updateHUD()
- *  Refreshes the stage / mode / coin readouts.
- * ---------------------------------------------------------------- */
-function updateHUD() {
-    const hs = document.getElementById('hud-stage');
-    if (hs) {
-        if (activeMode === 'timeAttack') hs.innerText = String(Math.max(0, Math.ceil(modeTime)));
-        else if (activeMode === 'shrinking') hs.innerText = String(Math.max(0, Math.floor(offlineArenaRadius)));
-        else hs.innerText = String(currentPlayingStage || 1);
-    }
-    const hm = document.getElementById('hud-mode');
-    if (hm) {
-        hm.innerText = activeMode === 'chaos' ? 'CHAOS'
-            : activeMode === 'timeAttack' ? 'TIME'
-                : activeMode === 'shrinking' ? 'SHRINK'
-                    : activeMode === 'stage' ? 'STAGE'
-                        : activeMode === 'p2p' ? 'P2P' : '--';
-    }
-    updateDisplays();
-}
-
-/* ---------------------------------------------------------------- *
- *  updatePhysics(dt)
- *  Moves the player, applies input, drifts arena parameters for the
- *  selected mode, resolves collisions and ring-outs.
- * ---------------------------------------------------------------- */
-function updatePhysics(dt) {
-    if (!gameActive || stageEnded) return;
-
-    const fs = dt * 60;
-
-    /* Input → velocity (touch stick and/or keyboard). */
-    let ix = touchVec ? touchVec.x : 0;
-    let iy = touchVec ? touchVec.y : 0;
-    if (keys) {
-        if (keys['a'] || keys['arrowleft']) ix -= 1;
-        if (keys['d'] || keys['arrowright']) ix += 1;
-        if (keys['w'] || keys['arrowup']) iy -= 1;
-        if (keys['s'] || keys['arrowdown']) iy += 1;
-    }
-    const ilen = Math.hypot(ix, iy);
-    if (ilen > 1) { ix /= ilen; iy /= ilen; }
-
-    player.vx = ix * PLAYER_SPEED;
-    player.vy = iy * PLAYER_SPEED;
-    player.x += player.vx * dt;
-    player.y += player.vy * dt;
-
-    /* Knockback persistence decays naturally through integration. */
-
-    /* Per-mode dynamics. */
-    if (activeMode === 'shrinking') {
-        offlineArenaRadius = Math.max((ARCADE_MODES.shrinking.minRadius || 125),
-            offlineArenaRadius - (ARCADE_MODES.shrinking.shrinkPerSecond || 2) * dt);
-        if (offlineArenaRadius <= (ARCADE_MODES.shrinking.minRadius || 125)) {
-            onStageClear();
-            return;
-        }
-    }
-    if (activeMode === 'timeAttack') {
-        modeTime -= dt;
-        if (modeTime <= 0) {
-            modeTime = 0;
-            if (player.alive) onStageClear();
-            else { gameActive = false; showGameOverScreen('TIME UP'); }
-            return;
-        }
-    }
-
-    /* Move bots and resolve interactions. */
-    updateBots(dt);
-
-    /* Collisions: player vs every alive bot. */
-    resolveCollisions(dt, fs);
-
-    /* Ring-outs. */
-    checkRingOuts();
-
-    if (activeMode === 'stage' && player.alive) {
-        const anyAlive = bots.some(b => b.alive);
-        if (!anyAlive) onStageClear();
-    }
-
-    updateHUD();
-}
-
-/* ---------------------------------------------------------------- *
- *  resolveCollisions
- * ---------------------------------------------------------------- */
-function resolveCollisions(dt, fs) {
-    if (!player.alive) return;
-
-    const pPower = 5 + (Number(upgrades.power) || 1) * 3;
-    const pWeight = 1 + (Number(upgrades.weight) || 1) * 0.35 + (Number(upgrades.coreDensity) || 0) * 0.8;
-
-    for (let i = 0; i < bots.length; i++) {
-        const bot = bots[i];
-        if (!bot || !bot.alive) continue;
-        const dx = bot.x - player.x;
-        const dy = bot.y - player.y;
-        const dist = Math.hypot(dx, dy);
-        const minDist = player.radius + bot.radius;
-        if (dist < minDist && dist > 0) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const overlap = minDist - dist;
-
-            /* Separate. */
-            player.x -= nx * overlap * 0.35;
-            player.y -= ny * overlap * 0.35;
-            bot.x += nx * overlap * 0.65;
-            bot.y += ny * overlap * 0.65;
-
-            /* Knockback. Bots are lighter than the player, so they fly. */
-            const push = (pPower / Math.max(0.4, pWeight)) * 60 * dt;
-            bot.vx += nx * push;
-            bot.vy += ny * push;
-            player.vx -= nx * push * 0.3;
-            player.vy -= ny * push * 0.3;
-            bot.lastHitTime = (performance.now ? performance.now() : Date.now());
-
-            /* Impact feedback. */
-            const burst = spawnExplosion(player.x + nx * 10, player.y + ny * 10, bot.color, 10);
-            if (burst && Array.isArray(burst)) gameParticles.push.apply(gameParticles, burst);
-            if (typeof window.NeonSystems?.audio?.playImpact === 'function') {
-                window.NeonSystems.audio.playImpact(Math.min(1.5, push * 0.4));
-            }
-        }
-    }
-}
-
-/* ---------------------------------------------------------------- *
- *  checkRingOuts — sumo edge rule
- * ---------------------------------------------------------------- */
-function checkRingOuts() {
-    const distPlayer = Math.hypot(player.x - GAME_CENTER_X, player.y - GAME_CENTER_Y);
-    if (player.alive && distPlayer > offlineArenaRadius) {
-        player.alive = false;
-        ringOutPlayer();
-        return;
-    }
-    for (let i = bots.length - 1; i >= 0; i--) {
-        const bot = bots[i];
-        if (!bot.alive) continue;
-        const d = Math.hypot(bot.x - GAME_CENTER_X, bot.y - GAME_CENTER_Y);
-        if (d > offlineArenaRadius + bot.radius * 0.5) {
-            bot.alive = false;
-            modeEliminations += 1;
-            modeScore += bot.isBoss ? 3 : 1;
-            const burst = spawnExplosion(bot.x, bot.y, bot.color || '#ff3366', bot.isBoss ? 36 : 18);
-            if (burst && Array.isArray(burst)) gameParticles.push.apply(gameParticles, burst);
-            if (typeof window.NeonSystems?.audio?.playImpact === 'function') window.NeonSystems.audio.playImpact(1);
-            bots.splice(i, 1);
-        }
-    }
-}
-
-function ringOutPlayer() {
-    gameActive = false;
-    stageEnded = true;
-    totalDeaths += 1;
-    try { localStorage.setItem('sumo_total_deaths', String(totalDeaths)); } catch (_e) {}
-    const burst = spawnExplosion(player.x, player.y, player.color || '#00e5ff', 40);
-    if (burst && Array.isArray(burst)) gameParticles.push.apply(gameParticles, burst);
-    showGameOverScreen('RING OUT!');
-}
-
-/* ---------------------------------------------------------------- *
- *  onStageClear — success path
- * ---------------------------------------------------------------- */
-function onStageClear() {
-    if (stageEnded) return;
-    stageEnded = true;
-    gameActive = false;
-    modeRewarded = true;
-
-    const bonus = (ARCADE_MODES[activeMode] && ARCADE_MODES[activeMode].reward) ? ARCADE_MODES[activeMode].reward : 15;
-    coins += bonus;
-    if (activeMode === 'stage') {
-        maxUnlockedStage = Math.max(maxUnlockedStage, currentPlayingStage);
-    }
-    saveData();
-
-    if (activeMode === 'stage') {
-        showWinStage();
-    } else {
-        showWinStage();
-    }
-}
-
-/* ---------------------------------------------------------------- *
- *  updateBots(dt) — AI movement, boss behaviour, death cleanup
- * ---------------------------------------------------------------- */
-function updateBots(dt) {
-    const fs = dt * 60;
-    for (let i = bots.length - 1; i >= 0; i--) {
-        const bot = bots[i];
-        if (!bot.alive) { bots.splice(i, 1); continue; }
-
-        /* Knockback integrates; add gentle damping. */
-        const damp = Math.pow(0.90, dt);
-        bot.vx *= damp;
-        bot.vy *= damp;
-        bot.x += bot.vx * dt;
-        bot.y += bot.vy * dt;
-
-        bot.aiTimer -= dt;
-        bot.walkCycle += dt * 10;
-
-        if (!player.alive) continue;
-        if (bot.aiTimer <= 0) {
-            bot.aiState = bot.aiState === 'chase' ? 'flank' : 'chase';
-            bot.aiTimer = 1 + Math.random() * 2.2;
-        }
-
-        const dx = player.x - bot.x;
-        const dy = player.y - bot.y;
-        const dist = Math.hypot(dx, dy) || 1;
-
-        let mx = dx / dist;
-        let my = dy / dist;
-
-        /* Flank state: orbit slightly to approach from the side. */
-        if (bot.aiState === 'flank') {
-            const ortho = ((dx * 0 - dy) / dist);
-            mx += (ortho !== 0 ? ortho : 0) * 0.6;
-            my += (dx / dist) * 0.6;
-        }
-
-        /* Edge / abyss avoidance. */
-        const cd = Math.hypot(GAME_CENTER_X - bot.x, GAME_CENTER_Y - bot.y) || 1;
-        const edgeLimit = offlineArenaRadius * 0.86;
-        if (cd > edgeLimit) {
-            mx += ((GAME_CENTER_X - bot.x) / cd) * 0.9;
-            my += ((GAME_CENTER_Y - bot.y) / cd) * 0.9;
-        }
-        if (cd > offlineArenaRadius) {
-            mx += ((GAME_CENTER_X - bot.x) / cd) * 2.2;
-            my += ((GAME_CENTER_Y - bot.y) / cd) * 2.2;
-        }
-
-        const mag = Math.hypot(mx, my) || 1;
-        mx /= mag; my /= mag;
-
-        /* Bosses are slower but heavier and aggressive. */
-        const speedScale = bot.isBoss ? 0.72 : 1;
-        const moveSpeed = (bot.baseSpeed || 1.5) * 100 * speedScale * (0.8 + bot.aiAggression * 0.5);
-        bot.x += mx * moveSpeed * dt;
-        bot.y += my * moveSpeed * dt;
-
-        /* Boss special: radial shockwave pulse. */
-        if (bot.isBoss && player.alive) {
-            const bossDist = Math.hypot(player.x - bot.x, player.y - bot.y);
-            if (bossDist < bot.radius + player.radius + 8) {
-                bot.lastHitTime = (performance.now ? performance.now() : Date.now());
-                const n = Math.hypot(player.x - bot.x, player.y - bot.y) || 1;
-                player.vx += (player.x - bot.x) / n * 320 * dt;
-                player.vy += (player.y - bot.y) / n * 320 * dt;
-                const burst = spawnExplosion(player.x, player.y, BOSS_COLOR, 18);
-                if (burst && Array.isArray(burst)) gameParticles.push.apply(gameParticles, burst);
-            }
-        }
-    }
-}
-
-/* ---------------------------------------------------------------- *
- *  render() — draws arena, player, bots
- * ---------------------------------------------------------------- */
-function render() {
-    const t = computeScreenTransform();
-    const S = (x, y) => ({ x: t.ox + x * t.scale, y: t.oy + y * t.scale });
-
-    /* Arena bed. */
-    ctx.save();
-    ctx.scale(t.scale, t.scale);
-
-    /* Outer glow ring. */
-    ctx.beginPath();
-    ctx.arc(GAME_CENTER_X, GAME_CENTER_Y, offlineArenaRadius + 6, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(157,0,255,0.18)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    /* Boundary ring. */
-    ctx.beginPath();
-    ctx.arc(GAME_CENTER_X, GAME_CENTER_Y, offlineArenaRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,243,255,0.65)';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 14;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    /* Inner decorative ring. */
-    ctx.beginPath();
-    ctx.arc(GAME_CENTER_X, GAME_CENTER_Y, offlineArenaRadius * 0.88, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,243,255,0.12)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    /* Center stone. */
-    ctx.beginPath();
-    ctx.arc(GAME_CENTER_X, GAME_CENTER_Y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(125,255,0,0.25)';
-    ctx.shadowColor = '#7dff00';
-    ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    /* Bots. */
-    for (const bot of bots) {
-        if (!bot.alive) continue;
-        if (bot.isBoss) renderBoss(bot);
-        else renderBot(bot);
-    }
-
-    /* Player. */
-    if (player.alive) renderPlayer();
-
-    ctx.restore();
-}
-
-function renderPlayer() {
-    const t = computeScreenTransform();
-    const s = t.scale;
-    ctx.fillStyle = player.color || '#00e5ff';
-    ctx.shadowColor = player.color || '#00e5ff';
-    ctx.shadowBlur = 20 * s;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    /* Glint. */
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.beginPath();
-    ctx.arc(player.x - player.radius * 0.28, player.y - player.radius * 0.32, player.radius * 0.16, 0, Math.PI * 2);
-    ctx.fill();
-    /* HP pip hint. */
-    if (playerHp < PLAYER_MAX_HP) {
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.font = `${Math.round(9 * s)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('♥'.repeat(Math.max(0, playerHp)), player.x, player.y - player.radius - 8 * s);
-    }
-}
-
-function renderBot(bot) {
-    ctx.save();
-    ctx.fillStyle = bot.color || '#ff3366';
-    ctx.shadowColor = bot.color || '#ff3366';
-    ctx.shadowBlur = 10;
-    /* Body. */
-    ctx.beginPath();
-    ctx.ellipse(bot.x, bot.y, bot.radius, bot.radius, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    /* Eyes — direction toward centre. */
-    const eyes = Math.atan2(GAME_CENTER_Y - bot.y, GAME_CENTER_X - bot.x);
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(bot.x + Math.cos(eyes - 0.4) * bot.radius * 0.4, bot.y + Math.sin(eyes - 0.4) * bot.radius * 0.4, bot.radius * 0.14, 0, Math.PI * 2);
-    ctx.arc(bot.x + Math.cos(eyes + 0.4) * bot.radius * 0.4, bot.y + Math.sin(eyes + 0.4) * bot.radius * 0.4, bot.radius * 0.14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-}
-
-function renderBoss(bot) {
-    ctx.save();
-    ctx.fillStyle = BOSS_COLOR;
-    ctx.shadowColor = BOSS_COLOR;
-    ctx.shadowBlur = 24;
-    ctx.beginPath();
-    ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    /* Crown. */
-    ctx.fillStyle = '#ffd166';
-    ctx.fillRect(bot.x - bot.radius * 0.5, bot.y - bot.radius - 12, bot.radius, 6);
-    ctx.beginPath();
-    ctx.moveTo(bot.x - bot.radius * 0.5, bot.y - bot.radius);
-    ctx.lineTo(bot.x - bot.radius * 0.25, bot.y - bot.radius - 10);
-    ctx.lineTo(bot.x, bot.y - bot.radius);
-    ctx.lineTo(bot.x + bot.radius * 0.25, bot.y - bot.radius - 10);
-    ctx.lineTo(bot.x + bot.radius * 0.5, bot.y - bot.radius);
-    ctx.fill();
-    /* Boss HP bar. */
-    const w = bot.radius * 2;
-    const hpRatio = bot.maxHp > 0 ? (bot.hp / bot.maxHp) : 1;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(bot.x - w / 2, bot.y - bot.radius - 24, w, 6);
-    ctx.fillStyle = '#ff2bd6';
-    ctx.fillRect(bot.x - w / 2, bot.y - bot.radius - 24, w * Math.max(0, hpRatio), 6);
-    ctx.restore();
-}
-
-/* ---------------------------------------------------------------- *
- *  handleSwipe(angle) — swipe-triggered dash
- * ---------------------------------------------------------------- */
-function handleSwipe(angle) {
-    const rad = angle * Math.PI / 180;
-    player.vx = Math.cos(rad) * 430;
-    player.vy = Math.sin(rad) * 430;
-    const burst = spawnExplosion(player.x, player.y, player.color || '#00e5ff', 14);
-    if (burst && Array.isArray(burst)) gameParticles.push.apply(gameParticles, burst);
-    if (typeof window.NeonSystems?.audio?.playDash === 'function') window.NeonSystems.audio.playDash();
-    if (typeof window.NeonSystems?.audio?.screenFlash === 'function') window.NeonSystems.audio.screenFlash('rgba(0,243,255,0.10)');
-}
-
-/* ---------------------------------------------------------------- *
- *  STAGE MODE — startOfflineStage(level)
- * ---------------------------------------------------------------- */
-function startOfflineStage(level) {
-    const lvl = Math.max(1, Math.floor(level) || 1);
-    currentPlayingStage = lvl;
+function startModeBase(mode, radius) {
     gameActive = true;
-    gameMode = 'offline';
-    activeMode = 'stage';
-    stageEnded = false;
-    stageReady = true;
-    playerHp = PLAYER_MAX_HP;
-    modeScore = 0;
-    modeEliminations = 0;
-    modeRewarded = false;
-
-    let cfg = null;
-    if (typeof window.NeonSystems?.progression?.getStageConfig === 'function') {
-        try { cfg = window.NeonSystems.progression.getStageConfig(lvl); } catch (_e) { cfg = null; }
-    }
-    const radius = (cfg && cfg.arenaRadius) ? cfg.arenaRadius : Math.max(160, 250 - Math.floor(lvl / 5) * 2);
-    offlineArenaRadius = radius;
-    reviveSnapshot = { x: GAME_CENTER_X, y: GAME_CENTER_Y, radius };
-
-    hideAllMenus();
-    const hudEl = document.getElementById('hud');
-    if (hudEl) hudEl.classList.remove('hidden');
-    if (touchBox) { touchBox.style.display = 'block'; touchBox.classList.add('active'); }
-
-    player.x = GAME_CENTER_X;
-    player.y = GAME_CENTER_Y;
-    player.vx = 0; player.vy = 0;
-    player.alive = true;
-    applyEquippedSkin();
-
-    bots = [];
-    gameParticles = [];
-
-    const botCountRaw = (cfg && cfg.botCount) ? cfg.botCount : 1 + Math.floor(lvl / 2);
-    const botCount = Math.min(8, Math.max(1, botCountRaw));
-    const isBossStage = !!(cfg && cfg.isBoss);
-    const isMiniBoss = !!(cfg && cfg.isMiniBoss && !isBossStage);
-
-    for (let i = 0; i < botCount; i++) {
-        const angle = (Math.PI * 2 * i) / botCount + Math.random() * 0.6;
-        const rr = Math.min(190, radius * 0.72);
-        const bx = GAME_CENTER_X + Math.cos(angle) * rr;
-        const by = GAME_CENTER_Y + Math.sin(angle) * rr;
-        const st = (cfg && cfg.botStats) || {};
-        const boss = isBossStage && i === 0;
-        const bossProf = (boss && window.NeonSystems?.bosses && typeof window.NeonSystems.bosses.profile === 'function')
-            ? window.NeonSystems.bosses.profile(lvl, player.radius) : null;
-        bots.push({
-            x: bx, y: by, vx: 0, vy: 0,
-            radius: boss ? ((bossProf && bossProf.radius) || 32)
-                : (isMiniBoss ? ((st.radius || 18) * 1.5) : (st.radius || 18)),
-            color: boss ? BOSS_COLOR : (i % 2 === 0 ? '#ff3366' : '#ffbb00'),
-            alive: true, team: i % 2 === 0 ? 'red' : 'blue',
-            w: 22, h: 30, walkCycle: 0, score: 0,
-            aiState: 'patrol', aiTimer: 0, aiTarget: null,
-            baseSpeed: (st.speed || 0.6) + 0.5,
-            aiAggression: (st.aggression != null) ? st.aggression : 0.5,
-            edgeAvoidTimer: 0, lastHitTime: 0, knockbackX: 0, knockbackY: 0,
-            isBoss: boss, isMiniBoss: !!isMiniBoss,
-            power: (st.power || 6), mass: (st.mass || 1.2),
-            hp: boss ? ((bossProf && bossProf.maxHp) || 6) : 1,
-            maxHp: boss ? ((bossProf && bossProf.maxHp) || 6) : 1
-        });
-    }
-
-    updateHUD();
-    startGameLoop();
-    if (typeof window.NeonSystems?.audio?.playClick === 'function') window.NeonSystems.audio.playClick();
-    if (typeof screenFlash === 'function') screenFlash('rgba(0,243,255,0.12)');
-    saveData();
+    gameMode = 'offline'; activeMode = mode; stageEnded = false;
+    stageReady = false;
+    hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
+    touchBox.style.display = 'block';
+    touchBox.classList.add('active');
+    touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
+    player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+    player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
+    modeTime = ARCADE_MODES[mode]?.duration || 0;
+    modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
+    modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
+    document.getElementById('hud-left').innerText = mode === 'chaos' ? '🌀 CHAOS ARENA' : mode === 'timeAttack' ? '⏱️ TIME ATTACK' : '🔻 SHRINKING ARENA';
+    updateDisplays(); applyEquippedSkin();
+    /* Resize canvas for the game mode */
+    setTimeout(resizeCanvas, 50);
 }
+
+function startChaosArena() {
+    const config = ARCADE_MODES.chaos;
+    startModeBase('chaos', config.radius);
+    for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, '#ff3366');
+    stageReady = bots.some(bot => bot.alive);
+}
+
+function startTimeAttack() {
+    const config = ARCADE_MODES.timeAttack;
+    startModeBase('timeAttack', config.radius);
+    for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, i % 2 ? '#ff3366' : '#ffaa00');
+    stageReady = bots.some(bot => bot.alive);
+}
+
+function startShrinkingArena() {
+    const config = ARCADE_MODES.shrinking;
+    startModeBase('shrinking', config.radius);
+    for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, ['#ff0055', '#ffaa00', '#7dff00'][i]);
+    stageReady = bots.some(bot => bot.alive);
+}
+
+function addModeBot(index, scale, color) {
+    const angle = index * 2.399;
+    bots.push({ x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
+        radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .45 + scale * .03, power: 5 + scale,
+        color, isBoss: false, alive: true, cd: 0 });
+}
+
+function addBossMinion(boss) {
+    const angle = (boss.attackCycle + bots.length) * 2.399;
+    bots.push({ x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
+        radius: 16, mass: 1.05, speed: .38, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
+}
+
+function getActiveBoss() { return bots.find(bot => bot.isBoss && bot.alive); }
 
 /* ---------------------------------------------------------------- *
  *  SHOP
  * ---------------------------------------------------------------- */
+function showShop() {
+    hideAllMenus();
+    updateDisplays();
+    document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
+    document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
+    document.getElementById('buy-weight').innerText = `Buy (${upgrades.weight * 20}🪙)`;
+    document.getElementById('buy-power').innerText = `Buy (${upgrades.power * 20}🪙)`;
+    renderBodyUpgrades();
+    renderSkinShop();
+    document.getElementById('menu-shop').classList.remove('hidden');
+}
+
 function renderBodyUpgrades() {
     const grid = document.getElementById('body-upgrade-grid');
     if (!grid) return;
-    grid.innerHTML = '';
-    (typeof bodyUpgrades !== 'undefined' ? bodyUpgrades : []).forEach(def => {
-        const cur = Number(upgrades[def.id]) || 0;
-        const maxed = cur >= def.max;
-        const cost = def.cost ? def.cost(cur) : (cur + 1) * 45;
-        const locked = (maxUnlockedStage || 1) < def.unlock;
-        const card = document.createElement('div');
-        card.className = 'body-upgrade-card';
-        card.innerHTML = '<div class="body-upgrade-name"><span>'
-            + (def.icon || '◈') + '</span> ' + def.name
-            + (maxed ? ' <span style="color:#7dff00">MAX</span>' : '')
-            + '</div>'
-            + '<small>' + def.lore + '</small>'
-            + '<small style="color:#ffbb00">' + (locked ? 'Unlock at wave ' + def.unlock : 'Lv ' + cur + '/' + def.max) + '</small>'
-            + '<button class="shop-btn" type="button" '
-            + (locked || maxed ? 'disabled' : `onclick="buyUpgrade('${def.id}')"`)
-            + '>' + (locked ? '🔒 Locked' : maxed ? 'Maxed' : (def.cost ? cost + ' 🪙' : 'Buy'))
-            + '</button>';
-        grid.appendChild(card);
-    });
-
-    const sw = document.getElementById('stat-weight');
-    if (sw) sw.innerText = 'Lvl ' + (Number(upgrades.weight) || 1);
-    const sp = document.getElementById('stat-power');
-    if (sp) sp.innerText = 'Lvl ' + (Number(upgrades.power) || 1);
+    grid.innerHTML = bodyUpgrades.map(item => {
+        const level = Number(upgrades[item.id]) || 0;
+        const unlocked = maxUnlockedStage >= item.unlock;
+        const cost = item.cost(level);
+        return `<div class="body-upgrade-card ${unlocked ? '' : 'locked'}"><div class="body-upgrade-heading"><b>${item.icon} ${item.name}</b><strong>LVL ${level}/${item.max}</strong></div><small>${item.lore}</small><button class="shop-btn" type="button" onclick="buyBodyUpgrade('${item.id}')" ${!unlocked || level >= item.max ? 'disabled' : ''}>${level >= item.max ? 'MAXED' : unlocked ? `Upgrade ${cost}🪙` : `Unlocks at Wave ${item.unlock}`}</button></div>`;
+    }).join('');
 }
 
-function showShop() {
-    hideAllMenus();
-    const shop = document.getElementById('menu-shop');
-    if (shop) shop.classList.remove('hidden');
-    const sc = document.getElementById('shop-coins');
-    if (sc) sc.innerText = coins;
-    if (typeof renderSkinShop === 'function') renderSkinShop();
-    renderBodyUpgrades();
+function buyBodyUpgrade(id) {
+    const item = bodyUpgrades.find(entry => entry.id === id);
+    if (!item) return;
+    const level = Number(upgrades[id]) || 0;
+    const cost = item.cost(level);
+    if (maxUnlockedStage < item.unlock || level >= item.max || coins < cost) return;
+    coins -= cost;
+    upgrades[id] = level + 1;
+    saveData();
+    showShop();
 }
 
 function buyUpgrade(type) {
-    if (type === 'weight' || type === 'power') {
-        const cur = Number(upgrades[type]) || 1;
-        const cost = (cur) * 20;
-        if (coins < cost) { try { alert('الكوينز غير كافية!'); } catch (_e) {} return; }
+    if (type !== 'weight' && type !== 'power') return;
+    const level = Number(upgrades[type]) || 1;
+    const cost = level * 20;
+    if (coins >= cost) {
         coins -= cost;
-        upgrades[type] = cur + 1;
+        upgrades[type] = level + 1;
         saveData();
-        renderBodyUpgrades();
-        return;
+        showShop();
+    } else {
+        alert(`الكوينز غير كافية! تحتاج ${cost} 🪙`);
     }
-
-    const def = (typeof bodyUpgrades !== 'undefined' ? bodyUpgrades : []).find(b => b.id === type);
-    if (!def) return;
-    const cur = Number(upgrades[def.id]) || 0;
-    if (cur >= def.max) return;
-    if ((maxUnlockedStage || 1) < def.unlock) { try { alert('Unlock at stage ' + def.unlock); } catch (_e) {} return; }
-    const cost = def.cost ? def.cost(cur) : (cur + 1) * 45;
-    if (coins < cost) { try { alert('الكوينز غير كافية!'); } catch (_e) {} return; }
-    coins -= cost;
-    upgrades[def.id] = cur + 1;
-    saveData();
-    renderBodyUpgrades();
 }
 
 /* ---------------------------------------------------------------- *
- *  P2P LOBBY SHARE
+ *  OFFLINE STAGE PROGRESSION
+ * ---------------------------------------------------------------- */
+function offlineEnemyCount(level) {
+    if (level < 8) return 1;
+    if (level < 22) return 2;
+    return 3;
+}
+
+function offlineBotStats(level) {
+    const curve = Math.sqrt(level);
+    return {
+        radius: 18 + Math.min(7, curve * 0.85),
+        mass: 0.85 + Math.min(1.4, level * 0.011),
+        speed: 0.30 + Math.min(0.16, curve * 0.016),
+        power: 4.2 + Math.min(8.5, curve * 0.9)
+    };
+}
+
+function offlineBossStats(level, playerRadius) {
+    if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius);
+    const curve = Math.sqrt(level);
+    const wave = Math.max(1, Math.floor(level / 5));
+    const tier = Math.min(3, Math.floor(wave / 10));
+    return {
+        radius: Math.max(38, playerRadius * 1.38 + Math.min(6, curve * .8)),
+        mass: 9 + Math.min(5, curve * 0.45),
+        speed: 0.34 + Math.min(0.13, curve * 0.011),
+        power: 9.5 + Math.min(8, curve * 0.8),
+        maxHp: 8 + Math.min(8, Math.floor(wave * 0.4)),
+        shield: 3 + Math.min(5, Math.floor(wave * 0.2)),
+        tier
+    };
+}
+
+function startOfflineStage(level) {
+    try {
+        const config = window.NeonSystems?.progression?.getStageConfig(level);
+        if (!config) { console.warn('Stage config not found for level:', level); stageReady = false; showMainMenu(); return; }
+        gameMode = 'offline';
+        activeMode = 'stage';
+        currentPlayingStage = level;
+        gameActive = true;
+        hideAllMenus();
+        document.getElementById('hud').classList.remove('hidden');
+        touchBox.style.display = 'block';
+        touchBox.classList.add('active');
+        stageEnded = false;
+        stageReady = false;
+        offlineArenaRadius = config.arenaRadius;
+        player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+        player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
+        if (config.isBoss || config.isMiniBoss) {
+            const stats = offlineBossStats(level, player.radius);
+            const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
+            bots.push({
+                x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
+                speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
+                isBoss: true, isMiniBoss: config.isMiniBoss,
+                alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
+                shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
+                attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
+                minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
+            });
+        } else {
+            const count = config.botCount;
+            const stats = config.botStats;
+            const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
+            for (let i = 0; i < count; i++) {
+                let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
+                bots.push({
+                    x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
+                    vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
+                    power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
+                });
+            }
+        }
+        stageReady = bots.some(bot => bot.alive);
+        document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
+        updateDisplays();
+        applyEquippedSkin();
+        setTimeout(resizeCanvas, 50);
+    } catch (err) {
+        console.error('Failed to start stage:', err);
+        stageReady = false;
+        showMainMenu();
+    }
+}
+
+function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
+function nextStageOffline() { startOfflineStage(Math.min(1000, currentPlayingStage + 1)); }
+
+function finishOfflineStage() {
+    if (stageEnded) return;
+    stageEnded = true;
+    const clearedStage = currentPlayingStage;
+    if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) {
+        maxUnlockedStage = clearedStage + 1;
+        localStorage.setItem('sumo_stage', maxUnlockedStage);
+    }
+    let coinReward = 5;
+    if (clearedStage % 10 === 0) coinReward = 50;
+    else if (clearedStage % 5 === 0) coinReward = 20;
+    else if (clearedStage > 500) coinReward = 15;
+    else if (clearedStage > 100) coinReward = 10;
+    coins += coinReward;
+    const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+    localStorage.setItem('sumo_streak', streak);
+    resetDailyMissionIfNeeded();
+    dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
+    saveData();
+    if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || '0') + 1, bosses: clearedStage % 5 === 0 ? '1' : '0', stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
+    hideAllMenus();
+    document.getElementById('modal-win-stage').classList.remove('hidden');
+}
+
+function endArcadeMode(title, score) {
+    if (modeRewarded) return;
+    modeRewarded = true;
+    stageEnded = true;
+    const reward = Math.max(5, ARCADE_MODES[activeMode]?.reward || 5) + Math.floor(score / 10);
+    coins += reward;
+    const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+    localStorage.setItem('sumo_streak', streak);
+    resetDailyMissionIfNeeded();
+    dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
+    saveData(); hideAllMenus();
+    if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || '0') + 1, bosses: 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
+    document.getElementById('round-title').innerText = title;
+    document.getElementById('round-score').innerText = `${score} PTS • +${reward} 🪙`;
+    document.getElementById('modal-round').classList.remove('hidden');
+}
+
+function registerPlayerDeath() {
+    totalDeaths += 1;
+    localStorage.setItem('sumo_total_deaths', totalDeaths);
+    document.getElementById('death-count-copy').innerText = `Total ring-outs: ${totalDeaths} • ${counterLimits.revive - counters.revive} revive visits remaining`;
+    updateRewardButtons();
+}
+
+function reviveInPlaceOffline() {
+    gameActive = true;
+    stageEnded = false;
+    const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
+    const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
+    const scale = distance > safeDistance ? safeDistance / distance : 1;
+    player.x = 400 + (reviveSnapshot.x - 400) * scale;
+    player.y = 300 + (reviveSnapshot.y - 300) * scale;
+    player.vx = 0; player.vy = 0; player.alive = true;
+    hideAllMenus();
+    document.getElementById('hud').classList.remove('hidden');
+    touchBox.style.display = 'block';
+    touchBox.classList.add('active');
+    reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
+}
+
+function spawnImpact(x, y, color) {
+    for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
+        let angle = Math.random() * Math.PI * 2;
+        let speed = 3 + Math.random() * 4;
+        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
+    }
+    if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
+    if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
+}
+
+function distanceToPlayer(bot) { return Math.hypot(bot.x - player.x, bot.y - player.y); }
+
+/* ---------------------------------------------------------------- *
+ *  REAL SUMO PHYSICS — updatePhysics()
+ * ---------------------------------------------------------------- */
+function updatePhysics() {
+    if (gameMode === 'none') { gameActive = false; return; }
+    if (!gameActive) { touchBox.style.display = 'none'; touchBox.classList.remove('active'); return; }
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;
+        if (p.a <= 0) particles.splice(i, 1);
+    }
+    let dx = 0, dy = 0;
+    if (keys['arrowup'] || keys['w']) dy -= 1;
+    if (keys['arrowdown'] || keys['s']) dy += 1;
+    if (keys['arrowleft'] || keys['a']) dx -= 1;
+    if (keys['arrowright'] || keys['d']) dx += 1;
+    if (touchVec.x || touchVec.y) { dx = touchVec.x; dy = touchVec.y; }
+    let magnitude = Math.hypot(dx, dy);
+    if (magnitude > 1) { dx /= magnitude; dy /= magnitude; }
+
+    if (gameMode === 'offline' && player.alive && !stageEnded) {
+        const now = performance.now();
+        const deltaSeconds = Math.min(0.1, Math.max(0, (now - modeLastTick) / 1000));
+        modeLastTick = now;
+        if (activeMode === 'timeAttack') {
+            modeElapsedMs += deltaSeconds * 1000;
+            modeTime = Math.max(0, ARCADE_MODES.timeAttack.duration - modeElapsedMs / 1000);
+            if (modeTime <= 0) { endArcadeMode('TIME UP', modeScore); return; }
+            modeSpawnTimer += deltaSeconds;
+            if (modeSpawnTimer >= ARCADE_MODES.timeAttack.spawnEvery) {
+                modeSpawnTimer = 0;
+                addModeBot(bots.length, 1, Math.random() > .5 ? '#ffaa00' : '#ff3366');
+            }
+            document.getElementById('hud-left').innerText = `⏱️ ${Math.ceil(modeTime)}s • ${modeScore} PTS`;
+        } else if (activeMode === 'shrinking') {
+            modeElapsedMs += deltaSeconds * 1000;
+            offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
+            document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
+        }
+        const momentum = 1.6 + upgrades.neonMomentum * 0.12;
+        player.vx += dx * momentum; player.vy += dy * momentum;
+        player.vx *= 0.88; player.vy *= 0.88;
+        const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
+        player.vx *= recovery; player.vy *= recovery;
+        player.x += player.vx; player.y += player.vy;
+        if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
+            reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
+            player.alive = false; stageEnded = true;
+            registerPlayerDeath();
+            hideAllMenus();
+            document.getElementById('modal-death').classList.remove('hidden');
+            return;
+        }
+        let active = bots.filter(bot => bot.alive);
+        for (let bot of active) {
+            let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+            bot.cd = (bot.cd || 0) + 1;
+            if (bot.hurtCd > 0) bot.hurtCd -= 1;
+            let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
+            let critical = bot.isBoss && bot.hp <= bot.maxHp * 0.25;
+            if (raging && bot.phase === 1) { bot.phase = 2; bot.color = '#ff3366'; spawnImpact(bot.x, bot.y, '#ff3366'); }
+            if (critical && bot.phase === 2) { bot.phase = 3; bot.color = '#ffbb00'; bot.shield = bot.maxShield; bot.shieldCooldown = 240; bot.minionCooldown = 1; spawnImpact(bot.x, bot.y, '#ffbb00'); }
+            if (bot.isBoss) {
+                if (bot.shieldCooldown > 0) bot.shieldCooldown -= 1;
+                if (bot.shield <= 0 && bot.shieldCooldown === 0 && bot.hp > 0) { bot.shield = Math.min(bot.maxShield, bot.shield + 0.02); }
+                bot.minionCooldown -= 1;
+                const minionCount = bots.filter(candidate => candidate.alive && candidate.bossMinion).length;
+                if (bot.minionCooldown <= 0 && minionCount < 2 && bot.hp > 0) { addBossMinion(bot); bot.minionCooldown = Math.max(260, 420 - bot.tier * 35); }
+                bot.attackCooldown -= 1;
+                if (bot.telegraph > 0) {
+                    bot.telegraph -= 1;
+                    if (bot.telegraph === 0) {
+                        if (bot.attackType === 'wave') {
+                            bot.pulseRadius = 12;
+                            if (distanceToPlayer(bot) < 190) {
+                                const waveForce = raging ? 9.5 : 7.5;
+                                player.vx += Math.cos(angle) * waveForce;
+                                player.vy += Math.sin(angle) * waveForce;
+                            }
+                        } else {
+                            bot.dashTimer = raging ? 20 : 16;
+                            bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2);
+                            bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
+                        }
+                        bot.attackType = null;
+                        bot.attackCooldown = Math.max(68, (critical ? 78 : raging ? 92 : 118) - bot.tier * 6);
+                    }
+                } else if (bot.attackCooldown <= 0) {
+                    bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
+                    bot.attackCycle = (bot.attackCycle || 0) + 1;
+                    bot.telegraph = 42 + bot.tier * 3;
+                }
+                if (bot.pulseRadius > 0) bot.pulseRadius += 10;
+                if (bot.pulseRadius > 210) bot.pulseRadius = 0;
+            }
+            let speed = bot.speed * (critical ? 1.5 : raging ? 1.35 : 1);
+            let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
+            let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
+            let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
+            if (bot.cd > dashAt) speed *= dashMul;
+            if (bot.cd > dashEnd) bot.cd = 0;
+            if (bot.isBoss && bot.dashTimer > 0) {
+                bot.vx = bot.dashVx; bot.vy = bot.dashVy; bot.dashTimer -= 1;
+            } else {
+                bot.vx += Math.cos(angle) * speed; bot.vy += Math.sin(angle) * speed;
+            }
+            bot.vx *= bot.isBoss ? 0.92 : 0.9;
+            bot.vy *= bot.isBoss ? 0.92 : 0.9;
+            bot.x += bot.vx; bot.y += bot.vy;
+            let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
+            if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
+                let nx = (bot.x - 400) / fromCenter; let ny = (bot.y - 300) / fromCenter;
+                bot.x = 400 + nx * (offlineArenaRadius - 12); bot.y = 300 + ny * (offlineArenaRadius - 12);
+                bot.vx *= 0.25; bot.vy *= 0.25;
+            } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) { bot.alive = false; }
+            let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
+            if (bot.isBoss) {
+                bot.slamCd = (bot.slamCd || 0) + 1;
+                if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
+                    let slam = (raging ? 18 : 13) + bot.power * 0.22;
+                    player.vx -= Math.cos(angle) * slam; player.vy -= Math.sin(angle) * slam;
+                    bot.slamCd = 0; spawnImpact(player.x, player.y, '#ff0055');
+                }
+            }
+            if (distance < player.radius + bot.radius) {
+                let overlap = player.radius + bot.radius - distance;
+                let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
+                player.x -= Math.cos(collisionAngle) * (overlap * 0.45); player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
+                bot.x += Math.cos(collisionAngle) * (overlap * 0.55); bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
+                let playerMass = 1.0 + upgrades.weight * 0.25;
+                let playerPower = 6.0 + upgrades.power * 1.5;
+                const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
+                player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
+                if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
+                    let damage = 1;
+                    if (bot.shield > 0) { bot.shield = Math.max(0, bot.shield - damage); bot.shieldCooldown = 180; }
+                    else { bot.hp = Math.max(0, bot.hp - damage); bot.hurtCd = 22; if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); } }
+                }
+                bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
+                bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
+                spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
+            }
+        }
+        if (activeMode === 'timeAttack') {
+            const aliveCount = bots.filter(bot => bot.alive).length;
+            modeEliminations += active.length - aliveCount;
+            modeScore = modeEliminations * 10;
+            if (aliveCount === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
+        }
+        const activeBoss = getActiveBoss();
+        const remainingBots = bots.filter(bot => bot.alive).length;
+        const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
+        const stageVictory = activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+        const arcadeVictory = activeMode !== 'stage' && remainingBots === 0;
+        if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
+            if (activeMode === 'stage') { finishOfflineStage(); return; }
+            modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
+            endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
+            return;
+        }
+    }
+}
+
+/* ---------------------------------------------------------------- *
+ *  RENDER
+ * ---------------------------------------------------------------- */
+function render() {
+    ctx.fillStyle = '#08090f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (gameMode !== 'none') {
+        let radius = offlineArenaRadius;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const scale = Math.min(canvas.width / 800, canvas.height / 600);
+        const rScaled = radius * scale;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rScaled, 0, Math.PI * 2);
+        ctx.fillStyle = '#0f121d'; ctx.fill();
+        ctx.lineWidth = 4 * scale; ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff'; ctx.stroke();
+
+        for (let p of particles) {
+            ctx.beginPath(); ctx.arc(p.x * scale, p.y * scale, Math.max(1, 3 * scale), 0, Math.PI * 2);
+            ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
+        }
+        for (let bot of bots) {
+            if (!bot.alive) continue;
+            const br = bot.radius * scale;
+            ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br, 0, Math.PI * 2);
+            ctx.fillStyle = bot.color; ctx.fill();
+            ctx.lineWidth = (bot.isBoss ? 4 : 2) * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
+            if (bot.isBoss) {
+                if (bot.telegraph > 0) {
+                    const warningRadius = bot.attackType === 'wave' ? 190 : 64;
+                    const wrScaled = warningRadius * scale;
+                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, wrScaled, 0, Math.PI * 2);
+                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = bot.attackType === 'wave' ? '#ffbb00' : '#ff0055';
+                    ctx.globalAlpha = 0.35 + (bot.telegraph % 10) / 20;
+                    ctx.stroke(); ctx.globalAlpha = 1;
+                }
+                if (bot.pulseRadius > 0) {
+                    const prScaled = bot.pulseRadius * scale;
+                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, prScaled, 0, Math.PI * 2);
+                    ctx.lineWidth = 5 * scale; ctx.strokeStyle = '#ffbb00';
+                    ctx.globalAlpha = Math.max(0, 1 - bot.pulseRadius / 220);
+                    ctx.stroke(); ctx.globalAlpha = 1;
+                }
+                const bw = bot.radius * 2.2 * scale;
+                const bx = bot.x * scale - bw / 2;
+                const by = bot.y * scale - bot.radius * scale - 16 * scale;
+                ctx.fillStyle = '#351323'; ctx.fillRect(bx, by, bw, 5 * scale);
+                ctx.fillStyle = '#00ff66'; ctx.fillRect(bx, by, bw * Math.max(0, bot.hp / bot.maxHp), 5 * scale);
+                ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 7 * scale, bw, 3 * scale);
+                ctx.fillStyle = '#00e5ff'; ctx.fillRect(bx, by - 7 * scale, bw * Math.max(0, bot.shield / bot.maxShield), 3 * scale);
+            }
+        }
+        if (player.alive) {
+            const pr = player.radius * scale;
+            ctx.beginPath(); ctx.arc(player.x * scale, player.y * scale, pr, 0, Math.PI * 2);
+            ctx.fillStyle = player.color; ctx.fill();
+            ctx.lineWidth = 2.5 * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
+        }
+    }
+}
+
+function gameLoop() {
+    if (window.NeonSystems?.performance) window.NeonSystems.performance.tick();
+    try { updatePhysics(); render(); } catch (_error) {}
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+/* ---------------------------------------------------------------- *
+ *  SWIPE DASH (mobile) — retained from the current shell
+ * ---------------------------------------------------------------- */
+function handleSwipe(angle) {
+    const rad = angle * Math.PI / 180;
+    player.vx = Math.cos(rad) * 5;
+    player.vy = Math.sin(rad) * 5;
+    spawnImpact(player.x, player.y, player.color || '#00e5ff');
+}
+
+/* ---------------------------------------------------------------- *
+ *  P2P LOBBY SHARE — retained from the current shell
  * ---------------------------------------------------------------- */
 function getLobbyCode() {
     const el = document.getElementById('lobby-code');
@@ -684,20 +594,3 @@ function rootRoomLabel() {
     const code = getLobbyCode();
     return code ? '#' + code : 'ONLINE 1v1';
 }
-
-/* Signature required by index.html wiring — exported globally. */
-window.NeonSumoGame = {
-    initializeGame: initializeGame,
-    startGameLoop: startGameLoop,
-    stopGameLoopBinding: stopGameLoopBinding,
-    updateHUD: updateHUD,
-    updatePhysics: updatePhysics,
-    updateBots: updateBots,
-    render: render,
-    handleSwipe: handleSwipe,
-    startOfflineStage: startOfflineStage,
-    showShop: showShop,
-    buyUpgrade: buyUpgrade,
-    shareRoomWhatsApp: shareRoomWhatsApp,
-    copyRoomLink: copyRoomLink
-};
