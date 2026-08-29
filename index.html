@@ -509,25 +509,18 @@
         function claimDailyMission() { resetDailyMissionIfNeeded(); if (dailyMission.wins < 3 || dailyMission.claimed) return; dailyMission.claimed = true; coins += 25; saveData(); updateDailyMission(); }
         function saveData() { const _safeU = upgrades && typeof upgrades === 'object' ? upgrades : { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0 }; try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(_safeU)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = _safeU; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
         function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
-        let gameMode = 'none', activeMode = 'stage';
-        window.gameMode = gameMode;
-        window.activeMode = activeMode;
-        const ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
-        window.ARCADE_MODES = ARCADE_MODES; // Expose globally for game.js
-        let modeTime = 0, modeElapsedMs = 0, modeLastTick = 0, modeScore = 0, modeSpawnTimer = 0, modeEliminations = 0, modeRewarded = false;
-         let totalDeaths = 0; try { totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0'); } catch(_e) {}
-        let reviveSnapshot = { x:400, y:300, radius:240 };
-        let currentPlayingStage = 1, offlineArenaRadius = 240;
-        let stageEnded = false, stageReady = false;
-        let gameActive = false;
-        window.gameActive = gameActive;
-        window.stageEnded = stageEnded;
-        window.offlineArenaRadius = offlineArenaRadius;
-        let player = { x:400, y:300, vx:0, vy:0, radius:24, color:'#00e5ff', alive:true };
-        window.player = player; // Expose globally for headless testing
+        gameMode = 'none';
+        activeMode = 'stage';
+        ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
+        modeTime = 0; modeElapsedMs = 0; modeLastTick = 0; modeScore = 0; modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
+         totalDeaths = 0; try { totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0'); } catch(_e) {}
+        reviveSnapshot = { x:400, y:300, radius:240 };
+        currentPlayingStage = 1; offlineArenaRadius = 240;
+        stageEnded = false; stageReady = false;
+        gameActive = false;
+        player = { x:400, y:300, vx:0, vy:0, radius:24, color:'#00e5ff', alive:true };
         applyEquippedSkin();
-        let bots = [], gameParticles = [], keys = {};
-        window.bots = bots; // Expose globally for headless testing
+        bots = []; gameParticles = []; keys = {};
         try { updateDisplays(); } catch(_e) {}
 
         window.onkeydown = e => { const key = e.key.toLowerCase(); keys[key] = true; if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots); if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots); };
@@ -642,18 +635,6 @@
            ═══════════════════════════════════════ */
          function dismissLoading() { window.NeonBoot.forceShowMenu(); }
          dismissLoading();
-
-         // Expose all state to game.js modules (loaded after this script)
-         Object.defineProperty(window, 'gameMode', { get: () => gameMode, set: v => { gameMode = v; } });
-         Object.defineProperty(window, 'activeMode', { get: () => activeMode, set: v => { activeMode = v; } });
-         Object.defineProperty(window, 'gameActive', { get: () => gameActive, set: v => { gameActive = v; } });
-         Object.defineProperty(window, 'stageEnded', { get: () => stageEnded, set: v => { stageEnded = v; } });
-         Object.defineProperty(window, 'offlineArenaRadius', { get: () => offlineArenaRadius, set: v => { offlineArenaRadius = v; } });
-         Object.defineProperty(window, 'modeTime', { get: () => modeTime, set: v => { modeTime = v; } });
-         Object.defineProperty(window, 'modeElapsedMs', { get: () => modeElapsedMs, set: v => { modeElapsedMs = v; } });
-         Object.defineProperty(window, 'modeScore', { get: () => modeScore, set: v => { modeScore = v; } });
-         Object.defineProperty(window, 'modeEliminations', { get: () => modeEliminations, set: v => { modeEliminations = v; } });
-         Object.defineProperty(window, 'stageReady', { get: () => stageReady, set: v => { stageReady = v; } });
      </script>
      <script src="modules/storage.js"></script>
     <script src="modules/progression.js"></script>
