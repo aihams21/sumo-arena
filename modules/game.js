@@ -65,7 +65,7 @@ function startModeBase(mode, radius) {
     touchBox.classList.add('active');
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
     player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-    player.radius = playerRadius(); bots = []; particles = []; hazards = [];
+    player.radius = playerRadius(); bots.length = 0; particles.length = 0; hazards.length = 0;
     configHadBoss = false; bossRungOut = false;
     offlineArenaRadius = radius;
     modeTime = ARCADE_MODES[mode]?.duration || 0;
@@ -207,7 +207,7 @@ function offlineBossStats(level, playerRadius, scale = 1) {
  * nudge bodies with dt-based knockback.
  */
 function spawnHazards(level) {
-    hazards = [];
+    hazards.length = 0;
     const hc = window.NeonSystems?.progression?.getHazardConfig?.(level, { radius: playerRadius(), mass: playerMass() });
     if (!hc || hc.total <= 0) return;
     const R = Math.max(offlineArenaRadius - 26, 20);
@@ -262,7 +262,7 @@ function startOfflineStage(level) {
             offlineArenaRadius = config.arenaRadius;
         }
         player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-        player.radius = playerRadius(); bots = []; particles = []; hazards = [];
+        player.radius = playerRadius(); bots.length = 0; particles.length = 0; hazards.length = 0;
         if (config.isBoss || config.isMiniBoss) {
             const isMini = !!config.isMiniBoss;
             const stats = offlineBossStats(level, player.radius, isMini ? 0.75 : 1);
