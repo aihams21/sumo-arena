@@ -64,7 +64,7 @@ function startModeBase(mode, radius) {
     touchBox.style.display = 'block';
     touchBox.classList.add('active');
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
-    player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+    player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true; player.spawnGrace = 30;
     player.radius = playerRadius(); bots.length = 0; particles.length = 0; hazards.length = 0;
     configHadBoss = false; bossRungOut = false;
     offlineArenaRadius = radius;
@@ -261,7 +261,7 @@ function startOfflineStage(level) {
         } else {
             offlineArenaRadius = config.arenaRadius;
         }
-        player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+        player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true; player.spawnGrace = 30;
         player.radius = playerRadius(); bots.length = 0; particles.length = 0; hazards.length = 0;
         if (config.isBoss || config.isMiniBoss) {
             const isMini = !!config.isMiniBoss;
