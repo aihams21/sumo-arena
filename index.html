@@ -511,7 +511,7 @@
         function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
         gameMode = 'none';
         activeMode = 'stage';
-        ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
+        ARCADE_MODES = { chaos: { radius:210, bots:6, botScale:6, reward:20 }, timeAttack: { radius:260, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:270, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
         modeTime = 0; modeElapsedMs = 0; modeLastTick = 0; modeScore = 0; modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
          totalDeaths = 0; try { totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0'); } catch(_e) {}
         reviveSnapshot = { x:400, y:300, radius:240 };
