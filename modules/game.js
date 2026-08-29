@@ -13,6 +13,7 @@
 'use strict';
 
 let particles = [];
+let hazards = [];
 
 const CENTER = { x: 400, y: 300 };
 
@@ -34,6 +35,17 @@ function playerPower() {
 function dampStep(v, factor, n) { return v * Math.pow(Math.max(0, factor), Math.max(0, n)); }
 function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+/**
+ * Camera fit: pick a render scale so the whole arena (incl. enlarged boss
+ * arenas) always fits the viewport with margin — edges never clipped/black.
+ */
+function arenaFitScale(canvasW, canvasH, radius) {
+    if (!radius) return Math.min(canvasW / 800, canvasH / 600) || 1;
+    const baseScale = Math.min((canvasW || 800) / 800, (canvasH || 600) / 600);
+    const fitScale = Math.min(canvasW || 800, canvasH || 600) / (2 * (radius + 34));
+    return Math.max(0.18, Math.min(baseScale, fitScale));
+}
+
 /* ---------------------------------------------------------------- *
  *  MODE / STAGE ENTRY
  * ---------------------------------------------------------------- */
@@ -53,7 +65,7 @@ function startModeBase(mode, radius) {
     touchBox.classList.add('active');
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
     player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-    player.radius = playerRadius(); bots = []; particles = [];
+    player.radius = playerRadius(); bots = []; particles = []; hazards = [];
     configHadBoss = false; bossRungOut = false;
     offlineArenaRadius = radius;
     modeTime = ARCADE_MODES[mode]?.duration || 0;
@@ -189,6 +201,41 @@ function offlineBossStats(level, playerRadius, scale = 1) {
     };
 }
 
+/**
+ * Spawn a stage's hazard field (plasma orbs + mines) scaled by tier + body build.
+ * Hazards are spatial pressure, not lethal: they bounce off the arena wall and
+ * nudge bodies with dt-based knockback.
+ */
+function spawnHazards(level) {
+    hazards = [];
+    const hc = window.NeonSystems?.progression?.getHazardConfig?.(level, { radius: playerRadius(), mass: playerMass() });
+    if (!hc || hc.total <= 0) return;
+    const R = Math.max(offlineArenaRadius - 26, 20);
+    const cx = 400, cy = 300;
+    for (let i = 0; i < hc.plasma; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = Math.random() * Math.max(1, R - 12);
+        const dir = Math.random() * Math.PI * 2;
+        const spd = hc.speed * (0.7 + Math.random() * 0.8);
+        hazards.push({
+            type: 'plasma', alive: true,
+            x: cx + Math.cos(ang) * dist, y: cy + Math.sin(ang) * dist,
+            vx: Math.cos(dir) * spd, vy: Math.sin(dir) * spd,
+            radius: hc.radius, pulse: Math.random() * Math.PI * 2, seed: Math.random() * 100
+        });
+    }
+    for (let i = 0; i < hc.mines; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = Math.random() * Math.max(1, R - 14);
+        hazards.push({
+            type: 'mine', alive: true,
+            x: cx + Math.cos(ang) * dist, y: cy + Math.sin(ang) * dist,
+            vx: 0, vy: 0, radius: hc.mineRadius, pulse: (i / Math.max(1, hc.mines)) * Math.PI * 2,
+            seed: Math.random() * 100, wobble: 2 + Math.random() * 2
+        });
+    }
+}
+
 function startOfflineStage(level) {
     try {
         const config = window.NeonSystems?.progression?.getStageConfig(level);
@@ -212,15 +259,16 @@ function startOfflineStage(level) {
             offlineArenaRadius = config.arenaRadius;
         }
         player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-        player.radius = playerRadius(); bots = []; particles = [];
+        player.radius = playerRadius(); bots = []; particles = []; hazards = [];
         if (config.isBoss || config.isMiniBoss) {
             const isMini = !!config.isMiniBoss;
             const stats = offlineBossStats(level, player.radius, isMini ? 0.75 : 1);
+            const visual = stats.visual || defaultBossVisual(level, stats.tier, isMini);
             const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
             bots.push({
                 x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
-                isBoss: true, isMiniBoss: isMini,
+                speed: stats.speed, power: stats.power, color: visual.color,
+                isBoss: true, isMiniBoss: isMini, visual,
                 alive: true, cd: 0, slamCd: 90, phaseName: 'calm', hp: stats.maxHp, maxHp: stats.maxHp,
                 shield: stats.shield, maxShield: stats.shield, shieldGap: 0, hurtCd: 0,
                 broken: false, brokenFlash: 0,
@@ -229,6 +277,7 @@ function startOfflineStage(level) {
                 pattern: null, patIdx: 0, tier: stats.tier, abilities: stats.abilities
             });
         } else {
+            spawnHazards(level);
             const count = config.botCount;
             const stats = config.botStats;
             const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
@@ -475,6 +524,57 @@ function updatePhysics() {
         p.vx = dampStep(p.vx, 0.9, n); p.vy = dampStep(p.vy, 0.9, n);
         p.a -= 0.06 * n;
         if (p.a <= 0 || p.x < -50 || p.x > 850 || p.y < -50 || p.y > 650) particles.splice(i, 1);
+    }
+
+    // dt-based hazards (plasma orbs + pulsing mines) — spatial pressure only.
+    if (hazards.length) {
+        const hub = 400;
+        const hud = 300;
+        const hR = clampNum(offlineArenaRadius * 0.96, 40, 900);
+        for (let i = hazards.length - 1; i >= 0; i--) {
+            const hz = hazards[i];
+            if (!hz.alive) { hazards.splice(i, 1); continue; }
+            hz.pulse += 0.06 * n;
+            if (hz.type === 'plasma') {
+                hz.x += hz.vx * n; hz.y += hz.vy * n;
+                const d = Math.hypot(hz.x - hub, hz.y - hud);
+                if (d > hR - hz.radius) {
+                    // reflect off the wall
+                    const nx = (hz.x - hub) / d, ny = (hz.y - hud) / d;
+                    hz.x = hub + nx * (hR - hz.radius);
+                    hz.y = hud + ny * (hR - hz.radius);
+                    const dot = hz.vx * nx + hz.vy * ny;
+                    hz.vx -= 2 * dot * nx; hz.vy -= 2 * dot * ny;
+                    hz.vx = dampStep(hz.vx, 0.985, n); hz.vy = dampStep(hz.vy, 0.985, n);
+                }
+            } else {
+                // mine: subtle radial wobble
+                hz.x += Math.cos(hz.pulse / hz.wobble) * 0.12 * n;
+                hz.y += Math.sin(hz.pulse / hz.wobble) * 0.12 * n;
+                const dm = Math.hypot(hz.x - hub, hz.y - hud);
+                if (dm > hR - hz.radius) {
+                    const nx = (hz.x - hub) / dm, ny = (hz.y - hud) / dm;
+                    hz.x = hub + nx * (hR - hz.radius);
+                    hz.y = hud + ny * (hR - hz.radius);
+                }
+            }
+            // Hazard ↔ bodies: mild nudge, never lethal on its own.
+            const targets = [];
+            if (player.alive && !stageEnded && gameMode === 'offline') targets.push(player);
+            for (const b of bots) if (b.alive) targets.push(b);
+            for (const t of targets) {
+                const ex = t.x - hz.x, ey = t.y - hz.y;
+                const rr = hz.radius + t.radius;
+                const dist = Math.hypot(ex, ey);
+                if (dist < rr && dist > 0.001) {
+                    const nx = ex / dist, ny = ey / dist;
+                    const push = hz.type === 'mine' ? 1.4 : 2.2;
+                    const k = 1 - rr / (rr + Math.max(0, 16 - hz.radius)) * 0.5;
+                    t.vx += nx * push * k * n;
+                    t.vy += ny * push * k * n;
+                }
+            }
+        }
     }
 
     let dx = 0, dy = 0;
@@ -761,15 +861,82 @@ function render() {
     ctx.fillStyle = '#08090f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (gameMode !== 'none') {
-        let radius = offlineArenaRadius;
+        const radius = offlineArenaRadius;
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
-        const scale = Math.min(canvas.width / 800, canvas.height / 600);
+        // Camera fit: zoom out so the WHOLE arena (incl. huge boss arenas) is
+        // always visible with margin — never clipped into "black" edges.
+        const scale = arenaFitScale(canvas.width, canvas.height, radius);
         const rScaled = radius * scale;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rScaled, 0, Math.PI * 2);
-        ctx.fillStyle = '#0f121d'; ctx.fill();
-        ctx.lineWidth = 4 * scale; ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff'; ctx.stroke();
+
+        // --- Arena floor (rich, scaled) ---
+        const grad = ctx.createRadialGradient(cx, cy, rScaled * 0.15, cx, cy, rScaled);
+        grad.addColorStop(0, '#131a2b');
+        grad.addColorStop(0.72, '#0f1422');
+        grad.addColorStop(1, '#0a0d18');
+        ctx.beginPath(); ctx.arc(cx, cy, rScaled, 0, Math.PI * 2);
+        ctx.fillStyle = grad; ctx.fill();
+
+        // concentric ring bands
+        ctx.lineWidth = 1 * scale;
+        for (let i = 1; i <= 6; i++) {
+            ctx.beginPath(); ctx.arc(cx, cy, rScaled * (i / 6), 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.10)'; ctx.stroke();
+        }
+        // center disc + inner danger ring
+        ctx.beginPath(); ctx.arc(cx, cy, 10 * scale, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.25)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, rScaled * 0.18, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.14)'; ctx.lineWidth = 2 * scale; ctx.stroke();
+
+        // radial grid spokes
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.07)';
+        ctx.lineWidth = 1 * scale;
+        for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(a) * 14 * scale, cy + Math.sin(a) * 14 * scale);
+            ctx.lineTo(cx + Math.cos(a) * (rScaled - 4 * scale), cy + Math.sin(a) * (rScaled - 4 * scale));
+            ctx.stroke();
+        }
+
+        // boundary rim: layered glow so the edge reads as a lit ring, never black
+        const bossNow = bots.find(b => b.isBoss && b.alive);
+        const rimColor = bossNow ? (bossNow.visual && bossNow.visual.aura) || '#ff3366' :
+            (radius < 170 ? '#ff0055' : '#00e5ff');
+        for (let i = 3; i >= 1; i--) {
+            ctx.beginPath(); ctx.arc(cx, cy, rScaled + i * 6 * scale, 0, Math.PI * 2);
+            ctx.lineWidth = i * 3 * scale;
+            ctx.strokeStyle = rimColor;
+            ctx.globalAlpha = (0.06 + 0.05 * (4 - i)) * 0.6;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, rScaled, 0, Math.PI * 2);
+        ctx.lineWidth = 4 * scale; ctx.strokeStyle = rimColor; ctx.stroke();
+
+        // --- Hazards (dt-based plasma orbs + pulsing mines) ---
+        for (let hz of hazards) {
+            if (!hz.alive) continue;
+            const hx = hz.x * scale, hy = hz.y * scale;
+            if (hz.type === 'mine') {
+                const mR = hz.radius * scale;
+                const pulseAlpha = 0.5 + 0.4 * Math.sin(hz.pulse);
+                ctx.beginPath(); ctx.arc(hx, hy, mR * (1 + 0.18 * Math.sin(hz.pulse / hz.wobble)), 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 60, 80, 0.10)'; ctx.fill();
+                ctx.beginPath(); ctx.arc(hx, hy, mR, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 90, 110, ${pulseAlpha})`; ctx.fill();
+                ctx.lineWidth = 2 * scale; ctx.strokeStyle = '#ff8aa0'; ctx.stroke();
+            } else {
+                const pR = Math.max(1, hz.radius * scale);
+                const pAlpha = 0.55 + 0.35 * Math.sin(hz.pulse);
+                ctx.beginPath(); ctx.arc(hx, hy, pR, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 229, 255, ${pAlpha})`; ctx.fill();
+                ctx.beginPath(); ctx.arc(hx, hy, pR * 0.55, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(210, 250, 255, 0.9)'; ctx.fill();
+                ctx.lineWidth = 1.5 * scale; ctx.strokeStyle = 'rgba(180, 245, 255, 0.8)'; ctx.stroke();
+            }
+        }
 
         for (let p of particles) {
             ctx.beginPath(); ctx.arc(p.x * scale, p.y * scale, Math.max(1, 3 * scale), 0, Math.PI * 2);
@@ -780,8 +947,26 @@ function render() {
             const br = bot.radius * scale;
             ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br, 0, Math.PI * 2);
             ctx.fillStyle = bot.color; ctx.fill();
-            ctx.lineWidth = (bot.isBoss ? 4 : 2) * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
+            ctx.lineWidth = (bot.isBoss ? 4 : 2) * scale; ctx.strokeStyle = bot.visual?.accent || '#fff'; ctx.stroke();
             if (bot.isBoss) {
+                const vis = bot.visual || {};
+                // Tier-distinct rim accents (spikes / scallops around the body)
+                const spokeCount = Math.max(4, Math.min(14, 3 + Math.floor(bot.radius / 9)));
+                const spokeLen = (4 + (vis.rim || 4)) * scale;
+                ctx.strokeStyle = vis.accent || '#ff88aa';
+                ctx.lineWidth = Math.max(1, 1.6 * scale);
+                for (let si = 0; si < spokeCount; si++) {
+                    const sa = (si / spokeCount) * Math.PI * 2 + (performance.now() % 4000) / 4000 * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(bot.x * scale + Math.cos(sa) * (br - 2 * scale), bot.y * scale + Math.sin(sa) * (br - 2 * scale));
+                    ctx.lineTo(bot.x * scale + Math.cos(sa) * (br + spokeLen), bot.y * scale + Math.sin(sa) * (br + spokeLen));
+                    ctx.stroke();
+                }
+                // Tier name tag
+                ctx.font = `bold ${Math.max(10, 12 * scale)}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = vis.accent || '#fff';
+                ctx.fillText(vis.label || 'TITAN', bot.x * scale, bot.y * scale - br - 36 * scale);
                 // telegraph cue ring (per ability)
                 if (bot.curAttack && bot.telegraph > 0) {
                     const meta = window.NeonSystems?.bosses?.ABILITY_META || {};
@@ -814,22 +999,22 @@ function render() {
                 if (bot.pulseR > 0) {
                     const prScaled = bot.pulseR * scale;
                     ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, prScaled, 0, Math.PI * 2);
-                    ctx.lineWidth = 5 * scale; ctx.strokeStyle = '#ffbb00';
+                    ctx.lineWidth = 5 * scale; ctx.strokeStyle = vis.aura || '#ffbb00';
                     ctx.globalAlpha = Math.max(0, 1 - bot.pulseR / 230);
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
                 // phase flash ring
                 if (bot.phaseFlash && bot.phaseFlash > 0) {
                     ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + 8 * scale, 0, Math.PI * 2);
-                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = bot.color;
+                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = vis.aura || bot.color;
                     ctx.globalAlpha = Math.min(1, bot.phaseFlash / 30) * 0.8;
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
-                // Berserk rage aura (enraged / critical)
+                // Berserk rage aura (enraged / critical) — tined by tier palette
                 if (bot.phaseName === 'enraged' || bot.phaseName === 'critical') {
                     const pulse = (performance.now() % 800) / 800;
                     ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + (10 + pulse * 8) * scale, 0, Math.PI * 2);
-                    ctx.lineWidth = 6 * scale; ctx.strokeStyle = bot.phaseName === 'critical' ? '#ffbb00' : '#ff3366';
+                    ctx.lineWidth = 6 * scale; ctx.strokeStyle = bot.phaseName === 'critical' ? '#ffbb00' : (vis.aura || '#ff3366');
                     ctx.globalAlpha = 0.35 + 0.3 * (1 - pulse);
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }

@@ -20,9 +20,36 @@
   };
 
   /**
-   * Boss profile with tier tied to the progression ladder.
-   * scale (0..1) lets mini-bosses use a scaled-down subset of abilities.
+   * Per-tier boss palettes — distinct body colour, aura colour, accent ring
+   * colour and rim accent shape. Canonical 5-tier ramp (Early→Apex).
    */
+  const TIER_VISUALS = [
+    { name: 'TITAN',        color: '#ff0055', aura: '#ff3366', accent: '#ff88aa', rim: 4, label: '🔥 TITAN' },
+    { name: 'WARDEN',       color: '#ff8800', aura: '#ffbb00', accent: '#ffe08a', rim: 5, label: '🌀 WARDEN' },
+    { name: 'VOID CASTER',  color: '#00e5ff', aura: '#22ddff', accent: '#a8f4ff', rim: 6, label: '⬡ VOID CASTER' },
+    { name: 'NIGHTMARE',    color: '#cc00ff', aura: '#bb66ff', accent: '#e4b8ff', rim: 7, label: '☠ NIGHTMARE' },
+    { name: 'APEX COLOSSUS',color: '#ff5533', aura: '#ff0000', accent: '#ffd0b0', rim: 8, label: '◈ APEX COLOSSUS' }
+  ];
+
+  /**
+   * Choose a tier visual set. τ = floor(level/50) mapped onto the 5-tier ramp
+   * so boss 10 → Early and boss 1000 → Apex with smooth interpolation.
+   */
+  function tierPalette(level, isMini) {
+    const p = Math.min(1, Math.max(0, level / 1000));
+    const idx = Math.min(TIER_VISUALS.length - 1, Math.floor(p * TIER_VISUALS.length));
+    const base = TIER_VISUALS[idx];
+    // Mini-bosses: desaturated variant of the same ramp.
+    if (isMini) {
+      return { name: base.name, color: '#dd8800', aura: '#ffcc66', accent: '#ffe9b0', rim: 4, label: '⚔ MINI ' + base.name };
+    }
+    return base;
+  }
+
+  /** Fallback visual if progression/bosses is unavailable. */
+  function defaultBossVisual(level, tier, isMini = false) {
+    return tierPalette(level || 10, isMini);
+  }
   function profile(level, playerRadius, scale = 1) {
     const prog = window.NeonSystems?.progression;
     if (prog && typeof prog.getBossConfig === 'function') {
@@ -49,6 +76,7 @@
         tier: cfg.tier,
         tierIdx: cfg.tierIdx,
         abilities,
+        visual: tierPalette(level, scale < 1),
         isMini: scale < 1
       };
     }
@@ -64,6 +92,7 @@
       shield: 3 + Math.min(5, Math.floor(wave * .2)),
       tier,
       abilities: { wave: true, dash: tier >= 1 },
+      visual: tierPalette(level, scale < 1),
       isMini: scale < 1
     };
   }
@@ -74,5 +103,5 @@
   }
 
   window.NeonSystems = window.NeonSystems || {};
-  window.NeonSystems.bosses = { phases, phase, profile, ABILITY_META };
+  window.NeonSystems.bosses = { phases, phase, profile, ABILITY_META, tierPalette, defaultBossVisual, TIER_VISUALS };
 })();

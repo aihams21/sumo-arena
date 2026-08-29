@@ -45,22 +45,23 @@
             const p = level / this.MAX_LEVEL;              // 0..1
             const tierIdx = this.tierIndex(level);
 
-            // Bot count: gentle rise 1 -> 8 (1 + ~0.3/level at a decaying rate)
-            let botCount = 1 + Math.floor(7 * (1 - Math.pow(1 - p, 0.45)));
-            botCount = Math.min(8, Math.max(1, botCount));
+            // Bot count: aggressive rise 1 -> 12 (steeper, sub-linear but fast)
+            const botCountCurve = 1 - Math.pow(1 - p, 0.34);
+            let botCount = 1 + Math.floor(11 * botCountCurve) + (tierIdx >= 3 ? Math.floor(p * 1.5) : 0);
+            botCount = Math.min(12, Math.max(1, botCount));
 
-            // Arena radius: curved descent 250 -> 145 with horizon feel
-            const radiusDrop = (this.ARENA_START_RADIUS - this.ARENA_MIN_RADIUS) * Math.pow(p, 0.55);
+            // Arena radius: curved descent 250 -> 140 with horizon feel
+            const radiusDrop = (this.ARENA_START_RADIUS - this.ARENA_MIN_RADIUS) * Math.pow(p, 0.52);
             const arenaRadius = Math.max(this.ARENA_MIN_RADIUS, this.ARENA_START_RADIUS - radiusDrop);
 
-            // Bot base stats (per-second speeds)
-            const speedBase = 0.34 + (p * 0.55) + (tierIdx >= 3 ? 0.04 * (tierIdx - 2) : 0);   // 0.34 -> ~0.97
-            const massBase = 0.85 + (p * 2.4) + Math.pow(p, 3) * 1.6;                            // -> ~4.85
-            const powerBase = 4.0 + (p * 20.0) + Math.pow(p, 4) * 14;                            // -> ~38
-            const aggression = Math.min(1.0, 0.35 + (level / 180));
+            // Bot base stats (per-second speeds) — aggressively steepened
+            const speedBase = 0.34 + (p * 0.72) + (tierIdx >= 3 ? 0.05 * (tierIdx - 2) : 0) + (tierIdx >= 4 ? 0.08 : 0);   // ~1.2
+            const massBase = 0.85 + (p * 3.1) + Math.pow(p, 2.4) * 2.1;                                                    // ~6.5
+            const powerBase = 4.0 + (p * 26.0) + Math.pow(p, 3.2) * 20;                                                    // ~50
+            const aggression = Math.min(1.0, 0.35 + (level / 150) + Math.pow(p, 3) * 0.3);
 
-            // Radius: puffy but capped
-            const radius = 18 + (p * 12) + (tierIdx >= 2 ? 2 : 0);
+            // Radius: puffy but capped (slightly larger, late-tier boost)
+            const radius = 18 + (p * 14) + (tierIdx >= 2 ? 2 : 0) + (tierIdx >= 4 ? 2 : 0);
 
             return {
                 level,
@@ -77,6 +78,42 @@
                     power: powerBase,
                     aggression
                 }
+            };
+        },
+
+        /**
+         * Hazard pressure config for a non-boss stage. Scales plasma/mine count
+         * with stage tier AND the player's body build (radius/mass) so stronger
+         * bodies face a denser obstacle field. Values are pressure-flavoured,
+         * NOT lethal — the sumo ring-out remains the win condition.
+         */
+        getHazardConfig(level, body = { radius: 22, mass: 1 }) {
+            const p = level / this.MAX_LEVEL;
+            const tierIdx = this.tierIndex(level);
+            const isBoss = level % this.BOSS_INTERVAL === 0;
+            const isMiniBoss = !isBoss && (level % this.MINI_BOSS_INTERVAL === 0);
+            if (isBoss || isMiniBoss) return null; // hazards are reserved for swarm stages
+
+            const tierMult = 1 + tierIdx * 0.9;
+            const bodyRadius = Math.max(22, body.radius || 22);
+            const bodyMass = Math.max(1, body.mass || 1);
+            // Body build contribution: bigger/heavier players draw more hazards.
+            const bodyBonus = (bodyRadius - 22) * 0.12 + (bodyMass - 1) * 0.9;
+            const tierBase = 1 + p * 5 + Math.pow(p, 2) * 3;
+            let count = Math.floor(tierBase * tierMult + bodyBonus * tierMult);
+            count = Math.max(0, Math.min(14, count));
+
+            // Mix: mines appear later, plasma sooner.
+            const plasma = Math.max(0, count - Math.floor(p * 4));
+            const mines = count - plasma;
+            return {
+                total: count,
+                plasma,
+                mines,
+                speed: 0.6 + p * 1.4,          // per-second
+                radius: 7 + p * 4,
+                mineRadius: 10 + p * 4,
+                tier: tierIdx
             };
         },
 
