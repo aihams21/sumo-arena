@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Neon Sumo Arena</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
     <link rel="stylesheet" href="neon-style.css">
 </head>
 <body class="vignette scanlines">
@@ -202,7 +202,8 @@
         const installModal = document.getElementById('modal-install-guide');
         const installButton = document.getElementById('install-main-button');
         const isStandalone = window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone === true;
-        let isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
+        let isInstalled = isStandalone;
+        try { isInstalled = isInstalled || localStorage.getItem('neon_sumo_pwa_installed') === '1'; } catch(_e) {}
 
         const featureList = [
             'تشغيل مستقل دون تبويب','ملء الشاشة','بدء تشغيل أسرع','اختصار من الشاشة الرئيسية','دعم الوضع الأفقي','واجهة لمس محسنة','استجابة فورية للأزرار','حفظ التقدم محلياً','حفظ العملات','حفظ الترقيات','حفظ السكن المختار','هوية لاعب ثابتة','مزامنة الصدارة عند الاتصال','عمل دون إنترنت بعد التخزين','تحميل موارد اللعبة مرة واحدة','تقليل زمن الانتظار','استعادة آخر جلسة','حالة تثبيت موثوقة','إشعارات تثبيت واضحة','تعليمات حسب النظام','دعم Android','دعم iOS','دعم Windows','دعم macOS','دعم Linux','كشف Kali Linux','دعم Chrome','دعم Edge','دعم Safari','دعم Firefox','تحكم بلوحة المفاتيح','عصا تحكم لمسية','تخطيط متجاوب','أزرار كبيرة للمس','تباعد آمن للنوتش','تمرير سلس للقوائم','حماية من النقر المكرر','مؤشر حالة حي','عدادات دقيقة','نظام إحياء سريع','متجر سكنات','معاينة السكن','تبديل السكن فوراً','خريطة مراحل','مراحل زعيم','هجمات نيون','تحذيرات بصرية','أنماط لعب متعددة','ساحة فوضى','تحدي الوقت','حلبة متقلصة','مؤتمت الجولة','نظام نقاط','مكافآت العملات','مهمة يومية','سلسلة انتصارات','إحصاءات اللاعب','لوحة صدارة عالمية','فرز حسب المراحل','فرز حسب العملات','بحث عن اللاعبين','بروفايل اللاعب','شارة المركز الأول','شارة المركز الثاني','شارة المركز الثالث','هالة ذهبية','هالة فضية','هالة برونزية','تنظيف الذاكرة المؤقتة','تقليل مؤثرات الهاتف','رسم Canvas سريع','حلقة لعب مستقرة','تحديث فيزيائي مستقل','حماية بيانات الحساب','تنظيف الإدخالات','ترميز أسماء اللاعبين','معالجة فشل الشبكة','بيانات احتياطية مفيدة','مزامنة غير حاجبة','استمرار اللعب عند انقطاع الشبكة','توافق PWA','توافق Service Worker','كاش قابل للتحديث','حالة standalone','رصد appinstalled','رصد beforeinstallprompt','تجربة بدء نظيفة','زر تثبيت واحد','إرشاد سريع','تباين عالي','قراءة واضحة','تغذية بصرية للنقر','تغذية بصرية للفوز','تغذية بصرية للخسارة','تجربة خفيفة البطارية','دعم الشاشات الصغيرة','دعم الشاشات الكبيرة','جاهزية اللعب السريع','هوية Neon Sumo Arena'
@@ -260,7 +261,7 @@
         refreshInstallStatus();
         if (isInstalled) { installModal.classList.add('hidden'); document.getElementById('menu-install-button')?.classList.add('hidden'); }
         window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; installButton.innerText = 'تثبيت التطبيق الآن 📱'; refreshInstallStatus(); });
-        window.addEventListener('appinstalled', () => { deferredPrompt = null; isInstalled = true; installModal.classList.add('hidden'); localStorage.setItem('neon_sumo_pwa_installed', '1'); document.getElementById('menu-install-button')?.classList.add('hidden'); refreshInstallStatus(); });
+        window.addEventListener('appinstalled', () => { deferredPrompt = null; isInstalled = true; installModal.classList.add('hidden'); document.getElementById('menu-install-button')?.classList.add('hidden'); refreshInstallStatus(); });
 
         function handleSmartInstall() {
             if (isInstalled) return;
@@ -429,9 +430,9 @@
         }
 
         /* ── Game Data ── */
-        let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
-        let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
-        let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}');
+         let coins = 0; try { coins = parseInt(localStorage.getItem('sumo_coins') || '0'); } catch(_e) {}
+         let maxUnlockedStage = 1; try { maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1'); } catch(_e) {}
+         let upgrades = {}; try { upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}'); } catch(_e) { upgrades = {"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}; }
         upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0, ...upgrades };
         const bodyUpgrades = [
             { id:'coreDensity', name:'Core Density', icon:'◈', unlock:10, lore:'Recovered from the Foundry. Adds mass against heavy bosses.', max:3, cost: level => (level + 1) * 45 },
@@ -445,8 +446,8 @@
             { id:'toxic', name:'Toxic Fang', color:'#7dff00', accent:'#eaffb0', price:60, shape:'diamond' },
             { id:'void', name:'Void Samurai', color:'#ff2bd6', accent:'#ffe4fb', price:90, shape:'hex' }
         ];
-        let skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"owned":["cyan"],"equipped":"cyan"}');
-        let dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}');
+         let skinState = { owned:['cyan'], equipped:'cyan' }; try { skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"owned":["cyan"],"equipped":"cyan"}'); } catch(_e) {}
+         let dailyMission = {}; try { dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}'); } catch(_e) {}
 
         function renderSkinShop() {
             const grid = document.getElementById('skin-grid'); if (!grid) return; grid.innerHTML = '';
@@ -460,7 +461,7 @@
         function buyOrEquipSkin(id) {
             const skin = skinCatalog.find(item => item.id === id); if (!skin) return;
             if (!skinState.owned.includes(id)) { if (coins < skin.price) { alert('الكوينز غير كافية!'); return; } coins -= skin.price; skinState.owned.push(id); }
-            skinState.equipped = id; localStorage.setItem('sumo_skins', JSON.stringify(skinState)); applyEquippedSkin(); saveData(); renderSkinShop();
+            skinState.equipped = id; try { localStorage.setItem('sumo_skins', JSON.stringify(skinState)); } catch(_e) {} applyEquippedSkin(); saveData(); renderSkinShop();
         }
         function applyEquippedSkin() { const skin = skinCatalog.find(item => item.id === skinState.equipped) || skinCatalog[0]; player.color = skin.color; player.skinShape = skin.shape; player.skinAccent = skin.accent; }
         function resetDailyMissionIfNeeded() { const today = new Date().toISOString().slice(0, 10); if (dailyMission.date !== today) dailyMission = { date: today, wins: 0, claimed: false }; }
@@ -470,18 +471,18 @@
             document.getElementById('mission-progress').style.width = `${wins / 3 * 100}%`;
             const claim = document.getElementById('mission-claim'); claim.classList.toggle('hidden', wins < 3 || dailyMission.claimed);
             document.getElementById('mission-copy').innerText = dailyMission.claimed ? 'Mission complete. Return tomorrow for a new rush.' : 'Win 3 stages today for +25 coins';
-            document.getElementById('menu-streak').innerText = `${parseInt(localStorage.getItem('sumo_streak') || '0')} 🔥`;
-            localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission));
+            document.getElementById('menu-streak').innerText = `${(function(){try{return localStorage.getItem('sumo_streak')||'0'}catch(_e){return'0'}})()} 🔥`;
+             try { localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission)); } catch(_e) {}
         }
         function claimDailyMission() { resetDailyMissionIfNeeded(); if (dailyMission.wins < 3 || dailyMission.claimed) return; dailyMission.claimed = true; coins += 25; saveData(); updateDailyMission(); }
-        function saveData() { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades)); if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
+        function saveData() { try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
         function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
         updateDisplays();
 
         let gameMode = 'none', activeMode = 'stage';
         const ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
         let modeTime = 0, modeElapsedMs = 0, modeLastTick = 0, modeScore = 0, modeSpawnTimer = 0, modeEliminations = 0, modeRewarded = false;
-        let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
+         let totalDeaths = 0; try { totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0'); } catch(_e) {}
         let reviveSnapshot = { x:400, y:300, radius:240 };
         let currentPlayingStage = 1, offlineArenaRadius = 240;
         let stageEnded = false, stageReady = false;
@@ -656,13 +657,27 @@
         }
         ambientLoop();
 
-        /* ═══════════════════════════════════════
-           LOADING SCREEN DISMISS
+/* ═══════════════════════════════════════
+           LOADING SCREEN — Robust Dismiss
            ═══════════════════════════════════════ */
-        window.addEventListener('load', () => { setTimeout(() => { const ls = document.getElementById('loading-screen'); if (ls) { ls.classList.add('hidden'); setTimeout(() => ls.remove(), 500); } }, 800); });
-        setTimeout(() => { const ls = document.getElementById('loading-screen'); if (ls) { ls.classList.add('hidden'); setTimeout(() => ls.remove(), 500); } }, 1200);
-    </script>
-    <script src="modules/storage.js"></script>
+         function dismissLoading() {
+             const ls = document.getElementById('loading-screen');
+             if (!ls || ls.classList.contains('hidden')) return;
+             ls.classList.add('hidden');
+             setTimeout(() => { if (ls.parentNode) ls.remove(); }, 600);
+         }
+         /* Failsafe: auto-dismiss after 3 seconds regardless */
+         var _failsafeTimer = setTimeout(dismissLoading, 3000);
+         /* Window load fallback */
+         window.addEventListener('load', () => { clearTimeout(_failsafeTimer); setTimeout(dismissLoading, 100); });
+         /* Click / tap / keypress to skip instantly */
+         document.addEventListener('click', dismissLoading, { once: true });
+         document.addEventListener('touchstart', dismissLoading, { once: true, passive: true });
+         document.addEventListener('keydown', function(e) { dismissLoading(); }, { once: true });
+         /* Immediate fallback if DOM already ready */
+         if (document.readyState === 'complete' || document.readyState === 'interactive') { clearTimeout(_failsafeTimer); setTimeout(dismissLoading, 50); }
+     </script>
+     <script src="modules/storage.js"></script>
     <script src="modules/progression.js"></script>
     <script src="modules/physics.js"></script>
     <script src="modules/abilities.js"></script>
