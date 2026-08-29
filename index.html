@@ -40,11 +40,11 @@
         .hud-card { background: rgba(15, 18, 30, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 20px; font-size: clamp(10px, 3vw, 13px); font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .btn-exit { pointer-events: auto; background: #ff3366; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
         #stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 8px; max-height: 50vh; overflow-y: auto; padding: 10px; width: min(480px, 90vw); background: #0f121d; border-radius: 12px; border: 1px solid #20263a; }
-        .stage-card { background: #171b2a; border: 2px solid #23293d; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: bold; font-size: 12px; cursor: pointer; }
+        .stage-card { background: #171b2a; border: 2px solid #23293d; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: bold; font-size: 12px; cursor: pointer; pointer-events: auto; display: flex; align-items: center; justify-content: center; }
         .stage-card.unlocked { border-color: #00e5ff; color: #fff; }
         .stage-card.current { border-color: #ffbb00; color: #ffbb00; }
         .stage-card.boss { border-color: #ff0055; color: #ff0055; }
-        .stage-card.locked { opacity: 0.3; }
+        .stage-card.locked { opacity: 0.3; pointer-events: none; }
         .shop-container { display: flex; flex-direction: column; gap: 10px; width: min(450px, 90vw); margin: 10px 0; }
         .stats-panel { background: #0f121d; border: 1px solid #20263a; border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-around; }
         .stat-val { font-weight: bold; color: #00e5ff; }
@@ -112,7 +112,29 @@
             <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
             <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
             <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
-            <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
+            <div class="cyber-footer">
+                <div class="cyber-border-top"></div>
+                <div class="cyber-border-bottom"></div>
+                <div class="cyber-footer-inner">
+                    <div class="cyber-label">
+                        <span class="cyber-label-line"></span>
+                        <span class="cyber-label-text">CRAFTED BY</span>
+                        <span class="cyber-label-line"></span>
+                    </div>
+                    <div class="cyber-name-wrapper">
+                        <div class="cyber-name" data-text="AIHAM AM">
+                            <span class="cyber-name-main">AIHAM</span>
+                            <span class="cyber-name-accent">AM</span>
+                        </div>
+                    </div>
+                    <div class="cyber-divider"><span class="cyber-diamond">&#9670;</span></div>
+                    <div class="cyber-system">
+                        <span class="cyber-system-label">NEON SUMO</span>
+                        <span class="cyber-system-dot"></span>
+                        <span class="cyber-system-label">SYSTEMS</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="modal-install-guide" class="overlay hidden install-overlay">
@@ -442,7 +464,9 @@
         }, { passive: true });
 
         gameBox.addEventListener('pointerdown', e => {
-            if (!isPlayingNow() || !isPlayTouchTarget(e.target)) return;
+            if (!isPlayingNow()) return;
+            if (e.target.closest('.overlay:not(.hidden)') || e.target.closest('button')) return;
+            if (!isPlayTouchTarget(e.target)) return;
             pointerActive = true;
             startX = e.clientX;
             startY = e.clientY;
@@ -667,10 +691,9 @@
                     stage.classList.add('unlocked');
                     if (i === maxUnlockedStage) stage.classList.add('current');
                     stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`;
-                    stage.dataset.stage = i;
-                    stage.addEventListener('click', event => {
-                        event.preventDefault();
-                        startOfflineStage(Number(event.currentTarget.dataset.stage));
+                    const stageNum = i;
+                    stage.addEventListener('click', () => {
+                        startOfflineStage(stageNum);
                     });
                 } else {
                     stage.classList.add('locked');
@@ -834,49 +857,56 @@
         }
 
         function startOfflineStage(level) {
-            const config = window.NeonSystems.progression.getStageConfig(level);
-            gameMode = 'offline';
-            activeMode = 'stage';
-            currentPlayingStage = level;
-            hideAllMenus();
-            document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block';
-            stageEnded = false;
-            stageReady = false;
-            offlineArenaRadius = config.arenaRadius;
-            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
-            bots = [];
-            
-            if (config.isBoss || config.isMiniBoss) {
-                const stats = offlineBossStats(level, player.radius);
-                const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
-                bots.push({
-                    x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00', 
-                    isBoss: true, isMiniBoss: config.isMiniBoss,
-                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
-                    shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
-                    attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
-                    minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
-                });
-            } else {
-                const count = config.botCount;
-                const stats = config.botStats;
-                const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
-                for (let i = 0; i < count; i++) {
-                    let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
+            try {
+                const config = window.NeonSystems?.progression?.getStageConfig(level);
+                if (!config) { console.warn('Stage config not found for level:', level); stageReady = false; showMainMenu(); return; }
+                gameMode = 'offline';
+                activeMode = 'stage';
+                currentPlayingStage = level;
+                hideAllMenus();
+                document.getElementById('hud').classList.remove('hidden');
+                touchBox.style.display = 'block';
+                stageEnded = false;
+                stageReady = false;
+                offlineArenaRadius = config.arenaRadius;
+                player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+                player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
+                bots = [];
+                
+                if (config.isBoss || config.isMiniBoss) {
+                    const stats = offlineBossStats(level, player.radius);
+                    const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
                     bots.push({
-                        x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
-                        vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
-                        power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
+                        x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
+                        speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00', 
+                        isBoss: true, isMiniBoss: config.isMiniBoss,
+                        alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
+                        shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
+                        attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
+                        minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
                     });
+                } else {
+                    const count = config.botCount;
+                    const stats = config.botStats;
+                    const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
+                    for (let i = 0; i < count; i++) {
+                        let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
+                        bots.push({
+                            x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
+                            vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
+                            power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
+                        });
+                    }
                 }
+                stageReady = bots.some(bot => bot.alive);
+                document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
+                updateDisplays();
+                applyEquippedSkin();
+            } catch (err) {
+                console.error('Failed to start stage:', err);
+                stageReady = false;
+                showMainMenu();
             }
-            stageReady = bots.some(bot => bot.alive);
-            document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
-            updateDisplays();
-            applyEquippedSkin();
         }
 
         function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
