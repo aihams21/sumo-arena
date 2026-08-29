@@ -14,6 +14,24 @@
 
 let particles = [];
 
+const CENTER = { x: 400, y: 300 };
+
+let _lastPhys = 0;
+
+/* ---- Refined body scaling (diminishing returns) ---- */
+function playerRadius() {
+    return 22 + 20 * (1 - Math.exp(-(Math.max(1, upgrades.weight) - 1) / 6)) + (upgrades.coreDensity || 0) * 2.5;
+}
+function playerMass() {
+    return 1 + 0.9 * (1 - Math.exp(-(Math.max(1, upgrades.weight) - 1) / 8)) + (upgrades.coreDensity || 0) * 0.9;
+}
+function playerPower() {
+    return 6 + Math.min(24, (upgrades.power - 1) * 1.5) + (upgrades.coreDensity || 0) * 1.2;
+}
+/* Frame-rate independent damping: factor is per-reference-frame (60fps), n = frames elapsed. */
+function dampStep(v, factor, n) { return v * Math.pow(Math.max(0, factor), Math.max(0, n)); }
+function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
 /* ---------------------------------------------------------------- *
  *  MODE / STAGE ENTRY
  * ---------------------------------------------------------------- */
@@ -33,7 +51,7 @@ function startModeBase(mode, radius) {
     touchBox.classList.add('active');
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
     player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-    player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
+    player.radius = playerRadius(); bots = []; particles = [];
     modeTime = ARCADE_MODES[mode]?.duration || 0;
     modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
     modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
@@ -67,14 +85,14 @@ function startShrinkingArena() {
 function addModeBot(index, scale, color) {
     const angle = index * 2.399;
     bots.push({ x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
-        radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .45 + scale * .03, power: 5 + scale,
+        radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .48 + scale * .03, power: 5 + scale,
         color, isBoss: false, alive: true, cd: 0 });
 }
 
 function addBossMinion(boss) {
-    const angle = (boss.attackCycle + bots.length) * 2.399;
+    const angle = (Math.random() * Math.PI * 2) + bots.length;
     bots.push({ x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
-        radius: 16, mass: 1.05, speed: .38, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
+        radius: 16, mass: 1.08, speed: .42, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
 }
 
 function getActiveBoss() { return bots.find(bot => bot.isBoss && bot.alive); }
@@ -150,8 +168,8 @@ function offlineBotStats(level) {
     };
 }
 
-function offlineBossStats(level, playerRadius) {
-    if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius);
+function offlineBossStats(level, playerRadius, scale = 1) {
+    if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius, scale);
     const curve = Math.sqrt(level);
     const wave = Math.max(1, Math.floor(level / 5));
     const tier = Math.min(3, Math.floor(wave / 10));
@@ -162,7 +180,8 @@ function offlineBossStats(level, playerRadius) {
         power: 9.5 + Math.min(8, curve * 0.8),
         maxHp: 8 + Math.min(8, Math.floor(wave * 0.4)),
         shield: 3 + Math.min(5, Math.floor(wave * 0.2)),
-        tier
+        tier,
+        abilities: { wave: true, dash: tier >= 1 }
     };
 }
 
@@ -182,18 +201,20 @@ function startOfflineStage(level) {
         stageReady = false;
         offlineArenaRadius = config.arenaRadius;
         player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-        player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
+        player.radius = playerRadius(); bots = []; particles = [];
         if (config.isBoss || config.isMiniBoss) {
-            const stats = offlineBossStats(level, player.radius);
+            const isMini = !!config.isMiniBoss;
+            const stats = offlineBossStats(level, player.radius, isMini ? 0.75 : 1);
             const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
             bots.push({
                 x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
                 speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
-                isBoss: true, isMiniBoss: config.isMiniBoss,
-                alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
-                shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
-                attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
-                minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
+                isBoss: true, isMiniBoss: isMini,
+                alive: true, cd: 0, slamCd: 90, phaseName: 'calm', hp: stats.maxHp, maxHp: stats.maxHp,
+                shield: stats.shield, maxShield: stats.shield, shieldCd: 0, hurtCd: 0,
+                attackCd: 120, curAttack: null, cue: null, telegraph: 0, dashT: 0, dashDur: 0,
+                dashVx: 0, dashVy: 0, dashDur2: 0, grabT: 0, pulseR: 0, minionCd: 320,
+                pattern: null, patIdx: 0, tier: stats.tier, abilities: stats.abilities
             });
         } else {
             const count = config.botCount;
@@ -288,28 +309,162 @@ function reviveInPlaceOffline() {
 }
 
 function spawnImpact(x, y, color) {
-    for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
+    const budget = mobilePerformance ? 3 : 6;
+    for (let i = 0; i < budget; i++) {
         let angle = Math.random() * Math.PI * 2;
         let speed = 3 + Math.random() * 4;
         particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
     }
-    if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
+    const cap = mobilePerformance ? 45 : 120;
+    if (particles.length > cap) particles.splice(0, particles.length - cap);
     if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
 }
 
 function distanceToPlayer(bot) { return Math.hypot(bot.x - player.x, bot.y - player.y); }
 
+/* ------- Boss helpers --------------------------------------------------- */
+function bossPhaseInfo(bot) {
+    const names = window.NeonSystems?.bosses?.phase ? window.NeonSystems.bosses.phase(bot.hp, bot.maxHp)
+        : (bot.hp <= bot.maxHp * .25 ? 'critical' : bot.hp <= bot.maxHp * .5 ? 'enraged' : 'calm');
+    const colors = { calm: '#ff0055', enraged: '#ff3366', critical: '#ffbb00' };
+    return { phase: names, color: colors[names] || '#ff0055' };
+}
+function bossHas(bot, key) { return !!(bot.abilities && bot.abilities[key]); }
+
+function spawnMinions(bot, count) {
+    for (let i = 0; i < count; i++) {
+        if (bots.filter(c => c.alive && c.bossMinion).length >= 3) break;
+        addBossMinion(bot);
+    }
+    if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(180, .12, 'sawtooth');
+}
+
+/* ------- Telegraph -> attack resolution ---------------------------------- */
+function resolveBossAttack(bot, n, angle) {
+    const abilities = bot.abilities || {};
+    const phase = bossPhaseInfo(bot).phase;
+    const raged = phase === 'enraged';
+    const crit = phase === 'critical';
+    const a = bot.curAttack;
+    let hit = false;
+
+    if (a === 'wave') {
+        bot.pulseR = 14;
+        if (distanceToPlayer(bot) < 190) {
+            const waveForce = (crit ? 11 : raged ? 9.5 : 7.5) * n;
+            player.vx += Math.cos(angle) * waveForce;
+            player.vy += Math.sin(angle) * waveForce;
+        }
+        hit = true;
+    } else if (a === 'multiWave') {
+        bot.multiLeft = bot.multiLeft || 3;
+        bot.multiT = 0;
+        bot.pulseR = 14;
+        if (distanceToPlayer(bot) < 220) {
+            const force = (crit ? 12 : 9) * n;
+            player.vx += Math.cos(angle) * force;
+            player.vy += Math.sin(angle) * force;
+        }
+        hit = true;
+    } else if (a === 'dash') {
+        bot.dashT = n; // run for ~1 frame then integrate
+        bot.dashDur = (crit ? 30 : raged ? 24 : 20);
+        bot.dashVx = Math.cos(angle) * (crit ? 8.5 : raged ? 7.8 : 6.6);
+        bot.dashVy = Math.sin(angle) * (crit ? 8.5 : raged ? 7.8 : 6.6);
+        hit = true;
+    } else if (a === 'grab') {
+        if (distanceToPlayer(bot) < 250) {
+            const pull = (crit ? -8.5 : -7) * n;   // pull player TOWARD boss (reverse pressure)
+            player.vx += Math.cos(angle) * pull;
+            player.vy += Math.sin(angle) * pull;
+            bot.grabT = 40;
+        }
+        hit = true;
+    } else if (a === 'teleport') {
+        // blink to the flank behind the player (opposite the boss->player vector)
+        const dist = clampNum((bot.radius + player.radius) * 1.4, 70, 150);
+        const backAngle = angle + Math.PI * (Math.random() > .5 ? .7 : -.7);
+        const tx = clampNum(player.x + Math.cos(backAngle) * dist, 40, 760);
+        const ty = clampNum(player.y + Math.sin(backAngle) * dist, 40, 560);
+        if (Math.hypot(tx - CENTER.x, ty - CENTER.y) < offlineArenaRadius - bot.radius - 10) {
+            bot.x = tx; bot.y = ty; bot.vx = 0; bot.vy = 0;
+            spawnImpact(bot.x, bot.y, '#cc00ff');
+            bot.dashDur2 = 24; bot.dashVx = Math.cos(angle) * 6; bot.dashVy = Math.sin(angle) * 6;
+        }
+        hit = true;
+    } else if (a === 'berserk') {
+        bot.pulseR = 14; // shockwave pulse
+        if (distanceToPlayer(bot) < 240) {
+            const force = (crit ? 10.5 : 8.5) * n;
+            player.vx += Math.cos(angle) * force;
+            player.vy += Math.sin(angle) * force;
+        }
+        hit = true;
+    }
+
+    if (a === 'multiWave' && (bot.multiLeft || 0) > 0) {
+        bot.multiLeft -= 1;
+        bot.curAttack = 'multiWave';
+        bot.telegraph = 46; // quick re-telegraph for next cascade
+        if (bot.multiLeft <= 0) {
+            bot.curAttack = null;
+            bot.attackCd = bossCooldown(bot, phase);
+        }
+    } else if (hit) {
+        bot.curAttack = null;
+        bot.attackCd = bossCooldown(bot, phase);
+    }
+
+    bot.telegraph = 0;
+}
+
+function bossCooldown(bot, phase) {
+    const base = phase === 'critical' ? 78 : phase === 'enraged' ? 96 : 124;
+    return Math.max(60, base - (bot.tier || 0) * 6 + Math.floor(Math.random() * 20));
+}
+
+function bossPickAttack(bot) {
+    const abilities = bot.abilities || {};
+    const phase = bossPhaseInfo(bot).phase;
+    const pool = ['wave'];
+    if (abilities.hasDash) pool.push('dash');
+    if (abilities.hasGrab) pool.push('grab');
+    if (abilities.hasTeleport) pool.push('teleport');
+    if (abilities.hasMultiWave) pool.push('multiWave');
+    if (abilities.hasBerserk && phase !== 'calm') pool.push('berserk');
+    // deterministic rotation to avoid repeats
+    if (!bot.pattern || bot.patIdx >= bot.pattern.length) {
+        // shuffle a fresh copy but always lead with a "wave-family" attack
+        const copy = pool.slice();
+        for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; }
+        bot.pattern = copy; bot.patIdx = 0;
+    }
+    return bot.pattern[bot.patIdx++];
+}
+
 /* ---------------------------------------------------------------- *
- *  REAL SUMO PHYSICS — updatePhysics()
+ *  REAL SUMO PHYSICS — updatePhysics()  (frame-rate independent / dt)
  * ---------------------------------------------------------------- */
 function updatePhysics() {
     if (gameMode === 'none') { gameActive = false; return; }
     if (!gameActive) { touchBox.style.display = 'none'; touchBox.classList.remove('active'); return; }
+
+    const _now = performance.now();
+    let _dtms = _now - (_lastPhys || _now);
+    _lastPhys = _now;
+    if (_dtms <= 0) _dtms = 16;
+    const dt = Math.min(0.1, _dtms / 1000);
+    const n = dt * 60; // reference frames elapsed this tick (60fps reference)
+
+    // dt-based particles
     for (let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;
-        if (p.a <= 0) particles.splice(i, 1);
+        const p = particles[i];
+        p.x += p.vx * n; p.y += p.vy * n;
+        p.vx = dampStep(p.vx, 0.9, n); p.vy = dampStep(p.vy, 0.9, n);
+        p.a -= 0.06 * n;
+        if (p.a <= 0 || p.x < -50 || p.x > 850 || p.y < -50 || p.y > 650) particles.splice(i, 1);
     }
+
     let dx = 0, dy = 0;
     if (keys['arrowup'] || keys['w']) dy -= 1;
     if (keys['arrowdown'] || keys['s']) dy += 1;
@@ -338,12 +493,14 @@ function updatePhysics() {
             offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
             document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
         }
-        const momentum = 1.6 + upgrades.neonMomentum * 0.12;
+
+        // —— Player movement (dt-normalized) ——
+        const momentum = (1.6 + upgrades.neonMomentum * 0.12) * n;
         player.vx += dx * momentum; player.vy += dy * momentum;
-        player.vx *= 0.88; player.vy *= 0.88;
         const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
-        player.vx *= recovery; player.vy *= recovery;
-        player.x += player.vx; player.y += player.vy;
+        player.vx = dampStep(player.vx, 0.88, n); player.vy = dampStep(player.vy, 0.88, n);
+        player.vx = dampStep(player.vx, recovery, n); player.vy = dampStep(player.vy, recovery, n);
+        player.x += player.vx * n; player.y += player.vy * n;
         if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
             reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
             player.alive = false; stageEnded = true;
@@ -352,98 +509,185 @@ function updatePhysics() {
             document.getElementById('modal-death').classList.remove('hidden');
             return;
         }
+
+        // —— Bot / Boss update loop ——
         let active = bots.filter(bot => bot.alive);
+
         for (let bot of active) {
-            let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-            bot.cd = (bot.cd || 0) + 1;
-            if (bot.hurtCd > 0) bot.hurtCd -= 1;
-            let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
-            let critical = bot.isBoss && bot.hp <= bot.maxHp * 0.25;
-            if (raging && bot.phase === 1) { bot.phase = 2; bot.color = '#ff3366'; spawnImpact(bot.x, bot.y, '#ff3366'); }
-            if (critical && bot.phase === 2) { bot.phase = 3; bot.color = '#ffbb00'; bot.shield = bot.maxShield; bot.shieldCooldown = 240; bot.minionCooldown = 1; spawnImpact(bot.x, bot.y, '#ffbb00'); }
+            const angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+            bot.cd = (bot.cd || 0) + n;
+            if (bot.hurtCd && bot.hurtCd > 0) bot.hurtCd -= n;
+            const selfPower = playerPower();
+            const selfMass = playerMass();
+
             if (bot.isBoss) {
-                if (bot.shieldCooldown > 0) bot.shieldCooldown -= 1;
-                if (bot.shield <= 0 && bot.shieldCooldown === 0 && bot.hp > 0) { bot.shield = Math.min(bot.maxShield, bot.shield + 0.02); }
-                bot.minionCooldown -= 1;
-                const minionCount = bots.filter(candidate => candidate.alive && candidate.bossMinion).length;
-                if (bot.minionCooldown <= 0 && minionCount < 2 && bot.hp > 0) { addBossMinion(bot); bot.minionCooldown = Math.max(260, 420 - bot.tier * 35); }
-                bot.attackCooldown -= 1;
-                if (bot.telegraph > 0) {
-                    bot.telegraph -= 1;
-                    if (bot.telegraph === 0) {
-                        if (bot.attackType === 'wave') {
-                            bot.pulseRadius = 12;
-                            if (distanceToPlayer(bot) < 190) {
-                                const waveForce = raging ? 9.5 : 7.5;
-                                player.vx += Math.cos(angle) * waveForce;
-                                player.vy += Math.sin(angle) * waveForce;
+                // ---- Phase state machine ----
+                const info = bossPhaseInfo(bot);
+                if (info.phase !== bot.phaseName) {
+                    const was = bot.phaseName;
+                    bot.phaseName = info.phase;
+                    bot.color = info.color;
+                    bot.phaseFlash = 30;
+                    spawnImpact(bot.x, bot.y, info.color);
+                    if (info.phase === 'enraged' || info.phase === 'critical') {
+                        bot.attackCd = 0;                       // immediate next attack
+                        if (info.phase === 'critical') {
+                            if (bossHas(bot, 'voidArmor')) { bot.shield = bot.maxShield; bot.shieldCd = 120; }
+                            if (bossHas(bot, 'minions')) spawnMinions(bot, 2);
+                        } else if (was === 'calm' && bossHas(bot, 'berserk')) {
+                            // berserk opener pulse
+                            bot.pulseR = 14;
+                            if (distanceToPlayer(bot) < 240) {
+                                const f = 8 * n;
+                                player.vx += Math.cos(angle) * f; player.vy += Math.sin(angle) * f;
                             }
-                        } else {
-                            bot.dashTimer = raging ? 20 : 16;
-                            bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2);
-                            bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
                         }
-                        bot.attackType = null;
-                        bot.attackCooldown = Math.max(68, (critical ? 78 : raging ? 92 : 118) - bot.tier * 6);
                     }
-                } else if (bot.attackCooldown <= 0) {
-                    bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
-                    bot.attackCycle = (bot.attackCycle || 0) + 1;
-                    bot.telegraph = 42 + bot.tier * 3;
                 }
-                if (bot.pulseRadius > 0) bot.pulseRadius += 10;
-                if (bot.pulseRadius > 210) bot.pulseRadius = 0;
-            }
-            let speed = bot.speed * (critical ? 1.5 : raging ? 1.35 : 1);
-            let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
-            let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
-            let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
-            if (bot.cd > dashAt) speed *= dashMul;
-            if (bot.cd > dashEnd) bot.cd = 0;
-            if (bot.isBoss && bot.dashTimer > 0) {
-                bot.vx = bot.dashVx; bot.vy = bot.dashVy; bot.dashTimer -= 1;
-            } else {
-                bot.vx += Math.cos(angle) * speed; bot.vy += Math.sin(angle) * speed;
-            }
-            bot.vx *= bot.isBoss ? 0.92 : 0.9;
-            bot.vy *= bot.isBoss ? 0.92 : 0.9;
-            bot.x += bot.vx; bot.y += bot.vy;
-            let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
-            if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
-                let nx = (bot.x - 400) / fromCenter; let ny = (bot.y - 300) / fromCenter;
-                bot.x = 400 + nx * (offlineArenaRadius - 12); bot.y = 300 + ny * (offlineArenaRadius - 12);
-                bot.vx *= 0.25; bot.vy *= 0.25;
-            } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) { bot.alive = false; }
-            let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
-            if (bot.isBoss) {
-                bot.slamCd = (bot.slamCd || 0) + 1;
-                if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
-                    let slam = (raging ? 18 : 13) + bot.power * 0.22;
+                bot.phaseFlash = Math.max(0, (bot.phaseFlash || 0) - n);
+
+                // ---- Shield (void armor: faster regen + resist) ----
+                if (bot.shieldCd && bot.shieldCd > 0) bot.shieldCd -= n;
+                if (bot.shield <= 0 && bot.shieldCd <= 0 && bot.hp > 0) {
+                    const regen = bossHas(bot, 'voidArmor') ? 0.06 : 0.02;
+                    bot.shield = Math.min(bot.maxShield, bot.shield + regen);
+                }
+
+                // ---- Minions ----
+                if (bossHas(bot, 'minions')) {
+                    bot.minionCd = (bot.minionCd || 0) - n;
+                    const minionCount = bots.filter(c => c.alive && c.bossMinion).length;
+                    if (bot.minionCd <= 0 && minionCount < 2 && bot.hp > 0) {
+                        spawnMinions(bot, 1);
+                        bot.minionCd = Math.max(320, 520 - (bot.tier || 0) * 6);
+                    }
+                }
+
+                // ---- Berserk periodic pulses ----
+                if (bossHas(bot, 'berserk') && info.phase !== 'calm') {
+                    bot.berserkPulse = (bot.berserkPulse || 200) - n;
+                    if (bot.berserkPulse <= 0) {
+                        bot.berserkPulse = info.phase === 'critical' ? 300 : 420;
+                        bot.pulseR = 14;
+                        if (distanceToPlayer(bot) < 240) {
+                            const f = (info.phase === 'critical' ? 9 : 7.5) * n;
+                            player.vx += Math.cos(angle) * f; player.vy += Math.sin(angle) * f;
+                        }
+                    }
+                }
+
+                // ---- Teleport follow-up dash ----
+                if (bot.dashDur2 && bot.dashDur2 > 0) {
+                    bot.dashDur2 -= n;
+                    bot.vx = bot.dashVx; bot.vy = bot.dashVy;
+                }
+
+                // ---- Telegraph -> resolve attack ----
+                if (bot.curAttack && bot.telegraph > 0) {
+                    bot.telegraph -= n;
+                    if (bot.telegraph <= 0) resolveBossAttack(bot, n, angle);
+                } else if (bot.curAttack && bot.multiLeft > 0) {
+                    bot.telegraph -= n;
+                    if (bot.telegraph <= 0) resolveBossAttack(bot, n, angle);
+                } else if (bot.attackCd > 0) {
+                    bot.attackCd -= n;
+                } else if (!bot.curAttack) {
+                    const pick = bossPickAttack(bot);
+                    bot.curAttack = pick;
+                    bot.cue = pick;
+                    bot.telegraph = (pick === 'grab' || pick === 'teleport') ? 66 : (pick === 'multiWave' ? 60 : 46);
+                }
+
+                // ---- Grab follow-through (brief pull continues) ----
+                if (bot.grabT && bot.grabT > 0) {
+                    bot.grabT -= n;
+                    if (distanceToPlayer(bot) < 250) {
+                        const pull = -6 * n;
+                        player.vx += Math.cos(angle) * pull; player.vy += Math.sin(angle) * pull;
+                    }
+                }
+
+                // ---- Shockwave pulse visual/timer ----
+                if (bot.pulseR && bot.pulseR > 0) {
+                    bot.pulseR += n * 10;
+                    if (bot.pulseR > 230) bot.pulseR = 0;
+                }
+
+                // ---- Dash state ----
+                if (bot.dashT && bot.dashT > 0) {
+                    bot.dashDur -= n;
+                    bot.vx = bot.dashVx; bot.vy = bot.dashVy;
+                    if (bot.dashDur <= 0) bot.dashT = 0;
+                }
+
+                // ---- Slam ----
+                bot.slamCd = (bot.slamCd || 0) + n;
+                const slamAt = info.phase === 'enraged' || info.phase === 'critical' ? 115 : 150;
+                const dist = Math.hypot(bot.x - player.x, bot.y - player.y);
+                if (bot.slamCd > slamAt && dist < bot.radius + player.radius + 55) {
+                    const slam = ((info.phase === 'critical' ? 19 : info.phase === 'enraged' ? 16 : 13) + bot.power * 0.22) * n;
                     player.vx -= Math.cos(angle) * slam; player.vy -= Math.sin(angle) * slam;
                     bot.slamCd = 0; spawnImpact(player.x, player.y, '#ff0055');
                 }
+
+                // ---- Boss chase speed ----
+                const speed = bot.speed * (info.phase === 'critical' ? 1.5 : info.phase === 'enraged' ? 1.35 : 1);
+                if (bot.dashT <= 0 && !bot.dashDur2) {
+                    bot.vx += Math.cos(angle) * speed * n; bot.vy += Math.sin(angle) * speed * n;
+                }
+                bot.vx = dampStep(bot.vx, 0.92, n); bot.vy = dampStep(bot.vy, 0.92, n);
+            } else {
+                // ---- Regular bot / minion movement (dt) ----
+                let speed = bot.speed;
+                const dashAt = 80, dashEnd = dashAt + 28, dashMul = 1.85;
+                if (bot.cd > dashAt) speed *= dashMul;
+                if (bot.cd > dashEnd) bot.cd = 0;
+                bot.vx += Math.cos(angle) * speed * n; bot.vy += Math.sin(angle) * speed * n;
+                bot.vx = dampStep(bot.vx, 0.9, n); bot.vy = dampStep(bot.vy, 0.9, n);
             }
+
+            bot.x += bot.vx * n; bot.y += bot.vy * n;
+
+            // ---- Boundary ----
+            const fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
+            if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
+                const nx = (bot.x - 400) / fromCenter, ny = (bot.y - 300) / fromCenter;
+                bot.x = 400 + nx * (offlineArenaRadius - 12); bot.y = 300 + ny * (offlineArenaRadius - 12);
+                bot.vx *= 0.25; bot.vy *= 0.25;
+            } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
+                bot.alive = false;
+            }
+
+            // ---- Collision / push (dt-normalized) ----
+            const distance = Math.hypot(bot.x - player.x, bot.y - player.y);
             if (distance < player.radius + bot.radius) {
-                let overlap = player.radius + bot.radius - distance;
-                let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
-                player.x -= Math.cos(collisionAngle) * (overlap * 0.45); player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
-                bot.x += Math.cos(collisionAngle) * (overlap * 0.55); bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
-                let playerMass = 1.0 + upgrades.weight * 0.25;
-                let playerPower = 6.0 + upgrades.power * 1.5;
-                const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
-                player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor;
-                player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                const overlap = player.radius + bot.radius - distance;
+                const collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
+                player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
+                player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
+                bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
+                bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
+
+                const armorFactor = Math.max(0.55, (1 - upgrades.voidArmor * 0.12) * (bot.isBoss && bossHas(bot, 'voidArmor') ? 0.7 : 1));
+                player.vx -= Math.cos(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
+                player.vy -= Math.sin(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
+
                 let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
                 if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
-                    let damage = 1;
-                    if (bot.shield > 0) { bot.shield = Math.max(0, bot.shield - damage); bot.shieldCooldown = 180; }
-                    else { bot.hp = Math.max(0, bot.hp - damage); bot.hurtCd = 22; if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); } }
+                    const damage = 1;
+                    if (bot.shield > 0) { bot.shield = Math.max(0, bot.shield - damage); bot.shieldCd = 180; }
+                    else {
+                        bot.hp = Math.max(0, bot.hp - damage);
+                        bot.hurtCd = 22;
+                        if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); }
+                    }
                 }
-                bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
-                bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
+                bot.vx += Math.cos(collisionAngle) * (selfPower / bot.mass) * armor * n;
+                bot.vy += Math.sin(collisionAngle) * (selfPower / bot.mass) * armor * n;
                 spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
             }
         }
+
         if (activeMode === 'timeAttack') {
             const aliveCount = bots.filter(bot => bot.alive).length;
             modeEliminations += active.length - aliveCount;
@@ -492,28 +736,56 @@ function render() {
             ctx.fillStyle = bot.color; ctx.fill();
             ctx.lineWidth = (bot.isBoss ? 4 : 2) * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
             if (bot.isBoss) {
-                if (bot.telegraph > 0) {
-                    const warningRadius = bot.attackType === 'wave' ? 190 : 64;
-                    const wrScaled = warningRadius * scale;
+                // telegraph cue ring (per ability)
+                if (bot.curAttack && bot.telegraph > 0) {
+                    const meta = window.NeonSystems?.bosses?.ABILITY_META || {};
+                    const cueCfg = {
+                        wave:      { r: 190, c: '#ffbb00' },
+                        wavePush:  { r: 190, c: '#ffbb00' },
+                        multiWave: { r: 220, c: '#ff6600' },
+                        berserk:   { r: 240, c: '#ff3366' },
+                        dash:      { r: 64,  c: '#ff0055' },
+                        grab:      { r: 250, c: '#cc00ff' },
+                        teleport:  { r: 70,  c: '#cc00ff' }
+                    };
+                    const cfg = cueCfg[bot.curAttack] || { r: 190, c: '#ffbb00' };
+                    const wrScaled = cfg.r * scale;
                     ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, wrScaled, 0, Math.PI * 2);
-                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = bot.attackType === 'wave' ? '#ffbb00' : '#ff0055';
-                    ctx.globalAlpha = 0.35 + (bot.telegraph % 10) / 20;
+                    ctx.lineWidth = (3 + Math.floor(bot.telegraph / 6) % 3) * scale;
+                    ctx.strokeStyle = cfg.c;
+                    ctx.globalAlpha = 0.3 + (bot.telegraph % 8) / 16;
                     ctx.stroke(); ctx.globalAlpha = 1;
+                    // ability name tag
+                    const label = (meta[bot.curAttack] && meta[bot.curAttack].name) || bot.curAttack;
+                    ctx.font = `${Math.max(9, 11 * scale)}px monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = cfg.c;
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillText(label.toUpperCase(), bot.x * scale, bot.y * scale - br - 22 * scale);
+                    ctx.globalAlpha = 1;
                 }
-                if (bot.pulseRadius > 0) {
-                    const prScaled = bot.pulseRadius * scale;
+                // shockwave / berserk pulse
+                if (bot.pulseR > 0) {
+                    const prScaled = bot.pulseR * scale;
                     ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, prScaled, 0, Math.PI * 2);
                     ctx.lineWidth = 5 * scale; ctx.strokeStyle = '#ffbb00';
-                    ctx.globalAlpha = Math.max(0, 1 - bot.pulseRadius / 220);
+                    ctx.globalAlpha = Math.max(0, 1 - bot.pulseR / 230);
+                    ctx.stroke(); ctx.globalAlpha = 1;
+                }
+                // phase flash ring
+                if (bot.phaseFlash && bot.phaseFlash > 0) {
+                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + 8 * scale, 0, Math.PI * 2);
+                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = bot.color;
+                    ctx.globalAlpha = Math.min(1, bot.phaseFlash / 30) * 0.8;
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
                 const bw = bot.radius * 2.2 * scale;
                 const bx = bot.x * scale - bw / 2;
-                const by = bot.y * scale - bot.radius * scale - 16 * scale;
+                const by = bot.y * scale - bot.radius * scale - 30 * scale;
                 ctx.fillStyle = '#351323'; ctx.fillRect(bx, by, bw, 5 * scale);
                 ctx.fillStyle = '#00ff66'; ctx.fillRect(bx, by, bw * Math.max(0, bot.hp / bot.maxHp), 5 * scale);
-                ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 7 * scale, bw, 3 * scale);
-                ctx.fillStyle = '#00e5ff'; ctx.fillRect(bx, by - 7 * scale, bw * Math.max(0, bot.shield / bot.maxShield), 3 * scale);
+                ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 8 * scale, bw, 4 * scale);
+                ctx.fillStyle = '#00e5ff'; ctx.fillRect(bx, by - 8 * scale, bw * Math.max(0, bot.shield / bot.maxShield), 4 * scale);
             }
         }
         if (player.alive) {
