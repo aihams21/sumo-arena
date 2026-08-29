@@ -17,6 +17,8 @@ let particles = [];
 const CENTER = { x: 400, y: 300 };
 
 let _lastPhys = 0;
+let bossRungOut = false;
+let configHadBoss = false;
 
 /* ---- Refined body scaling (diminishing returns) ---- */
 function playerRadius() {
@@ -52,6 +54,8 @@ function startModeBase(mode, radius) {
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
     player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
     player.radius = playerRadius(); bots = []; particles = [];
+    configHadBoss = false; bossRungOut = false;
+    offlineArenaRadius = radius;
     modeTime = ARCADE_MODES[mode]?.duration || 0;
     modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
     modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
@@ -199,7 +203,14 @@ function startOfflineStage(level) {
         touchBox.classList.add('active');
         stageEnded = false;
         stageReady = false;
-        offlineArenaRadius = config.arenaRadius;
+        configHadBoss = !!(config.isBoss || config.isMiniBoss);
+        bossRungOut = false;
+        if (config.isBoss || config.isMiniBoss) {
+            // Massive boss arena: plenty of room for tactical dodging.
+            offlineArenaRadius = Math.min(560, offlineArenaRadius * (config.isMiniBoss ? 1.5 : 1.85));
+        } else {
+            offlineArenaRadius = config.arenaRadius;
+        }
         player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
         player.radius = playerRadius(); bots = []; particles = [];
         if (config.isBoss || config.isMiniBoss) {
@@ -211,7 +222,8 @@ function startOfflineStage(level) {
                 speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
                 isBoss: true, isMiniBoss: isMini,
                 alive: true, cd: 0, slamCd: 90, phaseName: 'calm', hp: stats.maxHp, maxHp: stats.maxHp,
-                shield: stats.shield, maxShield: stats.shield, shieldCd: 0, hurtCd: 0,
+                shield: stats.shield, maxShield: stats.shield, shieldGap: 0, hurtCd: 0,
+                broken: false, brokenFlash: 0,
                 attackCd: 120, curAttack: null, cue: null, telegraph: 0, dashT: 0, dashDur: 0,
                 dashVx: 0, dashVy: 0, dashDur2: 0, grabT: 0, pulseR: 0, minionCd: 320,
                 pattern: null, patIdx: 0, tier: stats.tier, abilities: stats.abilities
@@ -532,7 +544,7 @@ function updatePhysics() {
                     if (info.phase === 'enraged' || info.phase === 'critical') {
                         bot.attackCd = 0;                       // immediate next attack
                         if (info.phase === 'critical') {
-                            if (bossHas(bot, 'voidArmor')) { bot.shield = bot.maxShield; bot.shieldCd = 120; }
+                            if (bossHas(bot, 'voidArmor') && !bot.broken) bot.shield = bot.maxShield;
                             if (bossHas(bot, 'minions')) spawnMinions(bot, 2);
                         } else if (was === 'calm' && bossHas(bot, 'berserk')) {
                             // berserk opener pulse
@@ -545,11 +557,15 @@ function updatePhysics() {
                     }
                 }
                 bot.phaseFlash = Math.max(0, (bot.phaseFlash || 0) - n);
+                bot.brokenFlash = Math.max(0, (bot.brokenFlash || 0) - n);
 
-                // ---- Shield (void armor: faster regen + resist) ----
-                if (bot.shieldCd && bot.shieldCd > 0) bot.shieldCd -= n;
-                if (bot.shield <= 0 && bot.shieldCd <= 0 && bot.hp > 0) {
-                    const regen = bossHas(bot, 'voidArmor') ? 0.06 : 0.02;
+                // ---- Shield: recharges whenever the player stops attacking ----
+                bot.shieldGap = Math.max(0, (bot.shieldGap || 0) - n); // reset on every shield hit
+                if (bot.hp <= 0) bot.broken = true; // armor always breaks at 0 HP (defensive sync)
+                if (bot.broken) {
+                    bot.shield = 0;
+                } else if (bot.shieldGap <= 0 && bot.shield < bot.maxShield && bot.hp > 0) {
+                    const regen = bossHas(bot, 'voidArmor') ? 0.09 : 0.05;
                     bot.shield = Math.min(bot.maxShield, bot.shield + regen);
                 }
 
@@ -630,8 +646,10 @@ function updatePhysics() {
                     bot.slamCd = 0; spawnImpact(player.x, player.y, '#ff0055');
                 }
 
-                // ---- Boss chase speed ----
-                const speed = bot.speed * (info.phase === 'critical' ? 1.5 : info.phase === 'enraged' ? 1.35 : 1);
+                // ---- Boss chase speed (broken boss is staggered / vulnerable) ----
+                const speed = bot.broken
+                    ? bot.speed * 0.5
+                    : bot.speed * (info.phase === 'critical' ? 1.5 : info.phase === 'enraged' ? 1.35 : 1);
                 if (bot.dashT <= 0 && !bot.dashDur2) {
                     bot.vx += Math.cos(angle) * speed * n; bot.vy += Math.sin(angle) * speed * n;
                 }
@@ -648,12 +666,24 @@ function updatePhysics() {
 
             bot.x += bot.vx * n; bot.y += bot.vy * n;
 
-            // ---- Boundary ----
+            // ---- Boundary (real sumo: only a physical ring-out eliminates) ----
             const fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
-            if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
-                const nx = (bot.x - 400) / fromCenter, ny = (bot.y - 300) / fromCenter;
-                bot.x = 400 + nx * (offlineArenaRadius - 12); bot.y = 300 + ny * (offlineArenaRadius - 12);
-                bot.vx *= 0.25; bot.vy *= 0.25;
+            if (bot.isBoss) {
+                const ringEdge = offlineArenaRadius - bot.radius;        // center must stay inside this
+                if (fromCenter > ringEdge) {
+                    if (bot.hp > 0) {
+                        // Armor intact => cannot be ringed out; clamp back inside.
+                        const nx = (bot.x - 400) / fromCenter, ny = (bot.y - 300) / fromCenter;
+                        const rest = Math.max(0, ringEdge - 4);
+                        bot.x = 400 + nx * rest; bot.y = 300 + ny * rest;
+                        bot.vx *= 0.25; bot.vy *= 0.25;
+                    } else if (fromCenter > offlineArenaRadius - bot.radius + 6) {
+                        // Armor broken => boss can finally be physically thrown out.
+                        bot.alive = false;
+                        spawnImpact(bot.x, bot.y, '#ff6600');
+                        bossRungOut = true;
+                    }
+                }
             } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
                 bot.alive = false;
             }
@@ -672,18 +702,32 @@ function updatePhysics() {
                 player.vx -= Math.cos(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
                 player.vy -= Math.sin(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
 
-                let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
+                // Knockback armor: intact boss resists pushes; broken boss takes full shove.
+                const armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
+                const broken = bot.isBoss && bot.broken;
                 if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
                     const damage = 1;
-                    if (bot.shield > 0) { bot.shield = Math.max(0, bot.shield - damage); bot.shieldCd = 180; }
-                    else {
+                    if (bot.shield > 0) {
+                        bot.shield = Math.max(0, bot.shield - damage);
+                        bot.shieldGap = 90; // player attacking => delay shield recharge
+                        if (bot.shield <= 0) spawnImpact(bot.x, bot.y, '#00e5ff');
+                    } else {
                         bot.hp = Math.max(0, bot.hp - damage);
                         bot.hurtCd = 22;
-                        if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); }
+                        if (bot.hp <= 0 && !bot.broken) {
+                            // Armor broken: boss does NOT die — it becomes vulnerable to being thrown out.
+                            bot.broken = true;
+                            bot.brokenFlash = 60;
+                            bot.shield = 0;
+                            spawnImpact(bot.x, bot.y, '#ff6600');
+                            if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(120, .25, 'sawtooth', .05);
+                        }
                     }
                 }
-                bot.vx += Math.cos(collisionAngle) * (selfPower / bot.mass) * armor * n;
-                bot.vy += Math.sin(collisionAngle) * (selfPower / bot.mass) * armor * n;
+                // Broken boss: amplified shove so the player can physically throw it out (ring-out win).
+                const pushMass = broken ? Math.max(1, bot.mass * 0.25) : bot.mass;
+                bot.vx += Math.cos(collisionAngle) * (selfPower / pushMass) * (broken ? 4.0 : armor) * n;
+                bot.vy += Math.sin(collisionAngle) * (selfPower / pushMass) * (broken ? 4.0 : armor) * n;
                 spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
             }
         }
@@ -696,8 +740,10 @@ function updatePhysics() {
         }
         const activeBoss = getActiveBoss();
         const remainingBots = bots.filter(bot => bot.alive).length;
-        const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
-        const stageVictory = activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+        // Victory in a boss stage is a REAL sumo ring-out — the boss must be
+        // physically thrown out of the arena. Depleting its HP only breaks its
+        // armor; it never auto-wins when HP/shield runs out.
+        const stageVictory = activeMode === 'stage' && (remainingBots === 0 || (configHadBoss && !activeBoss));
         const arcadeVictory = activeMode !== 'stage' && remainingBots === 0;
         if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
             if (activeMode === 'stage') { finishOfflineStage(); return; }
@@ -779,13 +825,45 @@ function render() {
                     ctx.globalAlpha = Math.min(1, bot.phaseFlash / 30) * 0.8;
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
+                // Berserk rage aura (enraged / critical)
+                if (bot.phaseName === 'enraged' || bot.phaseName === 'critical') {
+                    const pulse = (performance.now() % 800) / 800;
+                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + (10 + pulse * 8) * scale, 0, Math.PI * 2);
+                    ctx.lineWidth = 6 * scale; ctx.strokeStyle = bot.phaseName === 'critical' ? '#ffbb00' : '#ff3366';
+                    ctx.globalAlpha = 0.35 + 0.3 * (1 - pulse);
+                    ctx.stroke(); ctx.globalAlpha = 1;
+                }
+                // Broken (armor shattered): the boss is now shove-able to a ring-out.
+                if (bot.broken) {
+                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + 5 * scale, 0, Math.PI * 2);
+                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = '#ff6600';
+                    ctx.globalAlpha = 0.5 + 0.4 * Math.abs(Math.sin(bot.brokenFlash / 8));
+                    ctx.stroke(); ctx.globalAlpha = 1;
+                    ctx.font = `bold ${Math.max(10, 13 * scale)}px monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#ff6600';
+                    ctx.fillText('ARMOR BROKEN', bot.x * scale, bot.y * scale - br - 30 * scale);
+                }
                 const bw = bot.radius * 2.2 * scale;
                 const bx = bot.x * scale - bw / 2;
-                const by = bot.y * scale - bot.radius * scale - 30 * scale;
+                const by = bot.y * scale - bot.radius * scale - (bot.broken ? 58 : 46) * scale;
+                // Shield (top bar, cyan) — layered with HP
+                ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 8 * scale, bw, 5 * scale);
+                ctx.fillStyle = bot.broken ? '#ff6600' : '#00e5ff';
+                ctx.fillRect(bx, by - 8 * scale, bw * Math.max(0, bot.shield / bot.maxShield), 5 * scale);
+                // HP / armor (lower bar, green -> gold when nearly gone)
                 ctx.fillStyle = '#351323'; ctx.fillRect(bx, by, bw, 5 * scale);
-                ctx.fillStyle = '#00ff66'; ctx.fillRect(bx, by, bw * Math.max(0, bot.hp / bot.maxHp), 5 * scale);
-                ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 8 * scale, bw, 4 * scale);
-                ctx.fillStyle = '#00e5ff'; ctx.fillRect(bx, by - 8 * scale, bw * Math.max(0, bot.shield / bot.maxShield), 4 * scale);
+                const hpColor = bot.hp <= 0 ? '#ff6600' : bot.hp / bot.maxHp <= 0.25 ? '#ffbb00' : '#00ff66';
+                ctx.fillStyle = hpColor;
+                ctx.fillRect(bx, by, bw * Math.max(0, bot.hp / bot.maxHp), 5 * scale);
+                if (bot.broken) {
+                    ctx.font = `${Math.max(8, 9 * scale)}px monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillText('PUSH OUT TO WIN', bx + bw / 2, by + 22 * scale);
+                    ctx.globalAlpha = 1;
+                }
             }
         }
         if (player.alive) {
