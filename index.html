@@ -463,8 +463,9 @@
         /* ── Game Data ── */
          let coins = 0; try { coins = parseInt(localStorage.getItem('sumo_coins') || '0'); } catch(_e) {}
          let maxUnlockedStage = 1; try { maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1'); } catch(_e) {}
-         let upgrades = {}; try { upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}'); } catch(_e) { upgrades = {"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}; }
-        upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0, ...upgrades };
+         let upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0 };
+         try { const _u = JSON.parse(localStorage.getItem('sumo_upgrades') || ''); if (_u && typeof _u === 'object') upgrades = _u; } catch(_e) {}
+         upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0, ...upgrades };
         const bodyUpgrades = [
             { id:'coreDensity', name:'Core Density', icon:'◈', unlock:10, lore:'Recovered from the Foundry. Adds mass against heavy bosses.', max:3, cost: level => (level + 1) * 45 },
             { id:'neonMomentum', name:'Neon Momentum', icon:'⚡', unlock:12, lore:'Charged in Wave 12. Builds faster movement and impact power.', max:3, cost: level => (level + 1) * 55 },
@@ -506,7 +507,7 @@
              try { localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission)); } catch(_e) {}
         }
         function claimDailyMission() { resetDailyMissionIfNeeded(); if (dailyMission.wins < 3 || dailyMission.claimed) return; dailyMission.claimed = true; coins += 25; saveData(); updateDailyMission(); }
-        function saveData() { try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
+        function saveData() { const _safeU = upgrades && typeof upgrades === 'object' ? upgrades : { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0 }; try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(_safeU)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = _safeU; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
         function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
         let gameMode = 'none', activeMode = 'stage';
         const ARCADE_MODES = { chaos: { radius:185, bots:6, botScale:6, reward:20 }, timeAttack: { radius:235, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:250, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };

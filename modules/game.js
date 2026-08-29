@@ -253,8 +253,11 @@ function startOfflineStage(level) {
         configHadBoss = !!(config.isBoss || config.isMiniBoss);
         bossRungOut = false;
         if (config.isBoss || config.isMiniBoss) {
-            // Massive boss arena: plenty of room for tactical dodging.
-            offlineArenaRadius = Math.min(560, offlineArenaRadius * (config.isMiniBoss ? 1.5 : 1.85));
+            // Massive boss arena: plenty of room for tactical dodging. Always
+            // derived from THIS stage's config — never from a leftover/compounding
+            // value — so retries and revives get a stable, predictable arena
+            // (a shifting arena was a source of out-of-nowhere ring-outs).
+            offlineArenaRadius = Math.min(560, config.arenaRadius * (config.isMiniBoss ? 1.5 : 1.85));
         } else {
             offlineArenaRadius = config.arenaRadius;
         }
@@ -356,12 +359,19 @@ function registerPlayerDeath() {
 function reviveInPlaceOffline() {
     gameActive = true;
     stageEnded = false;
-    const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
+    // Player body/build must stay FULLY intact: re-sync radius from the live
+    // upgrades and re-apply the equipped skin — never a hardcoded/reset size.
+    player.radius = playerRadius();
+    applyEquippedSkin();
+    // Drop the player safely mid-arena (never dangling at the rim where a boss
+    // attack could instantly re-ring them out).
+    const dropRadius = Math.max(40, offlineArenaRadius * 0.45);
     const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
-    const scale = distance > safeDistance ? safeDistance / distance : 1;
+    const scale = distance > 1 ? Math.min(1, dropRadius / distance) : 1;
     player.x = 400 + (reviveSnapshot.x - 400) * scale;
     player.y = 300 + (reviveSnapshot.y - 300) * scale;
     player.vx = 0; player.vy = 0; player.alive = true;
+    player.spawnGrace = 30; // brief protection so a revive can't die instantly
     hideAllMenus();
     document.getElementById('hud').classList.remove('hidden');
     touchBox.style.display = 'block';
@@ -609,11 +619,25 @@ function updatePhysics() {
         // —— Player movement (dt-normalized) ——
         const momentum = (1.6 + upgrades.neonMomentum * 0.12) * n;
         player.vx += dx * momentum; player.vy += dy * momentum;
+        // Post-revive spawn grace: brief knockback resistance + no ring-out so
+        // a freshly revived player is never instantly re-flung out of the arena.
+        if ((player.spawnGrace || 0) > 0) {
+            player.spawnGrace -= n;
+            player.vx *= 0.55; player.vy *= 0.55;
+        }
         const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
         player.vx = dampStep(player.vx, 0.88, n); player.vy = dampStep(player.vy, 0.88, n);
         player.vx = dampStep(player.vx, recovery, n); player.vy = dampStep(player.vy, recovery, n);
+        // Velocity cap: a single frame can never launch the player across the
+        // arena (stacked boss knockback on a high-dt/lag frame previously killed
+        // from mid-arena in one frame — the "death out of nowhere").
+        const pSpd = Math.hypot(player.vx, player.vy);
+        if (pSpd > 30) { player.vx = (player.vx / pSpd) * 30; player.vy = (player.vy / pSpd) * 30; }
         player.x += player.vx * n; player.y += player.vy * n;
-        if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius) {
+        // Legitimate ring-out ONLY: the player dies when their whole body has
+        // been pushed past the arena bounds (center + radius beyond the line).
+        // A single clipped frame right at the rim never counts as a death.
+        if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius + player.radius && !((player.spawnGrace || 0) > 0)) {
             reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
             player.alive = false; stageEnded = true;
             registerPlayerDeath();
