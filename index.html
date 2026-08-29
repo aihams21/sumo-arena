@@ -517,8 +517,10 @@
         let currentPlayingStage = 1, offlineArenaRadius = 240;
         let stageEnded = false, stageReady = false;
         let player = { x:400, y:300, vx:0, vy:0, radius:24, color:'#00e5ff', alive:true };
+        window.player = player; // Expose globally for headless testing
         applyEquippedSkin();
         let bots = [], gameParticles = [], keys = {};
+        window.bots = bots; // Expose globally for headless testing
         try { updateDisplays(); } catch(_e) {}
 
         window.onkeydown = e => { const key = e.key.toLowerCase(); keys[key] = true; if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots); if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots); };
