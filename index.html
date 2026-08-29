@@ -642,6 +642,18 @@
            ═══════════════════════════════════════ */
          function dismissLoading() { window.NeonBoot.forceShowMenu(); }
          dismissLoading();
+
+         // Expose all state to game.js modules (loaded after this script)
+         Object.defineProperty(window, 'gameMode', { get: () => gameMode, set: v => { gameMode = v; } });
+         Object.defineProperty(window, 'activeMode', { get: () => activeMode, set: v => { activeMode = v; } });
+         Object.defineProperty(window, 'gameActive', { get: () => gameActive, set: v => { gameActive = v; } });
+         Object.defineProperty(window, 'stageEnded', { get: () => stageEnded, set: v => { stageEnded = v; } });
+         Object.defineProperty(window, 'offlineArenaRadius', { get: () => offlineArenaRadius, set: v => { offlineArenaRadius = v; } });
+         Object.defineProperty(window, 'modeTime', { get: () => modeTime, set: v => { modeTime = v; } });
+         Object.defineProperty(window, 'modeElapsedMs', { get: () => modeElapsedMs, set: v => { modeElapsedMs = v; } });
+         Object.defineProperty(window, 'modeScore', { get: () => modeScore, set: v => { modeScore = v; } });
+         Object.defineProperty(window, 'modeEliminations', { get: () => modeEliminations, set: v => { modeEliminations = v; } });
+         Object.defineProperty(window, 'stageReady', { get: () => stageReady, set: v => { stageReady = v; } });
      </script>
      <script src="modules/storage.js"></script>
     <script src="modules/progression.js"></script>
