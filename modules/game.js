@@ -65,7 +65,14 @@ function startModeBase(mode, radius) {
     touchBox.classList.add('active');
     touchBox.style.bottom = (28 + (window.matchMedia('(max-width: 768px)').matches ? 0 : 28)) + 'px';
     player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-    player.radius = playerRadius(); bots = []; particles = []; hazards = [];
+    player.radius = playerRadius();
+    // Initialize physics state for player
+    player.faceAngle = 0;
+    player.maxSpeed = 10 + (upgrades.neonMomentum || 0) * 0.8;
+    player.accel = 15;
+    player.friction = 2.2;
+    player.rotationSpeed = 2.0;
+    bots = []; particles = []; hazards = [];
     configHadBoss = false; bossRungOut = false;
     offlineArenaRadius = radius;
     modeTime = ARCADE_MODES[mode]?.duration || 0;
@@ -100,15 +107,25 @@ function startShrinkingArena() {
 
 function addModeBot(index, scale, color) {
     const angle = index * 2.399;
-    bots.push({ x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
-        radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .48 + scale * .03, power: 5 + scale,
-        color, isBoss: false, alive: true, cd: 0 });
+    const baseSpeed = .48 + scale * .03;
+    bots.push({
+        x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
+        radius: 18 + scale * 2, mass: 1 + scale * .12, speed: baseSpeed, power: 5 + scale,
+        color, isBoss: false, alive: true, cd: 0,
+        // Physics state
+        faceAngle: angle, maxSpeed: baseSpeed * 20, accel: 12 + baseSpeed * 3, friction: 2.0, rotationSpeed: 1.8
+    });
 }
 
 function addBossMinion(boss) {
     const angle = (Math.random() * Math.PI * 2) + bots.length;
-    bots.push({ x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
-        radius: 16, mass: 1.08, speed: .42, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
+    const baseSpeed = .42;
+    bots.push({
+        x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
+        radius: 16, mass: 1.08, speed: baseSpeed, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true,
+        // Physics state
+        faceAngle: angle, maxSpeed: baseSpeed * 20, accel: 12 + baseSpeed * 3, friction: 2.0, rotationSpeed: 1.8
+    });
 }
 
 function getActiveBoss() { return bots.find(bot => bot.isBoss && bot.alive); }
@@ -262,22 +279,32 @@ function startOfflineStage(level) {
             offlineArenaRadius = config.arenaRadius;
         }
         player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-        player.radius = playerRadius(); bots = []; particles = []; hazards = [];
+        player.radius = playerRadius();
+        // Initialize physics state for player
+        player.faceAngle = 0;
+        player.maxSpeed = 10 + (upgrades.neonMomentum || 0) * 0.8;
+        player.accel = 15;
+        player.friction = 2.2;
+        player.rotationSpeed = 2.0;
+        bots = []; particles = []; hazards = [];
         if (config.isBoss || config.isMiniBoss) {
             const isMini = !!config.isMiniBoss;
             const stats = offlineBossStats(level, player.radius, isMini ? 0.75 : 1);
             const visual = stats.visual || defaultBossVisual(level, stats.tier, isMini);
             const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
+            const baseSpeed = stats.speed;
             bots.push({
                 x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                speed: stats.speed, power: stats.power, color: visual.color,
+                speed: baseSpeed, power: stats.power, color: visual.color,
                 isBoss: true, isMiniBoss: isMini, visual,
                 alive: true, cd: 0, slamCd: 90, phaseName: 'calm', hp: stats.maxHp, maxHp: stats.maxHp,
                 shield: stats.shield, maxShield: stats.shield, shieldGap: 0, hurtCd: 0,
                 broken: false, brokenFlash: 0,
                 attackCd: 120, curAttack: null, cue: null, telegraph: 0, dashT: 0, dashDur: 0,
                 dashVx: 0, dashVy: 0, dashDur2: 0, grabT: 0, pulseR: 0, minionCd: 320,
-                pattern: null, patIdx: 0, tier: stats.tier, abilities: stats.abilities
+                pattern: null, patIdx: 0, tier: stats.tier, abilities: stats.abilities,
+                // Physics state for boss
+                faceAngle: 0, maxSpeed: baseSpeed * 25, accel: 14, friction: 2.1, rotationSpeed: 2.2
             });
         } else {
             spawnHazards(level);
@@ -286,10 +313,13 @@ function startOfflineStage(level) {
             const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
             for (let i = 0; i < count; i++) {
                 let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
+                const baseSpeed = stats.speed;
                 bots.push({
                     x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
-                    vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
-                    power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
+                    vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: baseSpeed,
+                    power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0,
+                    // Physics state
+                    faceAngle: angle, maxSpeed: baseSpeed * 20, accel: 12 + baseSpeed * 3, friction: 2.0, rotationSpeed: 1.8
                 });
             }
         }
@@ -389,6 +419,16 @@ function spawnImpact(x, y, color) {
     const cap = mobilePerformance ? 45 : 120;
     if (particles.length > cap) particles.splice(0, particles.length - cap);
     if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
+}
+
+// Spawn floating damage number
+function spawnDamageNumber(x, y, damage) {
+    particles.push({ x, y, vx: (Math.random() - 0.5) * 2, vy: -3, a: 1, c: '#ff3333', isDamage: true, damage: damage });
+    const cap = mobilePerformance ? 20 : 40;
+    if (particles.filter(p => p.isDamage).length > cap) {
+        const idx = particles.findIndex(p => p.isDamage);
+        if (idx >= 0) particles.splice(idx, 1);
+    }
 }
 
 function distanceToPlayer(bot) { return Math.hypot(bot.x - player.x, bot.y - player.y); }
@@ -616,23 +656,39 @@ function updatePhysics() {
             document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
         }
 
-        // —— Player movement (dt-normalized) ——
-        const momentum = (1.6 + upgrades.neonMomentum * 0.12) * n;
-        player.vx += dx * momentum; player.vy += dy * momentum;
-        // Post-revive spawn grace: brief knockback resistance + no ring-out so
-        // a freshly revived player is never instantly re-flung out of the arena.
+        // —— Player movement: realistic acceleration + friction ——
+        // Extend player with physics state if not present
+        if (!player.faceAngle) player.faceAngle = 0;
+        if (!player.rotationSpeed) player.rotationSpeed = 2.0; // radians/sec
+        if (!player.maxSpeed) player.maxSpeed = 10 + upgrades.neonMomentum * 0.8; // higher with upgrade
+        if (!player.accel) player.accel = 15; // units/sec²
+        if (!player.friction) player.friction = 2.2; // slide-stop coefficient
+
+        // Accelerate toward desired velocity
+        const accelResult = window.NeonSystems?.physics?.accelerate(dx, dy, player.accel, player.maxSpeed, player.vx, player.vy, dt);
+        if (accelResult) { player.vx = accelResult.vx; player.vy = accelResult.vy; }
+
+        // Post-revive spawn grace: brief knockback resistance
         if ((player.spawnGrace || 0) > 0) {
             player.spawnGrace -= n;
             player.vx *= 0.55; player.vy *= 0.55;
         }
-        const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
-        player.vx = dampStep(player.vx, 0.88, n); player.vy = dampStep(player.vy, 0.88, n);
-        player.vx = dampStep(player.vx, recovery, n); player.vy = dampStep(player.vy, recovery, n);
-        // Velocity cap: a single frame can never launch the player across the
-        // arena (stacked boss knockback on a high-dt/lag frame previously killed
-        // from mid-arena in one frame — the "death out of nowhere").
+
+        // Apply friction (body slides then stops, doesn't dead-stop)
+        const frictionResult = window.NeonSystems?.physics?.applyFriction(player.vx, player.vy, player.friction * n);
+        if (frictionResult) { player.vx = frictionResult.vx; player.vy = frictionResult.vy; }
+
+        // Clamp velocity to max speed as a safety against single-frame launches
         const pSpd = Math.hypot(player.vx, player.vy);
-        if (pSpd > 30) { player.vx = (player.vx / pSpd) * 30; player.vy = (player.vy / pSpd) * 30; }
+        if (pSpd > player.maxSpeed * 1.2) { player.vx = (player.vx / pSpd) * player.maxSpeed * 1.2; player.vy = (player.vy / pSpd) * player.maxSpeed * 1.2; }
+
+        // Update facing angle toward travel direction
+        if (pSpd > 0.1) {
+            const travelAngle = Math.atan2(player.vy, player.vx);
+            player.faceAngle = window.NeonSystems?.physics?.rotateToward(player.faceAngle, travelAngle, player.rotationSpeed, dt) || player.faceAngle;
+        }
+
+        // Move player
         player.x += player.vx * n; player.y += player.vy * n;
         // Legitimate ring-out ONLY: the player dies when their whole body has
         // been pushed past the arena bounds (center + radius beyond the line).
@@ -770,22 +826,73 @@ function updatePhysics() {
                     bot.slamCd = 0; spawnImpact(player.x, player.y, '#ff0055');
                 }
 
-                // ---- Boss chase speed (broken boss is staggered / vulnerable) ----
-                const speed = bot.broken
-                    ? bot.speed * 0.5
-                    : bot.speed * (info.phase === 'critical' ? 1.5 : info.phase === 'enraged' ? 1.35 : 1);
+                // ---- Boss chase speed: realistic acceleration ----
+                if (!bot.faceAngle) bot.faceAngle = angle;
+                if (!bot.maxSpeed) bot.maxSpeed = bot.speed * 25;
+                if (!bot.accel) bot.accel = 14;
+                if (!bot.friction) bot.friction = 2.1;
+                if (!bot.rotationSpeed) bot.rotationSpeed = 2.2;
+
+                const speedMult = bot.broken ? 0.5 : (info.phase === 'critical' ? 1.5 : info.phase === 'enraged' ? 1.35 : 1);
                 if (bot.dashT <= 0 && !bot.dashDur2) {
-                    bot.vx += Math.cos(angle) * speed * n; bot.vy += Math.sin(angle) * speed * n;
+                    // Chase with realistic acceleration
+                    const chaseInput = Math.cos(angle);
+                    const chaseInputY = Math.sin(angle);
+                    const accelResult = window.NeonSystems?.physics?.accelerate(chaseInput, chaseInputY, bot.accel, bot.maxSpeed * speedMult, bot.vx, bot.vy, dt);
+                    if (accelResult) { bot.vx = accelResult.vx; bot.vy = accelResult.vy; }
                 }
-                bot.vx = dampStep(bot.vx, 0.92, n); bot.vy = dampStep(bot.vy, 0.92, n);
+
+                // Apply friction
+                const frictionResult = window.NeonSystems?.physics?.applyFriction(bot.vx, bot.vy, bot.friction * n);
+                if (frictionResult) { bot.vx = frictionResult.vx; bot.vy = frictionResult.vy; }
+
+                // Update facing angle
+                const bossSpd = Math.hypot(bot.vx, bot.vy);
+                if (bossSpd > 0.1) {
+                    const travelAngle = Math.atan2(bot.vy, bot.vx);
+                    bot.faceAngle = window.NeonSystems?.physics?.rotateToward(bot.faceAngle, travelAngle, bot.rotationSpeed, dt) || bot.faceAngle;
+                }
             } else {
-                // ---- Regular bot / minion movement (dt) ----
-                let speed = bot.speed;
-                const dashAt = 80, dashEnd = dashAt + 28, dashMul = 1.85;
-                if (bot.cd > dashAt) speed *= dashMul;
-                if (bot.cd > dashEnd) bot.cd = 0;
-                bot.vx += Math.cos(angle) * speed * n; bot.vy += Math.sin(angle) * speed * n;
-                bot.vx = dampStep(bot.vx, 0.9, n); bot.vy = dampStep(bot.vy, 0.9, n);
+                // ---- Regular bot / minion movement (dt) — realistic acceleration + AI ----
+                // Apply AI behaviors (dodge, flank, retreat, chase)
+                if (window.NeonSystems?.ai && !bot.bossMinion) {
+                    window.NeonSystems.ai.applyBotAI(bot, player, offlineArenaRadius, dt);
+                } else {
+                    // Fallback: simple chase
+                    // Add physics state to bots if missing
+                    if (!bot.faceAngle) bot.faceAngle = angle;
+                    if (!bot.maxSpeed) bot.maxSpeed = bot.speed * 20; // convert to units/sec
+                    if (!bot.accel) bot.accel = 12 + bot.speed * 3;
+                    if (!bot.friction) bot.friction = 2.0;
+                    if (!bot.rotationSpeed) bot.rotationSpeed = 1.8;
+
+                    // Calculate direction toward player
+                    const targetAngle = Math.atan2(player.y - bot.y, player.x - bot.x);
+                    const inputX = Math.cos(targetAngle);
+                    const inputY = Math.sin(targetAngle);
+
+                    // Apply realistic acceleration
+                    const dashAt = 80, dashEnd = dashAt + 28, dashMul = 1.85;
+                    const speedMult = bot.cd > dashAt ? dashMul : 1;
+                    const botMaxSpeed = bot.maxSpeed * speedMult;
+
+                    const accelResult = window.NeonSystems?.physics?.accelerate(inputX, inputY, bot.accel, botMaxSpeed, bot.vx, bot.vy, dt);
+                    if (accelResult) { bot.vx = accelResult.vx; bot.vy = accelResult.vy; }
+
+                    // Apply friction for realistic slide
+                    const frictionResult = window.NeonSystems?.physics?.applyFriction(bot.vx, bot.vy, bot.friction * n);
+                    if (frictionResult) { bot.vx = frictionResult.vx; bot.vy = frictionResult.vy; }
+
+                    // Update facing angle
+                    const botSpd = Math.hypot(bot.vx, bot.vy);
+                    if (botSpd > 0.1) {
+                        const travelAngle = Math.atan2(bot.vy, bot.vx);
+                        bot.faceAngle = window.NeonSystems?.physics?.rotateToward(bot.faceAngle, travelAngle, bot.rotationSpeed, dt) || bot.faceAngle;
+                    }
+
+                    // Reset dash cooldown flag
+                    if (bot.cd > dashEnd) bot.cd = 0;
+                }
             }
 
             bot.x += bot.vx * n; bot.y += bot.vy * n;
@@ -812,7 +919,7 @@ function updatePhysics() {
                 bot.alive = false;
             }
 
-            // ---- Collision / push (dt-normalized) ----
+            // ---- Collision / push (enhanced physics-based impact) ----
             const distance = Math.hypot(bot.x - player.x, bot.y - player.y);
             if (distance < player.radius + bot.radius) {
                 const overlap = player.radius + bot.radius - distance;
@@ -822,13 +929,45 @@ function updatePhysics() {
                 bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
                 bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
 
+                // Calculate relative closing speed for physics-based impact
+                const relVx = bot.vx - player.vx;
+                const relVy = bot.vy - player.vy;
+                const relSpeed = Math.hypot(relVx, relVy);
+
+                // Impact angle factor: how direct is the hit (based on facing angles)
+                const playerFacing = player.faceAngle || 0;
+                const botFacing = bot.faceAngle || collisionAngle;
+                const impactFactor = Math.abs(window.NeonSystems?.physics?.impactAngleFactor?.(playerFacing, collisionAngle) || 1);
+
+                // Physics-based impact force: speed × angle × mass ratio × power
+                const basePower = bot.power / selfMass;
+                const impactForce = window.NeonSystems?.physics?.calculateImpactForce?.(relSpeed, impactFactor, bot.mass, player.mass || 1, basePower) || (relSpeed * basePower * 0.5);
+
+                // Apply impact force to player (knockback)
                 const armorFactor = Math.max(0.55, (1 - upgrades.voidArmor * 0.12) * (bot.isBoss && bossHas(bot, 'voidArmor') ? 0.7 : 1));
-                player.vx -= Math.cos(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
-                player.vy -= Math.sin(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
+                const playerKnockback = impactForce * armorFactor * n * 2.5;
+                player.vx -= Math.cos(collisionAngle) * playerKnockback;
+                player.vy -= Math.sin(collisionAngle) * playerKnockback;
+
+                // Screen shake proportional to impact force
+                if (impactForce > 3 && window.NeonSystems?.audio) {
+                    window.NeonSystems.audio.triggerShake?.(Math.min(impactForce * 0.8, 12));
+                }
+
+                // Spawn impact particles and visual effects
+                const impactPoint = { x: (player.x + bot.x) / 2, y: (player.y + bot.y) / 2 };
+                spawnImpact(impactPoint.x, impactPoint.y, bot.color);
+
+                // Add floating damage number for strong hits
+                if (impactForce > 4) {
+                    spawnDamageNumber(impactPoint.x, impactPoint.y, Math.round(impactForce * 2));
+                }
 
                 // Knockback armor: intact boss resists pushes; broken boss takes full shove.
                 const armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
                 const broken = bot.isBoss && bot.broken;
+
+                // Apply recoil to bot (reduced based on its mass)
                 if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
                     const damage = 1;
                     if (bot.shield > 0) {
@@ -848,11 +987,12 @@ function updatePhysics() {
                         }
                     }
                 }
+
                 // Broken boss: amplified shove so the player can physically throw it out (ring-out win).
                 const pushMass = broken ? Math.max(1, bot.mass * 0.25) : bot.mass;
-                bot.vx += Math.cos(collisionAngle) * (selfPower / pushMass) * (broken ? 4.0 : armor) * n;
-                bot.vy += Math.sin(collisionAngle) * (selfPower / pushMass) * (broken ? 4.0 : armor) * n;
-                spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
+                const pushForce = impactForce * (broken ? 4.0 : armor) * n * 1.5;
+                bot.vx += Math.cos(collisionAngle) * pushForce * (selfPower / pushMass);
+                bot.vy += Math.sin(collisionAngle) * pushForce * (selfPower / pushMass);
             }
         }
 
@@ -963,8 +1103,19 @@ function render() {
         }
 
         for (let p of particles) {
-            ctx.beginPath(); ctx.arc(p.x * scale, p.y * scale, Math.max(1, 3 * scale), 0, Math.PI * 2);
-            ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
+            if (p.isDamage) {
+                // Render floating damage number
+                ctx.font = `bold ${Math.max(10, 14 * scale)}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = p.c;
+                ctx.globalAlpha = p.a;
+                ctx.fillText(p.damage, p.x * scale, p.y * scale);
+                ctx.globalAlpha = 1;
+            } else {
+                // Regular particle
+                ctx.beginPath(); ctx.arc(p.x * scale, p.y * scale, Math.max(1, 3 * scale), 0, Math.PI * 2);
+                ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
+            }
         }
         for (let bot of bots) {
             if (!bot.alive) continue;
