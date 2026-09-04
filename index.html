@@ -833,7 +833,12 @@
         }
 
         function startOfflineStage(level) {
-            const config = window.NeonSystems.progression.getStageConfig(level);
+            // Calculate player power factor based on upgrades
+            const totalUpgrades = upgrades.weight + upgrades.power + upgrades.neonMomentum + upgrades.voidArmor + upgrades.hydroPusher + upgrades.coreDensity;
+            const maxPossible = 60; // ~10 levels each × 6 stats
+            const playerPowerFactor = 0.7 + (totalUpgrades / maxPossible) * 0.9; // 0.7 → 1.6
+
+            const config = window.NeonSystems.progression.getStageConfig(level, playerPowerFactor);
             gameMode = 'offline';
             activeMode = 'stage';
             currentPlayingStage = level;
@@ -849,9 +854,14 @@
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
-            
+
             if (config.isBoss || config.isMiniBoss) {
                 const stats = offlineBossStats(level, player.radius);
+                // Scale boss stats by player power
+                stats.mass *= playerPowerFactor;
+                stats.speed *= Math.pow(playerPowerFactor, 0.3);
+                stats.power *= playerPowerFactor;
+                stats.maxHp = Math.floor(stats.maxHp * Math.pow(playerPowerFactor, 0.5));
                 // Boss arena is wider — scale boss spawn distance accordingly
                 const bossDistance = Math.max(0, Math.min(offlineArenaRadius - stats.radius - 20, offlineArenaRadius * 0.55));
                 bots.push({
@@ -1155,8 +1165,9 @@
                 const activeBoss = getActiveBoss();
                 const remainingBots = bots.filter(bot => bot.alive).length;
                 const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
-                const stageVictory = player.alive && activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
-                const arcadeVictory = player.alive && activeMode !== 'stage' && remainingBots === 0;
+                const playerInArena = Math.hypot(player.x - 400, player.y - 300) <= offlineArenaRadius;
+                const stageVictory = player.alive && playerInArena && activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+                const arcadeVictory = player.alive && playerInArena && activeMode !== 'stage' && remainingBots === 0;
                 if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
                     if (activeMode === 'stage') { finishOfflineStage(); return; }
                     modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;

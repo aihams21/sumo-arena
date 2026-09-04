@@ -38,7 +38,7 @@
          * Smooth difficulty curves normalized to progressRatio = level/1000.
          * All speed values are per-second (frame-rate independent).
          */
-        getStageConfig(level) {
+        getStageConfig(level, playerPowerFactor) {
             level = Math.min(this.MAX_LEVEL, Math.max(1, level));
             const isBoss = level % this.BOSS_INTERVAL === 0;
             const isMiniBoss = !isBoss && (level % this.MINI_BOSS_INTERVAL === 0);
@@ -55,13 +55,19 @@
             const arenaRadius = Math.max(this.ARENA_MIN_RADIUS, this.ARENA_START_RADIUS - radiusDrop);
 
             // Bot base stats (per-second speeds) — aggressively steepened
-            const speedBase = 0.34 + (p * 0.72) + (tierIdx >= 3 ? 0.05 * (tierIdx - 2) : 0) + (tierIdx >= 4 ? 0.08 : 0);   // ~1.2
-            const massBase = 0.85 + (p * 3.1) + Math.pow(p, 2.4) * 2.1;                                                    // ~6.5
-            const powerBase = 4.0 + (p * 26.0) + Math.pow(p, 3.2) * 20;                                                    // ~50
+            let speedBase = 0.34 + (p * 0.72) + (tierIdx >= 3 ? 0.05 * (tierIdx - 2) : 0) + (tierIdx >= 4 ? 0.08 : 0);   // ~1.2
+            let massBase = 0.85 + (p * 3.1) + Math.pow(p, 2.4) * 2.1;                                                    // ~6.5
+            let powerBase = 4.0 + (p * 26.0) + Math.pow(p, 3.2) * 20;                                                    // ~50
             const aggression = Math.min(1.0, 0.35 + (level / 150) + Math.pow(p, 3) * 0.3);
 
             // Radius: puffy but capped (slightly larger, late-tier boost)
             const radius = 18 + (p * 14) + (tierIdx >= 2 ? 2 : 0) + (tierIdx >= 4 ? 2 : 0);
+
+            // Scale difficulty by player's upgrade power
+            const pf = Math.max(0.6, Math.min(1.6, playerPowerFactor || 1));
+            massBase *= pf;
+            speedBase *= Math.pow(pf, 0.3);
+            powerBase *= pf;
 
             return {
                 level,
