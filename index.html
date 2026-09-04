@@ -1117,7 +1117,7 @@
                             spawnImpact(player.x, player.y, '#ff0055');
                         }
                     }
-                    if (distance < player.radius + bot.radius) {
+                    if (distance < player.radius + bot.radius && player.alive) {
                         let overlap = player.radius + bot.radius - distance;
                         let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
                         player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
@@ -1155,8 +1155,8 @@
                 const activeBoss = getActiveBoss();
                 const remainingBots = bots.filter(bot => bot.alive).length;
                 const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
-                const stageVictory = activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
-                const arcadeVictory = activeMode !== 'stage' && remainingBots === 0;
+                const stageVictory = player.alive && activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+                const arcadeVictory = player.alive && activeMode !== 'stage' && remainingBots === 0;
                 if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
                     if (activeMode === 'stage') { finishOfflineStage(); return; }
                     modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
