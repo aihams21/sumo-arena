@@ -2,58 +2,93 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-    <meta name="theme-color" content="#020208">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#00e5ff">
     <title>Neon Sumo Arena</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
+    <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+        html, body { width: 100%; height: 100%; background: #08090f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #banner-ad { display: none !important; }
+        #game-box { position: relative; flex: 1; width: 100%; height: calc(100% - 35px); display: flex; align-items: center; justify-content: center; background: #07080d; }
+        body.online-mode #banner-ad { display: none !important; pointer-events: none !important; }
+        body.online-mode #game-box { height: 100%; }
+        body.online-mode iframe,
+        body.online-mode [id*="ad-"],
+        body.online-mode [class*="adsbox"] {
+            display: none !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
+        canvas { display: block; width: 100%; height: 100%; max-width: 800px; max-height: 600px; aspect-ratio: 4 / 3; object-fit: contain; }
+        .overlay { position: absolute; inset: 0; background: rgba(6, 7, 12, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); padding: 15px; text-align: center; }
+        .hidden { display: none !important; }
+        h1 { font-size: clamp(22px, 5vw, 34px); margin-bottom: 8px; color: #00e5ff; }
+        h2 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 12px; }
+        .btn { padding: 11px 18px; font-size: clamp(13px, 3.5vw, 15px); font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin: 4px; width: min(280px, 85vw); }
+        .btn:active { transform: scale(0.96); }
+        .btn-cyan { background: #00e5ff; color: #000; }
+        .btn-gold { background: #ffbb00; color: #000; }
+        .btn-magenta { background: #ff3366; color: #fff; }
+        .btn-green { background: #00ff66; color: #000; }
+        .btn-gray { background: #1c2030; color: #aaa; }
+        .btn-whatsapp { background: #25D366; color: #fff; }
+        input { padding: 10px 15px; font-size: 16px; border-radius: 8px; border: 2px solid #00e5ff; background: #111420; color: #fff; text-align: center; letter-spacing: 2px; margin: 8px 0; outline: none; width: 240px; }
+        #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 5; }
+        .hud-card { background: rgba(15, 18, 30, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 20px; font-size: clamp(10px, 3vw, 13px); font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .btn-exit { pointer-events: auto; background: #ff3366; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        #stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 8px; max-height: 50vh; overflow-y: auto; padding: 10px; width: min(480px, 90vw); background: #0f121d; border-radius: 12px; border: 1px solid #20263a; }
+        .stage-card { background: #171b2a; border: 2px solid #23293d; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: bold; font-size: 12px; cursor: pointer; }
+        .stage-card.unlocked { border-color: #00e5ff; color: #fff; }
+        .stage-card.current { border-color: #ffbb00; color: #ffbb00; }
+        .stage-card.boss { border-color: #ff0055; color: #ff0055; }
+        .stage-card.locked { opacity: 0.3; }
+        .shop-container { display: flex; flex-direction: column; gap: 10px; width: min(450px, 90vw); margin: 10px 0; }
+        .stats-panel { background: #0f121d; border: 1px solid #20263a; border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-around; }
+        .stat-val { font-weight: bold; color: #00e5ff; }
+        .shop-card { background: #0f121d; border: 1px solid #20263a; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
+        #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+    </style>
+    <link rel="stylesheet" href="neon-style.css">
+    <style>
+    :root {
+      --neon-cyan: #00f3ff;
+      --neon-pink: #ff0055;
+      --bg-dark: #05050a;
+    }
+    body, html {
+      background-color: var(--bg-dark) !important;
+      color: #ffffff !important;
+    }
+    .neon-btn-cyan, button {
+      border: 2px solid var(--neon-cyan) !important;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.4) !important;
+      transition: all 0.3s ease !important;
+    }
+    .neon-btn-cyan:hover {
+      background: var(--neon-cyan) !important;
+      color: #05050a !important;
+      box-shadow: 0 0 30px var(--neon-cyan) !important;
+    }
+    </style>
     <link rel="stylesheet" href="neon-style.css">
 </head>
-<body class="vignette scanlines">
-
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="loading-screen">
-        <div class="loading-ring"></div>
-        <div class="loading-text">Initializing Neon Systems</div>
-        <div class="loading-particles">
-            <div class="loading-particle"></div><div class="loading-particle"></div>
-            <div class="loading-particle"></div><div class="loading-particle"></div>
-            <div class="loading-particle"></div><div class="loading-particle"></div>
-        </div>
-    </div>
-
-    <!-- Banner Ad -->
+<body>
     <div id="banner-ad" aria-hidden="true"></div>
-
-    <!-- Particle Canvas Layer -->
-    <canvas id="particle-canvas"></canvas>
-
-    <!-- Main Game Box -->
     <div id="game-box">
         <canvas id="c" width="800" height="600"></canvas>
-        <div id="chromatic-overlay"></div>
+        <div id="touch-controller"><div id="stick"></div></div>
 
-        <!-- Touch Controller — Enhanced -->
-        <div id="touch-controller">
-            <div id="touch-base">
-                <div class="touch-arc"></div><div class="touch-arc"></div>
-                <div class="touch-arc"></div><div class="touch-arc"></div>
-            </div>
-            <div id="stick"></div>
-        </div>
-
-        <!-- HUD — Deep Glassmorphism -->
         <div id="hud" class="hidden">
             <div class="hud-card" id="hud-left">STAGE: 1</div>
-            <div class="hud-card"><span class="hud-icon">◆</span> STAGE: <span class="hud-value" id="hud-stage">1</span></div>
-            <div class="hud-card" style="color:#ffbb00;"><span class="hud-icon">🪙</span> <span id="hud-coins" class="hud-value">0</span></div>
-            <div class="hud-card" style="color:#7dff00;"><span class="hud-icon">⚡</span> <span id="hud-mode" class="hud-value">CHAOS</span></div>
-            <button class="btn-exit" id="btn-exit" type="button">EXIT ✕</button>
+            <div class="hud-card" id="hud-coins-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
+            <div class="hud-card"><button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button></div>
         </div>
 
-        <!-- ═══ MAIN MENU ═══ -->
         <div id="menu-main" class="overlay">
             <h1>NEON SUMO ARENA</h1>
             <div class="menu-metrics">
@@ -65,46 +100,21 @@
                 <div class="mission-heading"><span>⚡ DAILY RUSH</span><b id="mission-status">0 / 3 wins</b></div>
                 <div class="mission-track"><i id="mission-progress"></i></div>
                 <small id="mission-copy">Win 3 stages today for +25 coins</small>
-                <button id="mission-claim" class="mission-claim hidden" type="button" onclick="claimDailyMission()">Claim +25 🪙</button>
+                <button id="mission-claim" class="mission-claim hidden" onclick="claimDailyMission()">Claim +25 🪙</button>
             </div>
-            <button class="btn btn-cyan" id="btn-stage-map" type="button">🗺️ Stage Map (1000 Waves)</button>
+            <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
             <div class="mode-title">NEON GAME MODES</div>
             <div class="mode-grid">
-                <button class="mode-btn chaos" id="btn-chaos" type="button"><span class="mode-icon">🌀</span><span class="mode-name">CHAOS ARENA</span><small>6 bots • 185 radius</small></button>
-                <button class="mode-btn time" id="btn-time" type="button"><span class="mode-icon">⏱️</span><span class="mode-name">TIME ATTACK</span><small>60 seconds • score rush</small></button>
-                <button class="mode-btn shrink" id="btn-shrink" type="button"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
+                <button class="mode-btn chaos" onclick="startGameMode('chaos')"><span class="mode-icon">🌀</span><span class="mode-name">CHAOS ARENA</span><small>6 bots • 185 radius</small></button>
+                <button class="mode-btn time" onclick="startGameMode('timeAttack')"><span class="mode-icon">⏱️</span><span class="mode-name">TIME ATTACK</span><small>60 seconds • score rush</small></button>
+                <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
             </div>
-            <button class="btn btn-gold" id="btn-shop" type="button">🛍️ السكنات والمتجر (Skins & Shop)</button>
-            <button class="btn btn-magenta" id="btn-leaderboard" type="button">🏆 Live Hall of Fame</button>
-            <button id="menu-install-button" class="btn btn-green" type="button" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
-
-            <!-- Cyber Footer Badge -->
-            <div class="cyber-footer">
-                <div class="cyber-border-top"></div>
-                <div class="cyber-border-bottom"></div>
-                <div class="cyber-footer-inner">
-                    <div class="cyber-label">
-                        <span class="cyber-label-line"></span>
-                        <span class="cyber-label-text">CRAFTED BY</span>
-                        <span class="cyber-label-line"></span>
-                    </div>
-                    <div class="cyber-name-wrapper">
-                        <div class="cyber-name" data-text="AIHAM AM">
-                            <span class="cyber-name-main">AIHAM</span>
-                            <span class="cyber-name-accent">AM</span>
-                        </div>
-                    </div>
-                    <div class="cyber-divider"><span class="cyber-diamond">&#9670;</span></div>
-                    <div class="cyber-system">
-                        <span class="cyber-system-label">NEON SUMO</span>
-                        <span class="cyber-system-dot"></span>
-                        <span class="cyber-system-label">SYSTEMS</span>
-                    </div>
-                </div>
-            </div>
+            <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
+            <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
+            <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
+            <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
         </div>
 
-        <!-- ═══ INSTALL GUIDE ═══ -->
         <div id="modal-install-guide" class="overlay hidden install-overlay">
             <div class="install-card">
                 <span class="install-kicker">NEON SUMO ARENA / PWA</span>
@@ -116,158 +126,131 @@
                     <summary>استكشف 99 ميزة لتجربة التطبيق</summary>
                     <ol id="elite-features-list"></ol>
                 </details>
-                <button id="install-main-button" class="btn btn-cyan install-main-button" type="button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
-                <span class="install-dismiss" id="install-dismiss" role="button" tabindex="0">ليس الآن</span>
+                <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
+                <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
             </div>
         </div>
 
-        <!-- ═══ STAGE SELECT ═══ -->
         <div id="menu-stages" class="overlay hidden">
             <h2>SELECT STAGE (<span id="unlocked-count">1</span> / 1000)</h2>
             <div id="stage-grid"></div>
-            <button class="btn btn-gray" id="btn-back-stages" type="button">⬅ Back</button>
+            <button class="btn btn-gray" style="margin-top: 10px;" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
-        <!-- ═══ SHOP ═══ -->
         <div id="menu-shop" class="overlay hidden">
             <h2>SUMO STATS</h2>
-            <div style="font-size:13px;color:#ffbb00;margin-bottom:8px;font-weight:bold;">🪙 Coins: <span id="shop-coins">0</span></div>
+            <div style="font-size: 13px; color:#ffbb00; margin-bottom: 8px; font-weight:bold;">🪙 Coins: <span id="shop-coins">0</span></div>
             <div class="shop-container">
                 <div class="stats-panel">
                     <div>Weight: <span class="stat-val" id="stat-weight">Lvl 1</span></div>
                     <div>Power: <span class="stat-val" id="stat-power">Lvl 1</span></div>
                 </div>
-                <div class="shop-card"><div><b>🏋️ Weight (الوزن)</b></div><button class="shop-btn" id="buy-weight" data-upgrade="weight" type="button">Buy</button></div>
-                <div class="shop-card"><div><b>💥 Power (القوة)</b></div><button class="shop-btn" id="buy-power" data-upgrade="power" type="button">Buy</button></div>
+                <div class="shop-card">
+                    <div><b>🏋️ Weight (الوزن)</b></div>
+                    <button class="shop-btn" id="buy-weight" data-upgrade="weight" type="button">Buy</button>
+                </div>
+                <div class="shop-card">
+                    <div><b>💥 Power (القوة)</b></div>
+                    <button class="shop-btn" id="buy-power" data-upgrade="power" type="button">Buy</button>
+                </div>
                 <div class="shop-section-title"><span>BODY EVOLUTION</span><small>Story-linked modules</small></div>
                 <div id="body-upgrade-grid" class="body-upgrade-grid"></div>
                 <div class="shop-section-title"><span>NEON SKINS</span><small>Own it once. Equip forever.</small></div>
                 <div id="skin-grid" class="skin-grid"></div>
-                <button id="coin-reward-button" class="btn btn-green" style="width:100%;margin:5px 0;" type="button" onclick="handleAdClickWithCounter('free_coins')">GET 50 COINS: VISIT (0/10)</button>
+                <button id="coin-reward-button" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">GET 50 COINS: VISIT (0/10)</button>
             </div>
-            <button class="btn btn-gray" id="btn-back-shop" type="button">⬅ Back</button>
+            <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
-        <!-- ═══ MULTIPLAYER ═══ -->
         <div id="menu-multi" class="overlay hidden">
             <h2>ONLINE 1v1 (FRANKFURT EU)</h2>
-            <p style="font-size:11px;color:#00e5ff;margin-bottom:10px;">Ultra Low Latency | Dedicated Relay</p>
-            <p style="margin:8px 0;color:#888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="4-DIGIT CODE" maxlength="4" autocomplete="off">
-            <button class="btn btn-gray" id="btn-back-multi" type="button">⬅ Back</button>
+            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">Ultra Low Latency | Dedicated Relay</p>
+            
+            <p style="margin: 8px 0; color: #888;">--- OR ---</p>
+            <input type="text" id="room-input" placeholder="4-DIGIT CODE" maxlength="4">
+            
+            <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
         </div>
 
-        <!-- ═══ LOBBY ═══ -->
         <div id="menu-lobby" class="overlay hidden">
-            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff;letter-spacing:2px;">Connecting...</span></h2>
-            <p style="color:#aaa;margin:10px 0;">Share link with your friend to join:</p>
-            <button class="btn btn-whatsapp" id="btn-whatsapp" type="button">💬 Invite on WhatsApp</button>
-            <button class="btn btn-cyan" id="btn-copy-link" type="button">📋 Copy Direct Invite Link</button>
-            <button class="btn btn-gray" id="btn-cancel-lobby" style="margin-top:8px;" type="button">Cancel</button>
+            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff; letter-spacing:2px;">Connecting...</span></h2>
+            <p style="color:#aaa; margin: 10px 0;">Share link with your friend to join:</p>
+            <button class="btn btn-whatsapp" onclick="shareRoomWhatsApp()">💬 Invite on WhatsApp</button>
+            <button class="btn btn-cyan" onclick="copyRoomLink()">📋 Copy Direct Invite Link</button>
+            <button class="btn btn-gray" style="margin-top:8px;" onclick="exitToMenu()">Cancel</button>
         </div>
 
-        <!-- ═══ ROUND RESULT ═══ -->
         <div id="modal-round" class="overlay hidden">
             <h1 id="round-title">ROUND FINISHED</h1>
             <h2 id="round-score">0 - 0</h2>
-            <button class="btn btn-gray" id="btn-leave-room" type="button">Leave Room</button>
+            
+            <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
         </div>
 
-        <!-- ═══ DEATH / RING OUT ═══ -->
         <div id="modal-death" class="overlay hidden">
             <h1 style="color:#ff3366;">RING OUT!</h1>
             <p id="death-count-copy" class="death-count-copy"></p>
-            <button id="revive-button" class="btn btn-green" type="button" onclick="handleAdClickWithCounter('revive')">REVIVE: VISIT (0/5)</button>
-            <button class="btn btn-cyan" id="btn-retry" type="button" onclick="retryStageDirectly()">🔄 Retry Stage</button>
-            <button class="btn btn-gray" id="btn-death-menu" type="button">🏠 Main Menu</button>
+            <button id="revive-button" class="btn btn-green" onclick="handleAdClickWithCounter('revive')">REVIVE: VISIT (0/5)</button>
+            <button class="btn btn-cyan" onclick="retryStageDirectly()">🔄 Retry Stage</button>
+            <button class="btn btn-gray" onclick="exitToMenu()">🏠 Main Menu</button>
         </div>
 
-        <!-- ═══ STAGE CLEAR ═══ -->
         <div id="modal-win-stage" class="overlay hidden">
             <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
-            <button class="btn btn-cyan" id="btn-next-stage" type="button">Next Stage ➔</button>
-            <button class="btn btn-gray" id="btn-win-map" type="button">Stage Map</button>
+            <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
+            <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
     </div>
 
-    <!-- Neon Sidebar -->
-    <div id="neon-sidebar"></div>
-    <button id="neon-menu-btn" type="button" aria-label="Toggle sidebar">☰</button>
-
-    <!-- Matrix Background (legacy) -->
-    <canvas id="matrix-bg" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
-
     <script>
-        /* ═══════════════════════════════════════
-           UNIVERSAL BOOT FAILSAFE
-           Armed immediately so it can never be skipped by a later boot
-           exception. Force-dismisses the loading overlay and reveals the
-           main menu after 3s or on any global user gesture.
-           ═══════════════════════════════════════ */
-        window.NeonBoot = (function () {
-            let done = false;
-            function forceShowMenu() {
-                if (done) return;
-                const ls = document.getElementById('loading-screen');
-                const mm = document.getElementById('menu-main');
-                if (ls) ls.classList.add('hidden');
-                if (mm) mm.classList.remove('hidden');
-                done = true;
-                setTimeout(function () {
-                    const el = document.getElementById('loading-screen');
-                    if (el && el.parentNode) el.parentNode.removeChild(el);
-                }, 650);
-            }
-            const timer = setTimeout(forceShowMenu, 3000);
-            window.addEventListener('load', function () { clearTimeout(timer); setTimeout(forceShowMenu, 100); });
-            ['click', 'touchstart', 'pointerdown', 'keydown'].forEach(function (ev) {
-                document.addEventListener(ev, forceShowMenu, { once: true, capture: true });
-            });
-            if (document.readyState === 'interactive' || document.readyState === 'complete') {
-                clearTimeout(timer); setTimeout(forceShowMenu, 50);
-            }
-            return { forceShowMenu: forceShowMenu };
-        })();
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
         let deferredPrompt = null;
         const installModal = document.getElementById('modal-install-guide');
         const installButton = document.getElementById('install-main-button');
-        const isStandalone = window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone === true;
-        let isInstalled = isStandalone;
-        try { isInstalled = isInstalled || localStorage.getItem('neon_sumo_pwa_installed') === '1'; } catch(_e) {}
-
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        let isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
         const featureList = [
-            'تشغيل مستقل دون تبويب','ملء الشاشة','بدء تشغيل أسرع','اختصار من الشاشة الرئيسية','دعم الوضع الأفقي','واجهة لمس محسنة','استجابة فورية للأزرار','حفظ التقدم محلياً','حفظ العملات','حفظ الترقيات','حفظ السكن المختار','هوية لاعب ثابتة','مزامنة الصدارة عند الاتصال','عمل دون إنترنت بعد التخزين','تحميل موارد اللعبة مرة واحدة','تقليل زمن الانتظار','استعادة آخر جلسة','حالة تثبيت موثوقة','إشعارات تثبيت واضحة','تعليمات حسب النظام','دعم Android','دعم iOS','دعم Windows','دعم macOS','دعم Linux','كشف Kali Linux','دعم Chrome','دعم Edge','دعم Safari','دعم Firefox','تحكم بلوحة المفاتيح','عصا تحكم لمسية','تخطيط متجاوب','أزرار كبيرة للمس','تباعد آمن للنوتش','تمرير سلس للقوائم','حماية من النقر المكرر','مؤشر حالة حي','عدادات دقيقة','نظام إحياء سريع','متجر سكنات','معاينة السكن','تبديل السكن فوراً','خريطة مراحل','مراحل زعيم','هجمات نيون','تحذيرات بصرية','أنماط لعب متعددة','ساحة فوضى','تحدي الوقت','حلبة متقلصة','مؤتمت الجولة','نظام نقاط','مكافآت العملات','مهمة يومية','سلسلة انتصارات','إحصاءات اللاعب','لوحة صدارة عالمية','فرز حسب المراحل','فرز حسب العملات','بحث عن اللاعبين','بروفايل اللاعب','شارة المركز الأول','شارة المركز الثاني','شارة المركز الثالث','هالة ذهبية','هالة فضية','هالة برونزية','تنظيف الذاكرة المؤقتة','تقليل مؤثرات الهاتف','رسم Canvas سريع','حلقة لعب مستقرة','تحديث فيزيائي مستقل','حماية بيانات الحساب','تنظيف الإدخالات','ترميز أسماء اللاعبين','معالجة فشل الشبكة','بيانات احتياطية مفيدة','مزامنة غير حاجبة','استمرار اللعب عند انقطاع الشبكة','توافق PWA','توافق Service Worker','كاش قابل للتحديث','حالة standalone','رصد appinstalled','رصد beforeinstallprompt','تجربة بدء نظيفة','زر تثبيت واحد','إرشاد سريع','تباين عالي','قراءة واضحة','تغذية بصرية للنقر','تغذية بصرية للفوز','تغذية بصرية للخسارة','تجربة خفيفة البطارية','دعم الشاشات الصغيرة','دعم الشاشات الكبيرة','جاهزية اللعب السريع','هوية Neon Sumo Arena'
+            'تشغيل مستقل دون تبويب', 'ملء الشاشة', 'بدء تشغيل أسرع', 'اختصار من الشاشة الرئيسية', 'دعم الوضع الأفقي', 'واجهة لمس محسنة', 'استجابة فورية للأزرار', 'حفظ التقدم محلياً', 'حفظ العملات', 'حفظ الترقيات',
+            'حفظ السكن المختار', 'هوية لاعب ثابتة', 'مزامنة الصدارة عند الاتصال', 'عمل دون إنترنت بعد التخزين', 'تحميل موارد اللعبة مرة واحدة', 'تقليل زمن الانتظار', 'استعادة آخر جلسة', 'حالة تثبيت موثوقة', 'إشعارات تثبيت واضحة', 'تعليمات حسب النظام',
+            'دعم Android', 'دعم iOS', 'دعم Windows', 'دعم macOS', 'دعم Linux', 'كشف Kali Linux', 'دعم Chrome', 'دعم Edge', 'دعم Safari', 'دعم Firefox',
+            'تحكم بلوحة المفاتيح', 'عصا تحكم لمسية', 'تخطيط متجاوب', 'أزرار كبيرة للمس', 'تباعد آمن للنوتش', 'تمرير سلس للقوائم', 'حماية من النقر المكرر', 'مؤشر حالة حي', 'عدادات دقيقة', 'نظام إحياء سريع',
+            'متجر سكنات', 'معاينة السكن', 'تبديل السكن فوراً', 'خريطة مراحل', 'مراحل زعيم', 'هجمات نيون', 'تحذيرات بصرية', 'أنماط لعب متعددة', 'ساحة فوضى', 'تحدي الوقت',
+            'حلبة متقلصة', 'مؤقت الجولة', 'نظام نقاط', 'مكافآت العملات', 'مهمة يومية', 'سلسلة انتصارات', 'إحصاءات اللاعب', 'لوحة صدارة عالمية', 'فرز حسب المراحل', 'فرز حسب العملات',
+            'بحث عن اللاعبين', 'بروفايل اللاعب', 'شارة المركز الأول', 'شارة المركز الثاني', 'شارة المركز الثالث', 'هالة ذهبية', 'هالة فضية', 'هالة برونزية', 'تنظيف الذاكرة المؤقتة', 'تقليل مؤثرات الهاتف',
+            'رسم Canvas سريع', 'حلقة لعب مستقرة', 'تحديث فيزيائي مستقل', 'حماية بيانات الحساب', 'تنظيف الإدخالات', 'ترميز أسماء اللاعبين', 'معالجة فشل الشبكة', 'بيانات احتياطية مفيدة', 'مزامنة غير حاجبة', 'استمرار اللعب عند انقطاع الشبكة',
+            'توافق PWA', 'توافق Service Worker', 'كاش قابل للتحديث', 'حالة standalone', 'رصد appinstalled', 'رصد beforeinstallprompt', 'تجربة بدء نظيفة', 'زر تثبيت واحد', 'إرشاد سريع',
+            'تباين عالي', 'قراءة واضحة', 'تغذية بصرية للنقر', 'تغذية بصرية للفوز', 'تغذية بصرية للخسارة', 'تجربة خفيفة البطارية', 'دعم الشاشات الصغيرة', 'دعم الشاشات الكبيرة', 'جاهزية اللعب السريع', 'هوية Neon Sumo Arena'
         ];
         const innovationGroups = [
-            ['Combat Systems',['Momentum Banking','Counter-Impact Windows','Ring Edge Recovery','Perfect Dodge Pulse','Combo Pressure Meter','Directional Guard','Impact Prediction Arc','Stamina Breakpoints','Clutch Overdrive','Arena Rhythm Scoring']],
-            ['Physics Lab',['Mass Transfer Model','Surface Friction Profiles','Adaptive Bounce Solver','Impulse Dampening','Corner Deflection','Soft-Lock Collision Guard','Substep Simulation','Velocity Clamp','Weight-Class Balance','Physics Replay Frames']],
-            ['Bot Intelligence',['Threat Priority AI','Edge Avoidance Memory','Boss Phase Director','Team Flank Logic','Counter-Move Planner','Learning Aggression Curve','Retreat Confidence','Spawn Fairness Grid','Target Handoff','Bot Personality Seeds']],
-            ['Arena Worlds',['Foundry Hazard Layer','Abyss Current Zone','Void Gravity Ring','Neon Gate Events','Boss Telegraph Language','Stage Weather Cycle','Dynamic Safe Zones','Wave Modifier Deck','Lore Relic Spawns','Arena Mutation Rules']],
-            ['Progression',['Milestone Mastery','Boss Research Log','Relic Collection Book','Branching Upgrade Paths','Prestige Circuit','Seasonal Rank Track','Challenge Stamps','Victory Grade','Comeback Bonus','New Game Plus Rules']],
-            ['Interface Systems',['Mode Rule Cards','Live Objective Strip','Compact Mobile HUD','Input Calibration Panel','Reduced Motion Switch','Colorblind Signal Set','Touch Dead-Zone Tuner','Keyboard Shortcut Map','Victory Summary Sheet','Feature Index Search']],
-            ['Commerce',['Upgrade Preview Stats','Bundle Value Guard','Purchase Confirmation','Skin Loadout Slots','Daily Shop Rotation','Earned Currency Ledger','Reward Claim Lock','Price Formatting Rules','Inventory Filter','Cosmetic Rarity Tags']],
-            ['Safety and Save',['Versioned Save Schema','Atomic Save Commit','Corrupt Save Recovery','Local Backup Slot','Progress Export Token','Offline Queue','Storage Quota Monitor','Input Sanitizer','Session Watchdog','Privacy Reset Center']],
-            ['Challenges',['Daily Seeded Trial','Weekly Boss Contract','No-Upgrade Gauntlet','Speedrun Medal','Perfect Ring Challenge','Survival Streak','Chaos Scoreboard','Shrinking Distance Goal','Time Attack Personal Best','Challenge Reward Ladder']],
-            ['Audio and Visuals',['Impact Sound Layer','Boss Warning Stinger','Adaptive Arena Glow','Elimination Burst','Victory Chime Set','Low-Power Effects Mode','Particle Budgeter','Screen Shake Slider','Color Accent Themes','Accessibility Captions']]
+            ['Combat Systems', ['Momentum Banking', 'Counter-Impact Windows', 'Ring Edge Recovery', 'Perfect Dodge Pulse', 'Combo Pressure Meter', 'Directional Guard', 'Impact Prediction Arc', 'Stamina Breakpoints', 'Clutch Overdrive', 'Arena Rhythm Scoring']],
+            ['Physics Lab', ['Mass Transfer Model', 'Surface Friction Profiles', 'Adaptive Bounce Solver', 'Impulse Dampening', 'Corner Deflection', 'Soft-Lock Collision Guard', 'Substep Simulation', 'Velocity Clamp', 'Weight-Class Balance', 'Physics Replay Frames']],
+            ['Bot Intelligence', ['Threat Priority AI', 'Edge Avoidance Memory', 'Boss Phase Director', 'Team Flank Logic', 'Counter-Move Planner', 'Learning Aggression Curve', 'Retreat Confidence', 'Spawn Fairness Grid', 'Target Handoff', 'Bot Personality Seeds']],
+            ['Arena Worlds', ['Foundry Hazard Layer', 'Abyss Current Zone', 'Void Gravity Ring', 'Neon Gate Events', 'Boss Telegraph Language', 'Stage Weather Cycle', 'Dynamic Safe Zones', 'Wave Modifier Deck', 'Lore Relic Spawns', 'Arena Mutation Rules']],
+            ['Progression', ['Milestone Mastery', 'Boss Research Log', 'Relic Collection Book', 'Branching Upgrade Paths', 'Prestige Circuit', 'Seasonal Rank Track', 'Challenge Stamps', 'Victory Grade', 'Comeback Bonus', 'New Game Plus Rules']],
+            ['Interface Systems', ['Mode Rule Cards', 'Live Objective Strip', 'Compact Mobile HUD', 'Input Calibration Panel', 'Reduced Motion Switch', 'Colorblind Signal Set', 'Touch Dead-Zone Tuner', 'Keyboard Shortcut Map', 'Victory Summary Sheet', 'Feature Index Search']],
+            ['Commerce', ['Upgrade Preview Stats', 'Bundle Value Guard', 'Purchase Confirmation', 'Skin Loadout Slots', 'Daily Shop Rotation', 'Earned Currency Ledger', 'Reward Claim Lock', 'Price Formatting Rules', 'Inventory Filter', 'Cosmetic Rarity Tags']],
+            ['Safety and Save', ['Versioned Save Schema', 'Atomic Save Commit', 'Corrupt Save Recovery', 'Local Backup Slot', 'Progress Export Token', 'Offline Queue', 'Storage Quota Monitor', 'Input Sanitizer', 'Session Watchdog', 'Privacy Reset Center']],
+            ['Challenges', ['Daily Seeded Trial', 'Weekly Boss Contract', 'No-Upgrade Gauntlet', 'Speedrun Medal', 'Perfect Ring Challenge', 'Survival Streak', 'Chaos Scoreboard', 'Shrinking Distance Goal', 'Time Attack Personal Best', 'Challenge Reward Ladder']],
+            ['Audio and Visuals', ['Impact Sound Layer', 'Boss Warning Stinger', 'Adaptive Arena Glow', 'Elimination Burst', 'Victory Chime Set', 'Low-Power Effects Mode', 'Particle Budgeter', 'Screen Shake Slider', 'Color Accent Themes', 'Accessibility Captions']]
         ];
         const innovationDetails = {
-            'Combat Systems':['تضيف قرارًا قتاليًا واضحًا أثناء الاشتباك','لرفع عمق المواجهة وجعل الانتصار نتيجة مهارة لا عشوائية'],
-            'Physics Lab':['تضبط حركة الاصطدام والطاقة بين اللاعب والبوت','لمنح الساحة سلوكًا متوقعًا وعادلًا على كل الأجهزة'],
-            'Bot Intelligence':['تمنح البوتات سلوكًا سياقيًا يتغير حسب الخطر والمرحلة','لجعل الزعماء والمواجهات المتكررة أكثر تحديًا وتنوعًا'],
-            'Arena Worlds':['تضيف طبقة عالمية أو حدثًا جديدًا إلى الساحة','لربط اللعب بقصة Neon Sumo وتجنب تكرار الحلبة'],
-            'Progression':['تسجل إنجازًا أو مسار تطور طويل الأمد','لتحويل كل مرحلة إلى تقدم ملموس يتجاوز المكافأة الفورية'],
-            'Interface Systems':['تقدم حالة أو تحكمًا أو تقريرًا أوضح للاعب','لخفض الالتباس وتحسين القراءة باللمس ولوحة المفاتيح'],
-            'Commerce':['تنظم الشراء والمخزون والمكافآت مع معاينة أثرها','لمنع الإنفاق غير المقصود وجعل الاقتصاد قابلًا للفهم'],
-            'Safety and Save':['تحمي التقدم المحلي وتتعامل مع الانقطاع أو البيانات التالفة','لمنع فقدان المراحل والعملات وترقية اللاعب'],
-            'Challenges':['تنشئ هدفًا قابلًا للقياس مع نتيجة ومكافأة','لإضافة سبب يومي وأسبوعي للعودة إلى اللعبة'],
-            'Audio and Visuals':['تضيف إشارة بصرية أو صوتية قابلة للضبط','لتحسين الإحساس بالضربة والفوز مع احترام الأداء وإتاحة الوصول']
+            'Combat Systems': ['تضيف قرارًا قتاليًا واضحًا أثناء الاشتباك', 'لرفع عمق المواجهة وجعل الانتصار نتيجة مهارة لا عشوائية'],
+            'Physics Lab': ['تضبط حركة الاصطدام والطاقة بين اللاعب والبوت', 'لمنح الساحة سلوكًا متوقعًا وعادلًا على كل الأجهزة'],
+            'Bot Intelligence': ['تمنح البوتات سلوكًا سياقيًا يتغير حسب الخطر والمرحلة', 'لجعل الزعماء والمواجهات المتكررة أكثر تحديًا وتنوعًا'],
+            'Arena Worlds': ['تضيف طبقة عالمية أو حدثًا جديدًا إلى الساحة', 'لربط اللعب بقصة Neon Sumo وتجنب تكرار الحلبة'],
+            'Progression': ['تسجل إنجازًا أو مسار تطور طويل الأمد', 'لتحويل كل مرحلة إلى تقدم ملموس يتجاوز المكافأة الفورية'],
+            'Interface Systems': ['تقدم حالة أو تحكمًا أو تقريرًا أوضح للاعب', 'لخفض الالتباس وتحسين القراءة باللمس ولوحة المفاتيح'],
+            'Commerce': ['تنظم الشراء والمخزون والمكافآت مع معاينة أثرها', 'لمنع الإنفاق غير المقصود وجعل الاقتصاد قابلًا للفهم'],
+            'Safety and Save': ['تحمي التقدم المحلي وتتعامل مع الانقطاع أو البيانات التالفة', 'لمنع فقدان المراحل والعملات وترقية اللاعب'],
+            'Challenges': ['تنشئ هدفًا قابلًا للقياس مع نتيجة ومكافأة', 'لإضافة سبب يومي وأسبوعي للعودة إلى اللعبة'],
+            'Audio and Visuals': ['تضيف إشارة بصرية أو صوتية قابلة للضبط', 'لتحسين الإحساس بالضربة والفوز مع احترام الأداء وإتاحة الوصول']
         };
         const eliteFeatureCatalog = featureList.map((name, index) => ({ id: index + 1, name, category: 'Existing Experience', what: 'ميزة موجودة في منظومة Neon Sumo وتعمل ضمن تجربة اللعبة الحالية.', why: 'لرفع الاعتمادية والوضوح وتكامل تجربة اللاعب.' }));
-        innovationGroups.forEach(([category, names]) => names.forEach(name => { const [what, why] = innovationDetails[category]; eliteFeatureCatalog.push({ id: eliteFeatureCatalog.length + 1, name, category, what: `${what}: ${name}.`, why }); }));
+        innovationGroups.forEach(([category, names]) => names.forEach(name => {
+            const [what, why] = innovationDetails[category];
+            eliteFeatureCatalog.push({ id: eliteFeatureCatalog.length + 1, name, category, what: `${what}: ${name}.`, why });
+        }));
         document.getElementById('elite-features-list').innerHTML = featureList.map((feature, index) => `<li>${index + 1}. ${feature}</li>`).join('');
-
-        /* ── OS/Browser Detection ── */
         function detectOperatingSystem() {
             const ua = navigator.userAgent || '';
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
@@ -287,20 +270,45 @@
             if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'Safari';
             return 'Browser';
         }
-        function updateInstallStatus(message) { const s = document.getElementById('install-system-status'); if (s) s.innerText = message; }
-        function refreshInstallStatus() { const system = detectOperatingSystem(); updateInstallStatus(isInstalled ? `النظام: ${system} • ${detectBrowser()} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • المتصفح: ${detectBrowser()} • جاهز للتثبيت الفعلي`); }
+        function updateInstallStatus(message) {
+            const status = document.getElementById('install-system-status');
+            if (status) status.innerText = message;
+        }
+        function refreshInstallStatus() {
+            const system = detectOperatingSystem();
+            updateInstallStatus(isInstalled ? `النظام: ${system} • ${detectBrowser()} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • المتصفح: ${detectBrowser()} • جاهز للتثبيت الفعلي`);
+        }
         refreshInstallStatus();
-        if (isInstalled) { installModal.classList.add('hidden'); document.getElementById('menu-install-button')?.classList.add('hidden'); }
-        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; installButton.innerText = 'تثبيت التطبيق الآن 📱'; refreshInstallStatus(); });
-        window.addEventListener('appinstalled', () => { deferredPrompt = null; isInstalled = true; installModal.classList.add('hidden'); document.getElementById('menu-install-button')?.classList.add('hidden'); refreshInstallStatus(); });
+        if (isInstalled) {
+            installModal.classList.add('hidden');
+            document.getElementById('menu-install-button')?.classList.add('hidden');
+        }
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.innerText = 'تثبيت التطبيق الآن 📱';
+            refreshInstallStatus();
+        });
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            isInstalled = true;
+            installModal.classList.add('hidden');
+            localStorage.setItem('neon_sumo_pwa_installed', '1');
+            document.getElementById('menu-install-button')?.classList.add('hidden');
+            refreshInstallStatus();
+        });
 
         function handleSmartInstall() {
             if (isInstalled) return;
-            if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.finally(() => { deferredPrompt = null; }); return; }
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.finally(() => { deferredPrompt = null; });
+                return;
+            }
             let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent), isAndroid = /Android/.test(navigator.userAgent);
             const title = document.getElementById('guide-device-title');
             const body = document.getElementById('guide-device-body');
-            if (isIOS) { title.innerText = 'أضف الساحة معك 🍏'; body.innerText = 'اضغط مشاركة ثم إضافة إلى الشاشة الرئيسية.'; }
+            if (isIOS) { title.innerText = 'أضف الساحة إلى جهازك 🍏'; body.innerText = 'اضغط مشاركة ثم إضافة إلى الشاشة الرئيسية.'; }
             else if (isAndroid) { title.innerText = 'ثبّت الساحة على أندرويد 🤖'; body.innerText = 'افتح قائمة المتصفح ثم اختر تثبيت التطبيق.'; }
             else {
                 title.innerText = `اختصار Neon Sumo Arena على ${detectOperatingSystem()} 💻`;
@@ -309,334 +317,1125 @@
             }
             installModal.classList.remove('hidden');
         }
+
         function downloadDesktopShortcut() {
-            const system = detectOperatingSystem(); const target = window.location.href;
-            let fileName = 'Neon-Sumo-Arena.url', content = `[InternetShortcut]\nURL=${target}\nIconIndex=0\n`, type = 'application/internet-shortcut';
-            if (system === 'Linux' || system === 'Kali Linux') { fileName = 'neon-sumo-arena.desktop'; content = `[Desktop Entry]\nType=Application\nName=Neon Sumo Arena\nComment=Launch Neon Sumo Arena\nExec=${target}\nTerminal=false\nCategories=Game;\n`; type = 'application/x-desktop'; }
-            else if (system === 'macOS') { fileName = 'Neon-Sumo-Arena.webloc'; content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>URL</key><string>${target}</string></dict></plist>`; type = 'application/xml'; }
-            const blob = new Blob([content], { type }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = fileName; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            const system = detectOperatingSystem();
+            const target = window.location.href;
+            let fileName = 'Neon-Sumo-Arena.url';
+            let content = `[InternetShortcut]\nURL=${target}\nIconIndex=0\n`;
+            let type = 'application/internet-shortcut';
+            if (system === 'Linux' || system === 'Kali Linux') {
+                fileName = 'neon-sumo-arena.desktop';
+                content = `[Desktop Entry]\nType=Application\nName=Neon Sumo Arena\nComment=Launch Neon Sumo Arena\nExec=xdg-open ${target}\nTerminal=false\nCategories=Game;\n`;
+                type = 'application/x-desktop';
+            } else if (system === 'macOS') {
+                fileName = 'Neon-Sumo-Arena.webloc';
+                content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>URL</key><string>${target}</string></dict></plist>`;
+                type = 'application/xml';
+            }
+            const blob = new Blob([content], { type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
             updateInstallStatus(`النظام: ${system} • ${detectBrowser()} • تم تنزيل اختصار ${fileName} ✓`);
         }
-        function closeInstallGuide() { installModal.classList.add('hidden'); }
+        function closeInstallGuide() {
+            installModal.classList.add('hidden');
+        }
 
-        /* ── Reward Counters ── */
-        const SMARTLINK = "https://infamouscomer.com/yuubg1d6u?key=1084a110bc0ce970cee62716b1ae5599";
-        const counterLimits = { free_coins: 10, revive: 5 };
-        let counters = JSON.parse(sessionStorage.getItem('sumo_reward_counters') || '{"free_coins":0,"revive":0}');
+        function isOnlineSession() {
+            return document.body.classList.contains('online-mode') || gameMode === 'p2p';
+        }
 
-        function isOnlineSession() { return document.body.classList.contains('online-mode') || gameMode === 'p2p'; }
         function setOnlineAdsOff(off) {
             document.body.classList.toggle('online-mode', !!off);
-            if (bannerAd) { bannerAd.style.display = off ? 'none' : 'flex'; bannerAd.style.pointerEvents = off ? 'none' : 'auto'; }
-            document.querySelectorAll('iframe').forEach(frame => { if (!off) return; frame.style.display = 'none'; frame.style.pointerEvents = 'none'; });
-        }
-        function handleAdClickWithCounter(type) {
-            if (!counterLimits[type] || isOnlineSession()) return;
-            window.open(SMARTLINK, '_blank');
-            counters[type] = Math.min(counterLimits[type], (Number(counters[type]) || 0) + 1);
-            sessionStorage.setItem('sumo_reward_counters', JSON.stringify(counters));
-            updateRewardButtons();
-            if (counters[type] >= counterLimits[type]) {
-                counters[type] = 0; sessionStorage.setItem('sumo_reward_counters', JSON.stringify(counters));
-                if (type === 'free_coins') { coins += 50; saveData(); showShop(); alert("🎉 +50 Coins!"); }
-                else if (type === 'revive' && !player.alive) reviveInPlaceOffline();
-                updateRewardButtons();
+            if (bannerAd) {
+                bannerAd.style.display = off ? 'none' : 'flex';
+                bannerAd.style.pointerEvents = off ? 'none' : 'auto';
             }
+            document.querySelectorAll('iframe').forEach(frame => {
+                if (!off) return;
+                frame.style.display = 'none';
+                frame.style.pointerEvents = 'none';
+            });
         }
+
+        function handleAdClickWithCounter(type) {
+            if (isOnlineSession()) return;
+            if (type === 'free_coins') {
+                coins += 50;
+                saveData();
+                showShop();
+                alert("🎉 +50 Coins added!");
+            } else if (type === 'revive' && !player.alive) {
+                reviveInPlaceOffline();
+            }
+            updateRewardButtons();
+        }
+
         function updateRewardButtons() {
-            const cb = document.getElementById('coin-reward-button'), rb = document.getElementById('revive-button');
-            if (cb) cb.innerText = `GET 50 COINS: VISIT (${counters.free_coins}/${counterLimits.free_coins})`;
-            if (rb) rb.innerText = `REVIVE: VISIT (${counters.revive}/${counterLimits.revive})`;
+            const coinButton = document.getElementById('coin-reward-button');
+            const reviveButton = document.getElementById('revive-button');
+            if (coinButton) coinButton.innerText = '+50 COINS';
+            if (reviveButton) reviveButton.innerText = 'REVIVE NOW';
         }
         updateRewardButtons();
-        function triggerSmartlinkDirect() { return false; }
+        function triggerSmartlinkDirect() {
+            return false;
+        }
 
-        /* ═══════════════════════════════════════
-           CANVAS SCALING & PARTICLE INIT
-           ═══════════════════════════════════════ */
-        const canvas = document.getElementById('c');
-        const ctx = canvas.getContext('2d', { alpha: false });
-        const mobilePerformance = window.matchMedia('(max-width:600px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const canvas = document.getElementById('c'), ctx = canvas.getContext('2d', { alpha: false });
+        const mobilePerformance = window.matchMedia('(max-width: 600px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (mobilePerformance) ctx.imageSmoothingEnabled = false;
-
-        function resizeCanvas() {
-            const gb = document.getElementById('game-box');
-            if (!gb) return;
-            const bw = gb.clientWidth, bh = gb.clientHeight;
-            if (bw <= 0 || bh <= 0) return;
-            const aspect = 4 / 3; let w = bw, h = bh;
-            if (w / h > aspect) { w = h * aspect; } else { h = w / aspect; }
-            canvas.width = Math.floor(w); canvas.height = Math.floor(h);
-            canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        /* Particle System Init */
-        if (typeof window.NeonSystems?.particles?.init === 'function') window.NeonSystems.particles.init('particle-canvas');
-
-        function spawnExplosion(x, y, color, count) {
-            if (typeof window.NeonSystems?.particles?.spawnBurst === 'function') return window.NeonSystems.particles.spawnBurst(x, y, color, count);
-            const burst = [];
-            for (let i = 0; i < (count || 20); i++) {
-                const angle = (Math.PI * 2 * i) / (count || 20) + Math.random() * .3;
-                const speed = Math.random() * 4 + 2;
-                burst.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: Math.random() * 3 + 1, life: 1, decay: Math.random() * .03 + .02, color });
-            }
-            return burst;
-        }
-
-        function screenFlash(color) { if (typeof window.NeonSystems?.audio?.screenFlash === 'function') window.NeonSystems.audio.screenFlash(color); }
-
-        /* ═══════════════════════════════════════
-           GAME STATE & DATA
-           ═══════════════════════════════════════ */
         const gameBox = document.getElementById('game-box');
         const touchBox = document.getElementById('touch-controller'), stick = document.getElementById('stick'), bannerAd = document.getElementById('banner-ad');
         let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0, pointerActive = false;
-        let gameActive = false;
 
         function applyMoveVector(dx, dy) {
-            const m = 45; const dist = Math.hypot(dx, dy);
-            if (dist > m) { dx = (dx / dist) * m; dy = (dy / dist) * m; }
+            const m = 45;
+            const dist = Math.hypot(dx, dy);
+            if (dist > m) {
+                dx = (dx / dist) * m;
+                dy = (dy / dist) * m;
+            }
             stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-            touchVec.x = dx / m; touchVec.y = dy / m;
-            if (gameMode === 'p2p' && typeof setP2PInput === 'function') setP2PInput(touchVec.x, touchVec.y);
+            touchVec.x = dx / m;
+            touchVec.y = dy / m;
+            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
+                setP2PInput(touchVec.x, touchVec.y);
+            }
         }
-        function clearMoveVector() {
-            activeTouchId = null; pointerActive = false; touchVec = { x: 0, y: 0 };
-            stick.style.transform = 'translate(-50%,-50%)';
-            if (gameMode === 'p2p' && typeof setP2PInput === 'function') setP2PInput(0, 0);
-        }
-        function isPlayTouchTarget(target) { return !target.closest('button') && !target.closest('.overlay:not(.hidden)'); }
-        function isPlayingNow() { return gameMode === 'p2p' || gameMode === 'offline'; }
 
-        /* ── Desktop Pointer Events ── */
+        function clearMoveVector() {
+            activeTouchId = null;
+            pointerActive = false;
+            touchVec = { x: 0, y: 0 };
+            stick.style.transform = 'translate(-50%, -50%)';
+            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
+                setP2PInput(0, 0);
+            }
+        }
+
+        function isPlayTouchTarget(target) {
+            return !target.closest('button') && !target.closest('.overlay:not(.hidden)');
+        }
+
+        function isPlayingNow() {
+            return gameMode === 'p2p' || gameMode === 'offline';
+        }
+
+        touchBox.addEventListener('touchstart', e => {
+            if (window.PointerEvent) return;
+            const t = e.changedTouches[0];
+            activeTouchId = t.identifier;
+            const r = touchBox.getBoundingClientRect();
+            startX = r.left + r.width / 2;
+            startY = r.top + r.height / 2;
+        }, { passive: true });
+
         gameBox.addEventListener('pointerdown', e => {
-            if (!isPlayingNow()) return;
-            if (e.target.closest('.overlay:not(.hidden)') || e.target.closest('button')) return;
-            if (!isPlayTouchTarget(e.target)) return;
-            pointerActive = true; startX = e.clientX; startY = e.clientY;
-            try { gameBox.setPointerCapture(e.pointerId); } catch(_e) {}
+            if (!isPlayingNow() || !isPlayTouchTarget(e.target)) return;
+            pointerActive = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            try { gameBox.setPointerCapture(e.pointerId); } catch (_error) {}
             applyMoveVector(0, 0);
         });
-        gameBox.addEventListener('pointermove', e => { if (!pointerActive) return; applyMoveVector(e.clientX - startX, e.clientY - startY); });
+
+        gameBox.addEventListener('pointermove', e => {
+            if (!pointerActive) return;
+            applyMoveVector(e.clientX - startX, e.clientY - startY);
+        });
+
         gameBox.addEventListener('pointerup', clearMoveVector);
         gameBox.addEventListener('pointercancel', clearMoveVector);
 
-        /* ── Touch Events ── */
-        touchBox.addEventListener('touchstart', e => {
-            if (window.PointerEvent) return;
-            const touches = e.touches;
-            if (touches.length === 1) { const t = touches[0]; activeTouchId = t.identifier; const r = touchBox.getBoundingClientRect(); startX = r.left + r.width / 2; startY = r.top + r.height / 2; }
-            else if (touches.length === 2) { activeTouchId = 'dual'; const r = touchBox.getBoundingClientRect(); startX = r.left + r.width / 2; startY = r.top + r.height / 2; }
-        }, { passive: true });
-        touchBox.addEventListener('touchmove', e => {
-            if (!isPlayingNow()) return; const touches = e.touches;
-            if (touches.length === 1 && touches[0].identifier === activeTouchId) { const t = touches[0]; applyMoveVector(t.clientX - startX, t.clientY - startY); }
-            else if (touches.length === 2 && activeTouchId === 'dual') { const midX = (touches[0].clientX + touches[1].clientX) / 2; const midY = (touches[0].clientY + touches[1].clientY) / 2; applyMoveVector(midX - startX, midY - startY); }
-        }, { passive: true });
-        touchBox.addEventListener('touchend', e => {
-            for (const t of e.changedTouches) { if (t.identifier === activeTouchId || (activeTouchId === 'dual' && e.touches.length < 2)) clearMoveVector(); }
-        }, { passive: true });
-        touchBox.addEventListener('touchcancel', e => {
-            for (const t of e.changedTouches) { if (t.identifier === activeTouchId || (activeTouchId === 'dual' && e.touches.length < 2)) clearMoveVector(); }
-        }, { passive: true });
-        window.addEventListener('touchend', e => { for (const t of e.changedTouches) { if (t.identifier === activeTouchId) clearMoveVector(); } }, { passive: true });
-        window.addEventListener('touchcancel', e => { for (const t of e.changedTouches) { if (t.identifier === activeTouchId) clearMoveVector(); } }, { passive: true });
-
-        /* Swipe gesture */
-        let swipeStartX = 0, swipeStartY = 0, swipeStartTime = 0;
-        gameBox.addEventListener('pointerdown', e => { if (!isPlayingNow()) return; swipeStartX = e.clientX; swipeStartY = e.clientY; swipeStartTime = Date.now(); }, { passive: true });
-        gameBox.addEventListener('pointerup', e => {
-            if (!isPlayingNow()) return;
-            const dx = e.clientX - swipeStartX, dy = e.clientY - swipeStartY, dist = Math.hypot(dx, dy), elapsed = Date.now() - swipeStartTime;
-            if (dist > 50 && elapsed < 300) { const angle = Math.atan2(dy, dx) * 180 / Math.PI; if (typeof handleSwipe === 'function') handleSwipe(angle); }
+        window.addEventListener('touchmove', e => {
+            if (pointerActive || activeTouchId === null) return;
+            for (const t of e.changedTouches) {
+                if (t.identifier === activeTouchId) {
+                    applyMoveVector(t.clientX - startX, t.clientY - startY);
+                }
+            }
         }, { passive: true });
 
-        /* Cyber Name Tap Glow */
-        const cyberName = document.querySelector('.cyber-name');
-        if (cyberName && !window.matchMedia('(hover:hover)').matches) {
-            cyberName.addEventListener('touchstart', function(e) { e.preventDefault(); this.classList.add('tapped'); setTimeout(() => this.classList.remove('tapped'), 600); }, { passive: false });
-        }
+        const resetTouch = e => {
+            for (const t of e.changedTouches) {
+                if (t.identifier === activeTouchId) {
+                    clearMoveVector();
+                }
+            }
+        };
 
-        /* ── Game Data ── */
-         let coins = 0; try { coins = parseInt(localStorage.getItem('sumo_coins') || '0'); } catch(_e) {}
-         let maxUnlockedStage = 1; try { maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1'); } catch(_e) {}
-         let upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0 };
-         try { const _u = JSON.parse(localStorage.getItem('sumo_upgrades') || ''); if (_u && typeof _u === 'object') upgrades = _u; } catch(_e) {}
-         upgrades = { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0, ...upgrades };
+        window.addEventListener('touchend', resetTouch, { passive: true });
+        window.addEventListener('touchcancel', resetTouch, { passive: true });
+
+        let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
+        let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
+        let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}');
+        upgrades = { weight: 1, power: 1, coreDensity: 0, neonMomentum: 0, hydroPusher: 0, voidArmor: 0, ...upgrades };
         const bodyUpgrades = [
-            { id:'coreDensity', name:'Core Density', icon:'◈', unlock:10, lore:'Recovered from the Foundry. Adds mass against heavy bosses.', max:3, cost: level => (level + 1) * 45 },
-            { id:'neonMomentum', name:'Neon Momentum', icon:'⚡', unlock:12, lore:'Charged in Wave 12. Builds faster movement and impact power.', max:3, cost: level => (level + 1) * 55 },
-            { id:'hydroPusher', name:'Hydro-Pusher', icon:'◇', unlock:25, lore:'Abyssal coolant from Wave 25. Improves recovery after collisions.', max:3, cost: level => (level + 1) * 65 },
-            { id:'voidArmor', name:'Void Armor', icon:'⬡', unlock:50, lore:'Boss-core plating from Wave 50. Reduces ring-out force.', max:3, cost: level => (level + 1) * 80 }
+            { id: 'coreDensity', name: 'Core Density', icon: '◈', unlock: 10, lore: 'Recovered from the Foundry. Adds mass against heavy bosses.', max: 3, cost: level => (level + 1) * 45 },
+            { id: 'neonMomentum', name: 'Neon Momentum', icon: '⚡', unlock: 12, lore: 'Charged in Wave 12. Builds faster movement and impact power.', max: 3, cost: level => (level + 1) * 55 },
+            { id: 'hydroPusher', name: 'Hydro-Pusher', icon: '◇', unlock: 25, lore: 'Abyssal coolant from Wave 25. Improves recovery after collisions.', max: 3, cost: level => (level + 1) * 65 },
+            { id: 'voidArmor', name: 'Void Armor', icon: '⬡', unlock: 50, lore: 'Boss-core plating from Wave 50. Reduces ring-out force.', max: 3, cost: level => (level + 1) * 80 }
         ];
         const skinCatalog = [
-            { id:'cyan', name:'Pulse Core', color:'#00e5ff', accent:'#ffffff', price:0, shape:'orb' },
-            { id:'ember', name:'Ember Ring', color:'#ff6b00', accent:'#ffd166', price:35, shape:'orb' },
-            { id:'toxic', name:'Toxic Fang', color:'#7dff00', accent:'#eaffb0', price:60, shape:'diamond' },
-            { id:'void', name:'Void Samurai', color:'#ff2bd6', accent:'#ffe4fb', price:90, shape:'hex' }
+            { id: 'cyan', name: 'Pulse Core', color: '#00e5ff', accent: '#ffffff', price: 0, shape: 'orb' },
+            { id: 'ember', name: 'Ember Ring', color: '#ff6b00', accent: '#ffd166', price: 35, shape: 'orb' },
+            { id: 'toxic', name: 'Toxic Fang', color: '#7dff00', accent: '#eaffb0', price: 60, shape: 'diamond' },
+            { id: 'void', name: 'Void Samurai', color: '#ff2bd6', accent: '#ffe4fb', price: 90, shape: 'hex' }
         ];
-         let skinState = { owned:['cyan'], equipped:'cyan' }; try { skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"owned":["cyan"],"equipped":"cyan"}'); } catch(_e) {}
-         let dailyMission = {}; try { dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}'); } catch(_e) {}
+        let skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"owned":["cyan"],"equipped":"cyan"}');
+        let dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}');
 
         function renderSkinShop() {
-            const grid = document.getElementById('skin-grid'); if (!grid) return; grid.innerHTML = '';
+            const grid = document.getElementById('skin-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
             skinCatalog.forEach(skin => {
-                const owned = skinState.owned.includes(skin.id), equipped = skinState.equipped === skin.id;
-                const card = document.createElement('div'); card.className = `skin-card ${equipped ? 'equipped' : ''}`;
-                card.innerHTML = `<div class="skin-preview ${skin.shape}" style="--skin-color:${skin.color};--skin-accent:${skin.accent}"></div><div class="skin-info"><b>${skin.name}</b><small>${equipped ? 'EQUIPPED' : owned ? 'READY TO EQUIP' : `${skin.price} 🪙`}</small></div><button class="shop-btn" type="button" onclick="buyOrEquipSkin('${skin.id}')">${equipped ? 'Active' : owned ? 'Equip' : 'Buy'}</button>`;
+                const owned = skinState.owned.includes(skin.id);
+                const equipped = skinState.equipped === skin.id;
+                const card = document.createElement('div');
+                card.className = `skin-card ${equipped ? 'equipped' : ''}`;
+                card.innerHTML = `<div class="skin-preview ${skin.shape}" style="--skin-color:${skin.color};--skin-accent:${skin.accent}"></div><div class="skin-info"><b>${skin.name}</b><small>${equipped ? 'EQUIPPED' : owned ? 'READY TO EQUIP' : `${skin.price} 🪙`}</small></div><button class="shop-btn" onclick="buyOrEquipSkin('${skin.id}')">${equipped ? 'Active' : owned ? 'Equip' : 'Buy'}</button>`;
                 grid.appendChild(card);
             });
         }
+
         function buyOrEquipSkin(id) {
-            const skin = skinCatalog.find(item => item.id === id); if (!skin) return;
-            if (!skinState.owned.includes(id)) { if (coins < skin.price) { alert('الكوينز غير كافية!'); return; } coins -= skin.price; skinState.owned.push(id); }
-            skinState.equipped = id; try { localStorage.setItem('sumo_skins', JSON.stringify(skinState)); } catch(_e) {} applyEquippedSkin(); saveData(); renderSkinShop();
+            const skin = skinCatalog.find(item => item.id === id);
+            if (!skin) return;
+            if (!skinState.owned.includes(id)) {
+                if (coins < skin.price) { alert('الكوينز غير كافية!'); return; }
+                coins -= skin.price;
+                skinState.owned.push(id);
+            }
+            skinState.equipped = id;
+            localStorage.setItem('sumo_skins', JSON.stringify(skinState));
+            applyEquippedSkin();
+            saveData();
+            renderSkinShop();
         }
-        function applyEquippedSkin() { const skin = skinCatalog.find(item => item.id === skinState.equipped) || skinCatalog[0]; player.color = skin.color; player.skinShape = skin.shape; player.skinAccent = skin.accent; }
-        function resetDailyMissionIfNeeded() { const today = new Date().toISOString().slice(0, 10); if (dailyMission.date !== today) dailyMission = { date: today, wins: 0, claimed: false }; }
+
+        function applyEquippedSkin() {
+            const skin = skinCatalog.find(item => item.id === skinState.equipped) || skinCatalog[0];
+            player.color = skin.color;
+            player.skinShape = skin.shape;
+            player.skinAccent = skin.accent;
+        }
+
+        function resetDailyMissionIfNeeded() {
+            const today = new Date().toISOString().slice(0, 10);
+            if (dailyMission.date !== today) dailyMission = { date: today, wins: 0, claimed: false };
+        }
+
         function updateDailyMission() {
-            resetDailyMissionIfNeeded(); const wins = Math.min(3, dailyMission.wins || 0);
+            resetDailyMissionIfNeeded();
+            const wins = Math.min(3, dailyMission.wins || 0);
             document.getElementById('mission-status').innerText = `${wins} / 3 wins`;
             document.getElementById('mission-progress').style.width = `${wins / 3 * 100}%`;
-            const claim = document.getElementById('mission-claim'); claim.classList.toggle('hidden', wins < 3 || dailyMission.claimed);
+            const claim = document.getElementById('mission-claim');
+            claim.classList.toggle('hidden', wins < 3 || dailyMission.claimed);
             document.getElementById('mission-copy').innerText = dailyMission.claimed ? 'Mission complete. Return tomorrow for a new rush.' : 'Win 3 stages today for +25 coins';
-            document.getElementById('menu-streak').innerText = `${(function(){try{return localStorage.getItem('sumo_streak')||'0'}catch(_e){return'0'}})()} 🔥`;
-             try { localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission)); } catch(_e) {}
+            document.getElementById('menu-streak').innerText = `${parseInt(localStorage.getItem('sumo_streak') || '0')} 🔥`;
+            localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission));
         }
-        function claimDailyMission() { resetDailyMissionIfNeeded(); if (dailyMission.wins < 3 || dailyMission.claimed) return; dailyMission.claimed = true; coins += 25; saveData(); updateDailyMission(); }
-        function saveData() { const _safeU = upgrades && typeof upgrades === 'object' ? upgrades : { weight:1, power:1, coreDensity:0, neonMomentum:0, hydroPusher:0, voidArmor:0 }; try { localStorage.setItem('sumo_coins', coins); localStorage.setItem('sumo_stage', maxUnlockedStage); localStorage.setItem('sumo_upgrades', JSON.stringify(_safeU)); } catch(_e) {} if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = _safeU; }); updateDisplays(); if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer(); }
-        function updateDisplays() { document.getElementById('menu-coins').innerText = coins; const hc = document.getElementById('hud-coins'); if (hc) hc.innerText = coins; const sc = document.getElementById('shop-coins'); if (sc) sc.innerText = coins; const hs = document.getElementById('hud-stage'); if (hs) hs.innerText = currentPlayingStage || 1; const hm = document.getElementById('hud-mode'); if (hm) hm.innerText = activeMode === 'chaos' ? 'CHAOS' : activeMode === 'timeAttack' ? 'TIME' : activeMode === 'shrinking' ? 'SHRINK' : activeMode === 'p2p' ? 'P2P' : '--'; if (document.getElementById('menu-streak')) updateDailyMission(); }
-        gameMode = 'none';
-        activeMode = 'stage';
-        ARCADE_MODES = { chaos: { radius:210, bots:6, botScale:6, reward:20 }, timeAttack: { radius:260, bots:2, botScale:1, duration:60, spawnEvery:1.75, reward:10 }, shrinking: { radius:270, minRadius:125, bots:3, botScale:2, shrinkPerSecond:2, reward:10 } };
-        modeTime = 0; modeElapsedMs = 0; modeLastTick = 0; modeScore = 0; modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
-         totalDeaths = 0; try { totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0'); } catch(_e) {}
-        reviveSnapshot = { x:400, y:300, radius:240 };
-        currentPlayingStage = 1; offlineArenaRadius = 240;
-        stageEnded = false; stageReady = false;
-        gameActive = false;
-        player = { x:400, y:300, vx:0, vy:0, radius:24, color:'#00e5ff', alive:true };
-        applyEquippedSkin();
-        bots = []; gameParticles = []; keys = {};
-        try { updateDisplays(); } catch(_e) {}
 
-        window.onkeydown = e => { const key = e.key.toLowerCase(); keys[key] = true; if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots); if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots); };
+        function claimDailyMission() {
+            resetDailyMissionIfNeeded();
+            if (dailyMission.wins < 3 || dailyMission.claimed) return;
+            dailyMission.claimed = true;
+            coins += 25;
+            saveData();
+            updateDailyMission();
+        }
+
+        function saveData() {
+            localStorage.setItem('sumo_coins', coins);
+            localStorage.setItem('sumo_stage', maxUnlockedStage);
+            localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades));
+            if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; });
+            updateDisplays();
+            if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer();
+        }
+
+        function updateDisplays() {
+            document.getElementById('menu-coins').innerText = coins;
+            document.getElementById('hud-coins').innerText = coins;
+            document.getElementById('shop-coins').innerText = coins;
+            if (document.getElementById('menu-streak')) updateDailyMission();
+        }
+
+        updateDisplays();
+
+        let gameMode = 'none';
+        let activeMode = 'stage';
+        const ARCADE_MODES = {
+            chaos: { radius: 185, bots: 6, botScale: 6, reward: 20 },
+            timeAttack: { radius: 235, bots: 2, botScale: 1, duration: 60, spawnEvery: 1.75, reward: 10 },
+            shrinking: { radius: 250, minRadius: 125, bots: 3, botScale: 2, shrinkPerSecond: 2, reward: 10 }
+        };
+        let modeTime = 0;
+        let modeElapsedMs = 0;
+        let modeLastTick = 0;
+        let modeScore = 0;
+        let modeSpawnTimer = 0;
+        let modeEliminations = 0;
+        let modeRewarded = false;
+        let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
+        let reviveSnapshot = { x: 400, y: 300, radius: 240 };
+        let currentPlayingStage = 1;
+        let offlineArenaRadius = 240;
+        let stageEnded = false;
+        let stageReady = false;
+
+        let player = {
+            x: 400,
+            y: 300,
+            vx: 0,
+            vy: 0,
+            radius: 24,
+            color: '#00e5ff',
+            alive: true
+        };
+        applyEquippedSkin();
+
+        let bots = [];
+        let particles = [];
+        let keys = {};
+
+        window.onkeydown = e => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots);
+            if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots);
+        };
         window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
 
         function hideAllMenus() {
             document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-            const hud = document.getElementById('hud'); if (hud) hud.classList.add('hidden');
-            touchBox.style.display = 'none'; touchBox.classList.remove('active');
+            document.getElementById('hud').classList.add('hidden');
+            touchBox.style.display = 'none';
             bannerAd.style.display = document.body.classList.contains('online-mode') ? 'none' : 'flex';
         }
+
         function stopPlaySession() {
-            gameActive = false; gameMode = 'none'; stageEnded = false; stageReady = false;
-            bots = []; gameParticles = []; particles = []; player.alive = true; player.vx = 0; player.vy = 0;
-            touchBox.style.display = 'none'; touchBox.classList.remove('active');
+            gameMode = 'none';
+            stageEnded = false;
+            stageReady = false;
+            bots = [];
+            particles = [];
+            player.alive = true;
+            player.vx = 0;
+            player.vy = 0;
             if (typeof clearMoveVector === 'function') clearMoveVector();
-            if (typeof disconnectWS === 'function') { try { disconnectWS(); } catch(_e) {} }
+            if (typeof disconnectWS === 'function') { try { disconnectWS(); } catch (_error) {} }
             if (typeof netInterval !== 'undefined' && netInterval) { clearInterval(netInterval); netInterval = null; }
-            if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch(_e) {} ws = null; }
+            if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch (_error) {} ws = null; }
         }
+
         function showMainMenu() {
-            try { stopPlaySession(); if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false); } catch(_e) { gameMode = 'none'; }
-            hideAllMenus(); bannerAd.style.display = 'flex'; updateDisplays();
+            try {
+                stopPlaySession();
+                if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false);
+            } catch (_error) { gameMode = 'none'; }
+            hideAllMenus();
+            bannerAd.style.display = 'flex';
+            updateDisplays();
             document.getElementById('menu-main').classList.remove('hidden');
         }
+
         function showStageSelect() {
-            hideAllMenus(); document.getElementById('unlocked-count').innerText = maxUnlockedStage;
-            const grid = document.getElementById('stage-grid'); grid.innerHTML = '';
+            hideAllMenus();
+            document.getElementById('unlocked-count').innerText = maxUnlockedStage;
+            const grid = document.getElementById('stage-grid');
+            grid.innerHTML = '';
             for (let i = 1; i <= Math.min(1000, maxUnlockedStage + 12); i++) {
-                let stage = document.createElement('div'); stage.className = 'stage-card';
+                let stage = document.createElement('div');
+                stage.className = 'stage-card';
                 if (i % 5 === 0) stage.classList.add('boss');
-                if (i <= maxUnlockedStage) { stage.classList.add('unlocked'); if (i === maxUnlockedStage) stage.classList.add('current'); stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`; const sn = i; stage.addEventListener('click', () => { startOfflineStage(sn); }); }
-                else { stage.classList.add('locked'); stage.innerText = '🔒'; }
+                if (i <= maxUnlockedStage) {
+                    stage.classList.add('unlocked');
+                    if (i === maxUnlockedStage) stage.classList.add('current');
+                    stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`;
+                    stage.dataset.stage = i;
+                    stage.addEventListener('click', event => {
+                        event.preventDefault();
+                        startOfflineStage(Number(event.currentTarget.dataset.stage));
+                    });
+                } else {
+                    stage.classList.add('locked');
+                    stage.innerText = '🔒';
+                }
                 grid.appendChild(stage);
             }
             document.getElementById('menu-stages').classList.remove('hidden');
         }
-        function exitToMenu() { stopPlaySession(); hideAllMenus(); document.getElementById('menu-main').classList.remove('hidden'); if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false); bannerAd.style.display = 'flex'; updateDisplays(); }
-        function showGameOverScreen(message) {
-            document.getElementById('modal-death').classList.remove('hidden');
-            document.getElementById('death-count-copy').innerText = message || `Deaths: ${totalDeaths}`;
-            const reviveBtn = document.getElementById('revive-button'); const isOnline = isOnlineSession();
-            if (reviveBtn) { reviveBtn.style.display = isOnline ? 'none' : ''; if (!isOnline) { const rc = counters.revive || 0; reviveBtn.innerText = `REVIVE: VISIT (${rc}/${counterLimits.revive})`; } }
-            if (typeof window.NeonSystems?.audio?.playDeath === 'function') window.NeonSystems.audio.playDeath();
+
+        function startGameMode(mode) {
+            activeMode = mode;
+            if (mode === 'chaos') startChaosArena();
+            else if (mode === 'timeAttack') startTimeAttack();
+            else startShrinkingArena();
         }
-        function showWinStage() {
+
+        function startModeBase(mode, radius) {
+            gameMode = 'offline'; activeMode = mode; stageEnded = false;
+            stageReady = false;
+            hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block'; offlineArenaRadius = radius;
+            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
+            modeTime = ARCADE_MODES[mode]?.duration || 0;
+            modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
+            modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
+            document.getElementById('hud-left').innerText = mode === 'chaos' ? '🌀 CHAOS ARENA' : mode === 'timeAttack' ? '⏱️ TIME ATTACK' : '🔻 SHRINKING ARENA';
+            updateDisplays(); applyEquippedSkin();
+        }
+
+        function startChaosArena() {
+            const config = ARCADE_MODES.chaos;
+            startModeBase('chaos', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, '#ff3366');
+            stageReady = bots.some(bot => bot.alive);
+        }
+
+        function startTimeAttack() {
+            const config = ARCADE_MODES.timeAttack;
+            startModeBase('timeAttack', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, i % 2 ? '#ff3366' : '#ffaa00');
+            stageReady = bots.some(bot => bot.alive);
+        }
+
+        function startShrinkingArena() {
+            const config = ARCADE_MODES.shrinking;
+            startModeBase('shrinking', config.radius);
+            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, ['#ff0055', '#ffaa00', '#7dff00'][i]);
+            stageReady = bots.some(bot => bot.alive);
+        }
+
+        function addModeBot(index, scale, color) {
+            const angle = index * 2.399;
+            bots.push({ x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
+                radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .45 + scale * .03, power: 5 + scale,
+                color, isBoss: false, alive: true, cd: 0 });
+        }
+
+        function addBossMinion(boss) {
+            const angle = (boss.attackCycle + bots.length) * 2.399;
+            bots.push({ x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
+                radius: 16, mass: 1.05, speed: .38, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
+        }
+
+        function getActiveBoss() {
+            return bots.find(bot => bot.isBoss && bot.alive);
+        }
+
+        function showShop() {
+            hideAllMenus();
+            updateDisplays();
+            document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
+            document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
+            document.getElementById('buy-weight').innerText = `Buy (${upgrades.weight * 20}🪙)`;
+            document.getElementById('buy-power').innerText = `Buy (${upgrades.power * 20}🪙)`;
+            renderBodyUpgrades();
+            renderSkinShop();
+            document.getElementById('menu-shop').classList.remove('hidden');
+        }
+
+        function renderBodyUpgrades() {
+            const grid = document.getElementById('body-upgrade-grid');
+            if (!grid) return;
+            grid.innerHTML = bodyUpgrades.map(item => {
+                const level = Number(upgrades[item.id]) || 0;
+                const unlocked = maxUnlockedStage >= item.unlock;
+                const cost = item.cost(level);
+                return `<div class="body-upgrade-card ${unlocked ? '' : 'locked'}"><div class="body-upgrade-heading"><b>${item.icon} ${item.name}</b><strong>LVL ${level}/${item.max}</strong></div><small>${item.lore}</small><button class="shop-btn" type="button" onclick="buyBodyUpgrade('${item.id}')" ${!unlocked || level >= item.max ? 'disabled' : ''}>${level >= item.max ? 'MAXED' : unlocked ? `Upgrade ${cost}🪙` : `Unlocks at Wave ${item.unlock}`}</button></div>`;
+            }).join('');
+        }
+
+        function buyBodyUpgrade(id) {
+            const item = bodyUpgrades.find(entry => entry.id === id);
+            if (!item) return;
+            const level = Number(upgrades[id]) || 0;
+            const cost = item.cost(level);
+            if (maxUnlockedStage < item.unlock || level >= item.max || coins < cost) return;
+            coins -= cost;
+            upgrades[id] = level + 1;
+            saveData();
+            showShop();
+        }
+
+        function buyUpgrade(type) {
+            if (type !== 'weight' && type !== 'power') return;
+            const level = Number(upgrades[type]) || 1;
+            const cost = level * 20;
+            if (coins >= cost) {
+                coins -= cost;
+                upgrades[type] = level + 1;
+                saveData();
+                showShop();
+            } else {
+                alert(`الكوينز غير كافية! تحتاج ${cost} 🪙`);
+            }
+        }
+
+        document.querySelectorAll('[data-upgrade]').forEach(button => {
+            button.addEventListener('click', () => buyUpgrade(button.dataset.upgrade));
+        });
+
+        function showMultiMenu() {
+            setOnlineAdsOff(true);
+            hideAllMenus();
+            document.getElementById('menu-multi').classList.remove('hidden');
+        }
+
+        function exitToMenu() { showMainMenu(); }
+
+        function offlineEnemyCount(level) {
+            if (level < 8) return 1;
+            if (level < 22) return 2;
+            return 3;
+        }
+
+        function offlineBotStats(level) {
+            const curve = Math.sqrt(level);
+            return {
+                radius: 18 + Math.min(7, curve * 0.85),
+                mass: 0.85 + Math.min(1.4, level * 0.011),
+                speed: 0.30 + Math.min(0.16, curve * 0.016),
+                power: 4.2 + Math.min(8.5, curve * 0.9)
+            };
+        }
+
+        function offlineBossStats(level, playerRadius) {
+            if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius);
+            const curve = Math.sqrt(level);
+            const wave = Math.max(1, Math.floor(level / 5));
+            const tier = Math.min(3, Math.floor(wave / 10));
+            return {
+                radius: Math.max(38, playerRadius * 1.38 + Math.min(6, curve * .8)),
+                mass: 9 + Math.min(5, curve * 0.45),
+                speed: 0.34 + Math.min(0.13, curve * 0.011),
+                power: 9.5 + Math.min(8, curve * 0.8),
+                maxHp: 8 + Math.min(8, Math.floor(wave * 0.4)),
+                shield: 3 + Math.min(5, Math.floor(wave * 0.2)),
+                tier
+            };
+        }
+
+        function startOfflineStage(level) {
+            const config = window.NeonSystems.progression.getStageConfig(level);
+            gameMode = 'offline';
+            activeMode = 'stage';
+            currentPlayingStage = level;
+            hideAllMenus();
+            document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block';
+            stageEnded = false;
+            stageReady = false;
+            offlineArenaRadius = config.arenaRadius;
+            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
+            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
+            bots = [];
+            
+            if (config.isBoss || config.isMiniBoss) {
+                const stats = offlineBossStats(level, player.radius);
+                const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
+                bots.push({
+                    x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
+                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00', 
+                    isBoss: true, isMiniBoss: config.isMiniBoss,
+                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
+                    shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
+                    attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
+                    minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
+                });
+            } else {
+                const count = config.botCount;
+                const stats = config.botStats;
+                const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
+                for (let i = 0; i < count; i++) {
+                    let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
+                    bots.push({
+                        x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
+                        vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
+                        power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
+                    });
+                }
+            }
+            stageReady = bots.some(bot => bot.alive);
+            document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
+            updateDisplays();
+            applyEquippedSkin();
+        }
+
+        function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
+        function nextStageOffline() { startOfflineStage(Math.min(1000, currentPlayingStage + 1)); }
+
+        function finishOfflineStage() {
+            if (stageEnded) return;
+            stageEnded = true;
+            const clearedStage = currentPlayingStage;
+            if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) {
+                maxUnlockedStage = clearedStage + 1;
+                localStorage.setItem('sumo_stage', maxUnlockedStage);
+            }
+            
+            // Scaled coin rewards
+            let coinReward = 5;
+            if (clearedStage % 10 === 0) coinReward = 50; // Mega Boss
+            else if (clearedStage % 5 === 0) coinReward = 20; // Mini Boss
+            else if (clearedStage > 500) coinReward = 15;
+            else if (clearedStage > 100) coinReward = 10;
+            
+            coins += coinReward;
+            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+            localStorage.setItem('sumo_streak', streak);
+            resetDailyMissionIfNeeded();
+            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
+            saveData();
+            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: clearedStage % 5 === 0 ? 1 : 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
+            hideAllMenus();
             document.getElementById('modal-win-stage').classList.remove('hidden');
-            if (typeof window.NeonSystems?.audio?.playStageClear === 'function') window.NeonSystems.audio.playStageClear();
-            if (typeof window.NeonSystems?.audio?.playVictory === 'function') window.NeonSystems.audio.playVictory();
         }
 
-        /* ═══════════════════════════════════════
-           NAVIGATION BUTTON WIRING
-           Deferred until the DOM and all external scripts have loaded so
-           references to functions defined in later modules (leaderboard.js,
-           game.js) are always resolvable at bind time.
-           ═══════════════════════════════════════ */
-        function wireButtons() {
-            document.getElementById('btn-stage-map')?.addEventListener('click', showStageSelect);
-            document.getElementById('btn-chaos')?.addEventListener('click', () => startGameMode('chaos'));
-            document.getElementById('btn-time')?.addEventListener('click', () => startGameMode('timeAttack'));
-            document.getElementById('btn-shrink')?.addEventListener('click', () => startGameMode('shrinking'));
-            document.getElementById('btn-shop')?.addEventListener('click', showShop);
-            document.getElementById('btn-leaderboard')?.addEventListener('click', openLeaderboardModalSafe);
-            document.getElementById('btn-back-stages')?.addEventListener('click', showMainMenu);
-            document.getElementById('btn-back-shop')?.addEventListener('click', showMainMenu);
-            document.getElementById('btn-back-multi')?.addEventListener('click', showMainMenu);
-            document.getElementById('btn-leave-room')?.addEventListener('click', exitToMenu);
-            document.getElementById('btn-death-menu')?.addEventListener('click', exitToMenu);
-            document.getElementById('btn-retry')?.addEventListener('click', retryStageDirectly);
-            document.getElementById('btn-next-stage')?.addEventListener('click', nextStageOffline);
-            document.getElementById('btn-win-map')?.addEventListener('click', showStageSelect);
-            document.getElementById('btn-exit')?.addEventListener('click', exitToMenu);
-            document.getElementById('btn-whatsapp')?.addEventListener('click', shareRoomWhatsApp);
-            document.getElementById('btn-copy-link')?.addEventListener('click', copyRoomLink);
-            document.getElementById('btn-cancel-lobby')?.addEventListener('click', exitToMenu);
-            document.getElementById('mission-claim')?.addEventListener('click', claimDailyMission);
-            document.getElementById('buy-weight')?.addEventListener('click', () => buyUpgrade('weight'));
-            document.getElementById('buy-power')?.addEventListener('click', () => buyUpgrade('power'));
-            document.getElementById('install-dismiss')?.addEventListener('click', closeInstallGuide);
-            document.getElementById('install-dismiss')?.addEventListener('keydown', e => { if (e.key === 'Enter') closeInstallGuide(); });
-        }
-        function bootWiring() {
-            try { wireButtons(); } catch(_e) {}
-        }
-        if (document.readyState === 'complete' || document.readyState === 'interactive') { bootWiring(); }
-        else {
-            document.addEventListener('DOMContentLoaded', bootWiring);
-            window.addEventListener('load', bootWiring);
+        function endArcadeMode(title, score) {
+            if (modeRewarded) return;
+            modeRewarded = true;
+            stageEnded = true;
+            const reward = Math.max(5, ARCADE_MODES[activeMode]?.reward || 5) + Math.floor(score / 10);
+            coins += reward;
+            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
+            localStorage.setItem('sumo_streak', streak);
+            resetDailyMissionIfNeeded();
+            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
+            saveData(); hideAllMenus();
+            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
+            document.getElementById('round-title').innerText = title;
+            document.getElementById('round-score').innerText = `${score} PTS • +${reward} 🪙`;
+            document.getElementById('modal-round').classList.remove('hidden');
         }
 
-        /* ═══════════════════════════════════════
-           NEON SIDEBAR & MENU TOGGLE
-           ═══════════════════════════════════════ */
-        const neonSidebar = document.getElementById('neon-sidebar');
-        const neonMenuBtn = document.getElementById('neon-menu-btn');
-        if (neonMenuBtn && neonSidebar) {
-            neonMenuBtn.addEventListener('click', () => { const isOpen = neonSidebar.style.right === '0px' || neonSidebar.style.right === ''; neonSidebar.style.right = isOpen ? `min(-86vw,-330px)` : '0px'; });
+        function registerPlayerDeath() {
+            totalDeaths += 1;
+            localStorage.setItem('sumo_total_deaths', totalDeaths);
+            document.getElementById('death-count-copy').innerText = `Total ring-outs: ${totalDeaths}`;
+            updateRewardButtons();
         }
 
-        /* Ambient particle background render */
-        function ambientLoop() {
-            if (typeof window.NeonSystems?.particles?.renderAmbient === 'function') window.NeonSystems.particles.renderAmbient();
-            requestAnimationFrame(ambientLoop);
+        function reviveInPlaceOffline() {
+            stageEnded = false;
+            const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
+            const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
+            const scale = distance > safeDistance ? safeDistance / distance : 1;
+            player.x = 400 + (reviveSnapshot.x - 400) * scale;
+            player.y = 300 + (reviveSnapshot.y - 300) * scale;
+            player.vx = 0; player.vy = 0; player.alive = true;
+            hideAllMenus();
+            document.getElementById('hud').classList.remove('hidden');
+            touchBox.style.display = 'block';
         }
-        ambientLoop();
 
-/* ═══════════════════════════════════════
-           LOADING SCREEN — Robust Dismiss
-           Delegates to the bulletproof failsafe armed at the top of the
-           script. Idempotent: repeated calls are no-ops.
-           ═══════════════════════════════════════ */
-         function dismissLoading() { window.NeonBoot.forceShowMenu(); }
-         dismissLoading();
-     </script>
-     <script src="modules/storage.js"></script>
+        function spawnImpact(x, y, color) {
+            for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = 3 + Math.random() * 4;
+                particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
+            }
+            if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
+            if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
+        }
+
+        function distanceToPlayer(bot) {
+            return Math.hypot(bot.x - player.x, bot.y - player.y);
+        }
+
+        function updatePhysics() {
+            if (gameMode === 'none') return;
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;
+                if (p.a <= 0) particles.splice(i, 1);
+            }
+            let dx = 0, dy = 0;
+            if (keys['arrowup'] || keys['w']) dy -= 1;
+            if (keys['arrowdown'] || keys['s']) dy += 1;
+            if (keys['arrowleft'] || keys['a']) dx -= 1;
+            if (keys['arrowright'] || keys['d']) dx += 1;
+            if (touchVec.x || touchVec.y) { dx = touchVec.x; dy = touchVec.y; }
+            let magnitude = Math.hypot(dx, dy);
+            if (magnitude > 1) { dx /= magnitude; dy /= magnitude; }
+
+            if (gameMode === 'offline' && player.alive && !stageEnded) {
+                const now = performance.now();
+                const deltaSeconds = Math.min(0.1, Math.max(0, (now - modeLastTick) / 1000));
+                modeLastTick = now;
+                if (activeMode === 'timeAttack') {
+                    modeElapsedMs += deltaSeconds * 1000;
+                    modeTime = Math.max(0, ARCADE_MODES.timeAttack.duration - modeElapsedMs / 1000);
+                    if (modeTime <= 0) { endArcadeMode('TIME UP', modeScore); return; }
+                    modeSpawnTimer += deltaSeconds;
+                    if (modeSpawnTimer >= ARCADE_MODES.timeAttack.spawnEvery) {
+                        modeSpawnTimer = 0;
+                        addModeBot(bots.length, 1, Math.random() > .5 ? '#ffaa00' : '#ff3366');
+                    }
+                    document.getElementById('hud-left').innerText = `⏱️ ${Math.ceil(modeTime)}s • ${modeScore} PTS`;
+                } else if (activeMode === 'shrinking') {
+                    modeElapsedMs += deltaSeconds * 1000;
+                    offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
+                    document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
+                }
+                const momentum = 1.6 + upgrades.neonMomentum * 0.12;
+                player.vx += dx * momentum; player.vy += dy * momentum;
+                player.vx *= 0.88; player.vy *= 0.88;
+                const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
+                player.vx *= recovery; player.vy *= recovery;
+                // Cap velocity to prevent instant ejection from boss slams
+                const maxVel = 8 + upgrades.weight * 0.3;
+                const spd = Math.hypot(player.vx, player.vy);
+                if (spd > maxVel) { player.vx *= maxVel / spd; player.vy *= maxVel / spd; }
+                player.x += player.vx; player.y += player.vy;
+                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius - player.radius) {
+                    reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
+                    player.alive = false; stageEnded = true;
+                    registerPlayerDeath();
+                    hideAllMenus();
+                    document.getElementById('modal-death').classList.remove('hidden');
+                    return;
+                }
+                let active = bots.filter(bot => bot.alive);
+                for (let bot of active) {
+                    let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+                    bot.cd = (bot.cd || 0) + 1;
+                    if (bot.hurtCd > 0) bot.hurtCd -= 1;
+                    let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
+                    let critical = bot.isBoss && bot.hp <= bot.maxHp * 0.25;
+                    if (raging && bot.phase === 1) {
+                        bot.phase = 2; bot.color = '#ff3366';
+                        spawnImpact(bot.x, bot.y, '#ff3366');
+                    }
+                    if (critical && bot.phase === 2) {
+                        bot.phase = 3; bot.color = '#ffbb00'; bot.shield = bot.maxShield;
+                        bot.shieldCooldown = 240; bot.minionCooldown = 1;
+                        spawnImpact(bot.x, bot.y, '#ffbb00');
+                    }
+                    if (bot.isBoss) {
+                        if (bot.shieldCooldown > 0) bot.shieldCooldown -= 1;
+                        if (bot.shield <= 0 && bot.shieldCooldown === 0 && bot.hp > 0) {
+                            bot.shield = Math.min(bot.maxShield, bot.shield + 0.02);
+                        }
+                        bot.minionCooldown -= 1;
+                        const minionCount = bots.filter(candidate => candidate.alive && candidate.bossMinion).length;
+                        if (bot.minionCooldown <= 0 && minionCount < 2 && bot.hp > 0) {
+                            addBossMinion(bot);
+                            bot.minionCooldown = Math.max(260, 420 - bot.tier * 35);
+                        }
+                        bot.attackCooldown -= 1;
+                        if (bot.telegraph > 0) {
+                            bot.telegraph -= 1;
+                            if (bot.telegraph === 0) {
+                                if (bot.attackType === 'wave') {
+                                    bot.pulseRadius = 12;
+                                    if (distanceToPlayer(bot) < 190) {
+                                        const waveForce = raging ? 9.5 : 7.5;
+                                        player.vx += Math.cos(angle) * waveForce;
+                                        player.vy += Math.sin(angle) * waveForce;
+                                    }
+                                } else {
+                                    bot.dashTimer = raging ? 20 : 16;
+                                    bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2);
+                                    bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
+                                }
+                                bot.attackType = null;
+                                bot.attackCooldown = Math.max(68, (critical ? 78 : raging ? 92 : 118) - bot.tier * 6);
+                            }
+                        } else if (bot.attackCooldown <= 0) {
+                            bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
+                            bot.attackCycle = (bot.attackCycle || 0) + 1;
+                            bot.telegraph = 42 + bot.tier * 3;
+                        }
+                        if (bot.pulseRadius > 0) bot.pulseRadius += 10;
+                        if (bot.pulseRadius > 210) bot.pulseRadius = 0;
+                    }
+                    let speed = bot.speed * (critical ? 1.5 : raging ? 1.35 : 1);
+                    let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
+                    let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
+                    let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
+                    if (bot.cd > dashAt) speed *= dashMul;
+                    if (bot.cd > dashEnd) bot.cd = 0;
+                    if (bot.isBoss && bot.dashTimer > 0) {
+                        bot.vx = bot.dashVx;
+                        bot.vy = bot.dashVy;
+                        bot.dashTimer -= 1;
+                    } else {
+                        bot.vx += Math.cos(angle) * speed;
+                        bot.vy += Math.sin(angle) * speed;
+                    }
+                    bot.vx *= bot.isBoss ? 0.92 : 0.9;
+                    bot.vy *= bot.isBoss ? 0.92 : 0.9;
+                    bot.x += bot.vx; bot.y += bot.vy;
+                    let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
+                    if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
+                        let nx = (bot.x - 400) / fromCenter;
+                        let ny = (bot.y - 300) / fromCenter;
+                        bot.x = 400 + nx * (offlineArenaRadius - 12);
+                        bot.y = 300 + ny * (offlineArenaRadius - 12);
+                        bot.vx *= 0.25; bot.vy *= 0.25;
+                    } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
+                        bot.alive = false;
+                    }
+                    let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
+                    if (bot.isBoss) {
+                        bot.slamCd = (bot.slamCd || 0) + 1;
+                        if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
+                            let slam = (raging ? 12 : 8) + bot.power * 0.15;
+                            player.vx -= Math.cos(angle) * slam;
+                            player.vy -= Math.sin(angle) * slam;
+                            bot.slamCd = 0;
+                            spawnImpact(player.x, player.y, '#ff0055');
+                        }
+                    }
+                    if (distance < player.radius + bot.radius) {
+                        let overlap = player.radius + bot.radius - distance;
+                        let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
+                        player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
+                        player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
+                        bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
+                        bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
+                        let playerMass = 1.0 + upgrades.weight * 0.25;
+                        let playerPower = 6.0 + upgrades.power * 1.5;
+                        const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
+                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                        let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
+                        if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
+                            let damage = 1;
+                            if (bot.shield > 0) {
+                                bot.shield = Math.max(0, bot.shield - damage);
+                                bot.shieldCooldown = 180;
+                            } else {
+                                bot.hp = Math.max(0, bot.hp - damage);
+                                bot.hurtCd = 22;
+                                if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); }
+                            }
+                        }
+                        bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
+                        bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
+                        spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
+                    }
+                }
+                if (activeMode === 'timeAttack') {
+                    const aliveCount = bots.filter(bot => bot.alive).length;
+                    modeEliminations += active.length - aliveCount;
+                    modeScore = modeEliminations * 10;
+                    if (aliveCount === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
+                }
+                const activeBoss = getActiveBoss();
+                const remainingBots = bots.filter(bot => bot.alive).length;
+                const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
+                const stageVictory = activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
+                const arcadeVictory = activeMode !== 'stage' && remainingBots === 0;
+                if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
+                    if (activeMode === 'stage') { finishOfflineStage(); return; }
+                    modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
+                    endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
+                    return;
+                }
+            }
+        }
+
+        function render() {
+            ctx.fillStyle = '#08090f';
+            ctx.fillRect(0, 0, 800, 600);
+            if (gameMode !== 'none') {
+                let radius = offlineArenaRadius;
+                ctx.beginPath();
+                ctx.arc(400, 300, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0f121d'; ctx.fill();
+                ctx.lineWidth = 4; ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff'; ctx.stroke();
+
+                for (let p of particles) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
+                }
+                for (let bot of bots) {
+                    if (!bot.alive) continue;
+                    ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = bot.color; ctx.fill();
+                    ctx.lineWidth = bot.isBoss ? 4 : 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+                    if (bot.isBoss) {
+                        if (bot.telegraph > 0) {
+                            const warningRadius = bot.attackType === 'wave' ? 190 : 64;
+                            ctx.beginPath(); ctx.arc(bot.x, bot.y, warningRadius, 0, Math.PI * 2);
+                            ctx.lineWidth = 3; ctx.strokeStyle = bot.attackType === 'wave' ? '#ffbb00' : '#ff0055';
+                            ctx.globalAlpha = 0.35 + (bot.telegraph % 10) / 20;
+                            ctx.stroke(); ctx.globalAlpha = 1;
+                        }
+                        if (bot.pulseRadius > 0) {
+                            ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.pulseRadius, 0, Math.PI * 2);
+                            ctx.lineWidth = 5; ctx.strokeStyle = '#ffbb00';
+                            ctx.globalAlpha = Math.max(0, 1 - bot.pulseRadius / 220);
+                            ctx.stroke(); ctx.globalAlpha = 1;
+                        }
+                        const barWidth = bot.radius * 2.2;
+                        ctx.fillStyle = '#351323'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth, 5);
+                        ctx.fillStyle = '#00ff66'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth * Math.max(0, bot.hp / bot.maxHp), 5);
+                        ctx.fillStyle = '#172d48'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 9, barWidth, 3);
+                        ctx.fillStyle = '#00e5ff'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 9, barWidth * Math.max(0, bot.shield / bot.maxShield), 3);
+                    }
+                }
+                if (player.alive) {
+                    ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = player.color; ctx.fill();
+                    ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+                }
+            }
+        }
+
+        function gameLoop() {
+            if (window.NeonSystems?.performance) window.NeonSystems.performance.tick();
+            try { updatePhysics(); render(); } catch (_error) {}
+            requestAnimationFrame(gameLoop);
+        }
+        requestAnimationFrame(gameLoop);
+    </script>
+
+    <!-- زر القائمة الجانبية النيون -->
+    <div id="neon-menu-btn" onclick="toggleNeonMenu()" style="position: fixed; top: 110px; right: 30px; z-index: 9999; cursor: pointer; background: rgba(5,5,15,0.95); border: 2px solid #00f3ff; border-radius: 12px; padding: 12px 18px; box-shadow: 0 0 20px rgba(0,243,255,0.5); transition: 0.3s;">
+    <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ منيو</span>
+    </div>
+
+    <!-- القائمة الجانبية المتقدمة -->
+    <div id="neon-sidebar" style="position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: rgba(3, 3, 8, 0.98); border-left: 2px solid #00f3ff; box-shadow: -15px 0 40px rgba(0, 243, 255, 0.4); z-index: 10000; transition: right 0.4s ease; padding: 30px 20px; backdrop-filter: blur(20px); font-family: 'Orbitron', sans-serif; color: #fff; box-sizing: border-box; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid rgba(0,243,255,0.2); padding-bottom: 15px;">
+        <h2 style="color: #00f3ff; font-size: 18px; text-shadow: 0 0 10px #00f3ff; margin: 0;">CYBER MENU</h2>
+        <span onclick="toggleNeonMenu()" style="color: #ff0055; font-size: 26px; cursor: pointer; text-shadow: 0 0 10px #ff0055;">&times;</span>
+      </div>
+
+      <!-- صورة وحساب اللاعب -->
+      <div style="text-align: center; margin-bottom: 25px;">
+        <label for="avatar-input" style="cursor: pointer;">
+          <img id="sidebar-avatar" src="https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff" style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f3ff; object-fit: cover; box-shadow: 0 0 15px rgba(0,243,255,0.4); margin-bottom: 8px;" title="اضغط لتغيير الصورة">
+        </label>
+        <input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="loadAvatar(event)">
+        <div id="sidebar-name" style="font-size: 16px; font-weight: bold; color: #00f3ff; text-shadow: 0 0 8px #00f3ff;">RASHID</div>
+        <div id="sidebar-flag" style="font-size: 14px; color: #aaa; margin-top: 4px;">🇯🇴 Jordan</div>
+      </div>
+
+      <!-- أزرار التنقل -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button onclick="openHome()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏠 الشاشة الرئيسية (Home)</button>
+        <button onclick="openAccountModal()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">⚙️ تعديل الحساب (My Account)</button>
+        <button onclick="openLeaderboardModalSafe()" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
+        <a href="https://www.instagram.com/nn1v4/" target="_blank" style="text-decoration: none;">
+          <button style="width: 100%; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">💬 الدعم الفني (Instagram)</button>
+        </a>
+      </div>
+    </div>
+
+    <!-- ACCOUNT MODAL -->
+    <div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
+      <div style="background: #060612; border: 2px solid #00f3ff; padding: 25px; border-radius: 14px; width: 380px; box-shadow: 0 0 40px rgba(0,243,255,0.3); color: #fff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 10px;">
+          <h3 style="color: #00f3ff; margin: 0; font-size: 15px;">EDIT ACCOUNT</h3>
+          <span onclick="closeAccountModal()" style="color: #ff0055; font-size: 24px; cursor: pointer;">&times;</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
+          <label>اسم اللاعب:</label>
+          <input type="text" id="input-name" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
+          <label>علم الدولة / الايموجي:</label>
+          <input type="text" id="input-flag" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button onclick="saveAccount()" style="flex: 1; background: rgba(0,243,255,0.2); border: 1px solid #00f3ff; color: #00f3ff; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
+          <button onclick="closeAccountModal()" style="flex: 1; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إغلاق</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD MODAL -->
+    <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif; backdrop-filter: blur(15px);">
+      <div style="background: #050510; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; width: 450px; max-height: 85vh; box-shadow: 0 0 60px rgba(255,215,0,0.5); color: #fff; display: flex; flex-direction: column; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 12px; margin-bottom: 15px;">
+          <div>
+            <h2 style="color: #ffd700; font-size: 16px; text-shadow: 0 0 10px #ffd700; margin: 0;">🏆 CYBER HALL OF FAME</h2>
+            <span style="font-size: 10px; color: #00f3ff;">Ultimate Global Rankings</span>
+          </div>
+          <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
+        </div>
+                <div class="leaderboard-tools">
+                    <button class="lb-tab active" data-sort="stage" onclick="setLeaderboardSort('stage', this)">🌊 Waves</button>
+                    <button class="lb-tab" data-sort="coins" onclick="setLeaderboardSort('coins', this)">🪙 Coins</button>
+                    <input id="leaderboard-search" type="search" placeholder="Search fighter" oninput="filterLeaderboard(this.value)">
+                </div>
+                <div id="leaderboard-self" class="leaderboard-self"></div>
+        <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
+        <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
+      </div>
+    </div>
+
+        <div id="profile-modal" class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name" style="display:none;">
+            <div class="profile-panel">
+                <button class="profile-close" onclick="closePlayerProfile()" aria-label="Close profile">&times;</button>
+                <div id="profile-avatar" class="profile-avatar"></div>
+                <h2 id="profile-name">Fighter</h2>
+                <p id="profile-title" class="profile-title"></p>
+                <div id="profile-stats" class="profile-stats"></div>
+            </div>
+        </div>
+
+    <!-- خلفية الماتريكس -->
+    <canvas id="matrix-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; z-index: -2; pointer-events: none; opacity: 0.25;"></canvas>
+
+    <script>
+    function toggleNeonMenu() {
+      const sb = document.getElementById('neon-sidebar');
+      sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
+    }
+
+    function openHome() {
+      toggleNeonMenu();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openAccountModal() {
+      toggleNeonMenu();
+      document.getElementById('leaderboard-modal').style.display = 'none';
+      document.getElementById('account-modal').style.display = 'flex';
+      document.getElementById('input-name').value = localStorage.getItem('sumo_name') || 'aiham';
+      document.getElementById('input-flag').value = localStorage.getItem('sumo_flag') || '🇯🇴 Jordan';
+    }
+
+    function closeAccountModal() {
+      document.getElementById('account-modal').style.display = 'none';
+    }
+
+    function saveAccount() {
+      const name = document.getElementById('input-name').value;
+      const flag = document.getElementById('input-flag').value;
+      if(name) localStorage.setItem('sumo_name', name);
+      if(flag) localStorage.setItem('sumo_flag', flag);
+      updateAccountUI();
+      closeAccountModal();
+      location.reload();
+    }
+
+    function loadAvatar(event) {
+      const reader = new FileReader();
+      reader.onload = function(){
+        localStorage.setItem('sumo_avatar', reader.result);
+        updateAccountUI();
+      };
+      reader.readAsDataURL(event.target.files[0]);
+    }
+
+    function updateAccountUI() {
+      const savedName = localStorage.getItem('sumo_name');
+      const savedFlag = localStorage.getItem('sumo_flag');
+      const savedAvatar = localStorage.getItem('sumo_avatar');
+      if(savedName) document.getElementById('sidebar-name').innerText = savedName;
+      if(savedFlag) document.getElementById('sidebar-flag').innerText = savedFlag;
+      if(savedAvatar) document.getElementById('sidebar-avatar').src = savedAvatar;
+    }
+
+    window.onload = updateAccountUI;
+
+    function openLeaderboardModalSafe() {
+      toggleNeonMenu();
+      document.getElementById('account-modal').style.display = 'none';
+      document.getElementById('leaderboard-modal').style.display = 'flex';
+      renderFullLeaderboard();
+    }
+
+    function renderFullLeaderboard() {
+      const currentName = localStorage.getItem('sumo_name') || 'aiham';
+      const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
+      let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
+      let existingIndex = players.findIndex(p => p.name === currentName);
+      let currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
+      
+      if (existingIndex >= 0) {
+        players[existingIndex].coins = currentCoins;
+        players[existingIndex].avatar = currentAvatar;
+      } else {
+        players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
+      }
+      
+      players.sort((a, b) => b.coins - a.coins);
+      localStorage.setItem('sumo_global_players', JSON.stringify(players));
+      
+      const container = document.getElementById('modal-players-list');
+      if(!container) return;
+      container.innerHTML = '';
+      
+      players.forEach((player, index) => {
+        let rank = index + 1;
+        let rankStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(10,10,25,0.6);';
+        let rankBadge = '#' + rank;
+        let title = 'NetRunner 💻';
+        let trend = '🟢';
+        
+        if (rank === 1) {
+          rankStyle = 'background: rgba(255,215,0,0.15); border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.4);';
+          rankBadge = '👑 1';
+          title = 'Cyber Overlord 👑';
+          trend = '🔥';
+        } else if (rank === 2 || rank === 3) {
+          rankStyle = 'background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0;';
+          rankBadge = rank === 2 ? '🥈 2' : '🥉 3';
+          title = 'Neon Elite ⚡';
+          trend = '🚀';
+        }
+        
+        const row = document.createElement('div');
+        row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; " + rankStyle;
+        
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: bold; font-size: 13px; width: 32px; color: ${rank <= 3 ? '#ffd700' : '#00f3ff'};">${rankBadge} ${trend}</span>
+            <img src="${player.avatar}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #00f3ff;">
+            <div>
+              <div style="color: #fff; font-weight: bold; font-size: 13px;">${player.name}</div>
+              <div style="color: ${rank === 1 ? '#ffd700' : '#00f3ff'}; font-size: 9px; opacity: 0.8;">${title}</div>
+            </div>
+          </div>
+          <div style="color: #ffd700; font-weight: bold; font-size: 13px;">🪙 ${player.coins}</div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    // تشغيل خلفية الماتريكس
+    const matrixCanvas = document.getElementById('matrix-bg');
+    const matrixCtx = matrixCanvas.getContext('2d');
+    function resizeCanvas() { matrixCanvas.width = window.innerWidth; matrixCanvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ01010101KAILINUXCYBER';
+    const fontSize = 16;
+    let columns = matrixCanvas.width / fontSize;
+    const drops = [];
+    for (let i = 0; i < columns; i++) { drops[i] = 1; }
+    function drawMatrix() {
+            if (window.matchMedia('(max-width: 600px)').matches) return;
+    matrixCtx.fillStyle = 'rgba(2, 2, 5, 0.1)';
+    matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+    matrixCtx.fillStyle = '#00f3ff';
+    matrixCtx.font = fontSize + 'px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+        matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) { drops[i] = 0; }
+        drops[i]++;
+      }
+    }
+    setInterval(drawMatrix, 50);
+    </script>
+    <script src="modules/storage.js"></script>
     <script src="modules/progression.js"></script>
     <script src="modules/physics.js"></script>
     <script src="modules/abilities.js"></script>
@@ -644,9 +1443,22 @@
     <script src="modules/achievements.js"></script>
     <script src="modules/performance.js"></script>
     <script src="modules/audio.js"></script>
-    <script src="modules/particles.js"></script>
-    <script src="account-manager.js"></script>
-    <script src="modules/game.js"></script>
-    <script src="leaderboard.js"></script>
+
+<script>
+function toggleNeonMenu() {
+  const sb = document.getElementById('neon-sidebar');
+  if (sb) {
+    sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
+  }
+}
+
+function openHome() {
+  toggleNeonMenu();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+<script src="account-manager.js"></script>
+<script src="leaderboard.js"></script>
 </body>
+
 </html>
