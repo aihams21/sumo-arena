@@ -50,48 +50,8 @@
         .stat-val { font-weight: bold; color: #00e5ff; }
         .shop-card { background: #0f121d; border: 1px solid #20263a; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
         .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        #touch-controller {
-            position: absolute;
-            bottom: clamp(16px, 4vw, 36px);
-            left: 50%;
-            transform: translateX(-50%);
-            width: clamp(150px, 30vw, 200px);
-            height: clamp(150px, 30vw, 200px);
-            background: rgba(0, 229, 255, 0.07);
-            border: 2.5px solid rgba(0, 229, 255, 0.6);
-            border-radius: 50%;
-            touch-action: none;
-            z-index: 40;
-            display: none;
-            pointer-events: auto;
-            box-shadow: 0 0 24px rgba(0,229,255,0.18), inset 0 0 16px rgba(0,229,255,0.06);
-        }
-        #stick {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: clamp(44px, 9vw, 62px);
-            height: clamp(44px, 9vw, 62px);
-            background: radial-gradient(circle at 35% 35%, #4df0ff, #00b8d4);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            box-shadow: 0 0 14px rgba(0,229,255,0.5);
-        }
-        /* Tablet-specific layout */
-        @media (min-width: 600px) and (max-width: 1024px) {
-            #touch-controller {
-                width: clamp(170px, 22vw, 220px);
-                height: clamp(170px, 22vw, 220px);
-                bottom: clamp(20px, 3vh, 48px);
-            }
-        }
-        /* Large tablet / small desktop */
-        @media (min-width: 1024px) {
-            #touch-controller {
-                width: 190px;
-                height: 190px;
-            }
-        }
+        #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
+        #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     </style>
     <link rel="stylesheet" href="neon-style.css">
     <style>
@@ -1200,10 +1160,60 @@
             ctx.fillRect(0, 0, 800, 600);
             if (gameMode !== 'none') {
                 let radius = offlineArenaRadius;
+                const bossPresent = bots.some(b => b.isBoss && b.alive);
+
+                // Arena background
                 ctx.beginPath();
                 ctx.arc(400, 300, radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#0f121d'; ctx.fill();
-                ctx.lineWidth = 4; ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff'; ctx.stroke();
+                ctx.fillStyle = bossPresent ? '#12040a' : '#0f121d';
+                ctx.fill();
+
+                if (bossPresent) {
+                    // Boss arena: pulsing glow ring
+                    const t = Date.now() / 1000;
+                    const pulse = 0.5 + 0.5 * Math.sin(t * 2.5);
+                    // Outer glow layers
+                    for (let i = 3; i >= 0; i--) {
+                        const glowR = radius + 8 + i * 5 + pulse * 4;
+                        ctx.beginPath();
+                        ctx.arc(400, 300, glowR, 0, Math.PI * 2);
+                        ctx.lineWidth = 3 + i * 2;
+                        ctx.strokeStyle = `rgba(255,0,85,${0.06 + pulse * 0.06})`;
+                        ctx.stroke();
+                    }
+                    // Main border
+                    ctx.beginPath();
+                    ctx.arc(400, 300, radius, 0, Math.PI * 2);
+                    ctx.lineWidth = 5;
+                    ctx.strokeStyle = '#ff0055';
+                    ctx.shadowColor = '#ff0055';
+                    ctx.shadowBlur = 18 + pulse * 10;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // Inner danger marks (radial dashes)
+                    ctx.save();
+                    ctx.translate(400, 300);
+                    const dashCount = 12;
+                    for (let i = 0; i < dashCount; i++) {
+                        const a = (i / dashCount) * Math.PI * 2 + t * 0.4;
+                        const inner = radius - 14;
+                        const outer = radius - 4;
+                        ctx.beginPath();
+                        ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+                        ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = `rgba(255,0,85,${0.3 + pulse * 0.25})`;
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                } else {
+                    // Normal arena border
+                    ctx.beginPath();
+                    ctx.arc(400, 300, radius, 0, Math.PI * 2);
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff';
+                    ctx.stroke();
+                }
 
                 for (let p of particles) {
                     ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
