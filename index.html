@@ -50,8 +50,48 @@
         .stat-val { font-weight: bold; color: #00e5ff; }
         .shop-card { background: #0f121d; border: 1px solid #20263a; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
         .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
-        #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        #touch-controller {
+            position: absolute;
+            bottom: clamp(16px, 4vw, 36px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(150px, 30vw, 200px);
+            height: clamp(150px, 30vw, 200px);
+            background: rgba(0, 229, 255, 0.07);
+            border: 2.5px solid rgba(0, 229, 255, 0.6);
+            border-radius: 50%;
+            touch-action: none;
+            z-index: 40;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 0 24px rgba(0,229,255,0.18), inset 0 0 16px rgba(0,229,255,0.06);
+        }
+        #stick {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: clamp(44px, 9vw, 62px);
+            height: clamp(44px, 9vw, 62px);
+            background: radial-gradient(circle at 35% 35%, #4df0ff, #00b8d4);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 14px rgba(0,229,255,0.5);
+        }
+        /* Tablet-specific layout */
+        @media (min-width: 600px) and (max-width: 1024px) {
+            #touch-controller {
+                width: clamp(170px, 22vw, 220px);
+                height: clamp(170px, 22vw, 220px);
+                bottom: clamp(20px, 3vh, 48px);
+            }
+        }
+        /* Large tablet / small desktop */
+        @media (min-width: 1024px) {
+            #touch-controller {
+                width: 190px;
+                height: 190px;
+            }
+        }
     </style>
     <link rel="stylesheet" href="neon-style.css">
     <style>
@@ -838,16 +878,20 @@
             stageEnded = false;
             stageReady = false;
             offlineArenaRadius = config.arenaRadius;
+            // Boss stages get a much wider arena — give room to fight
+            if (config.isBoss) offlineArenaRadius = Math.min(380, offlineArenaRadius + 130);
+            else if (config.isMiniBoss) offlineArenaRadius = Math.min(320, offlineArenaRadius + 70);
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
             
             if (config.isBoss || config.isMiniBoss) {
                 const stats = offlineBossStats(level, player.radius);
-                const bossDistance = Math.max(0, Math.min(130, offlineArenaRadius - stats.radius - 12));
+                // Boss arena is wider — scale boss spawn distance accordingly
+                const bossDistance = Math.max(0, Math.min(offlineArenaRadius - stats.radius - 20, offlineArenaRadius * 0.55));
                 bots.push({
                     x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00', 
+                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
                     isBoss: true, isMiniBoss: config.isMiniBoss,
                     alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
                     shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
@@ -999,7 +1043,9 @@
                 const spd = Math.hypot(player.vx, player.vy);
                 if (spd > maxVel) { player.vx *= maxVel / spd; player.vy *= maxVel / spd; }
                 player.x += player.vx; player.y += player.vy;
-                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius - player.radius) {
+                // Death only when the entire player circle has left the arena
+                // (center distance > arena radius + player radius = fully outside)
+                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius + player.radius) {
                     reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
                     player.alive = false; stageEnded = true;
                     registerPlayerDeath();
@@ -1086,6 +1132,7 @@
                         bot.y = 300 + ny * (offlineArenaRadius - 12);
                         bot.vx *= 0.25; bot.vy *= 0.25;
                     } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
+                        // Bot dies only when its full circle exits the arena edge
                         bot.alive = false;
                     }
                     let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
