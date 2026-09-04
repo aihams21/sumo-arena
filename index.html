@@ -12,7 +12,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
         html, body { width: 100%; height: 100%; background: #08090f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         #banner-ad { display: none !important; }
-        #game-box { position: relative; flex: 1; width: 100%; height: calc(100% - 35px); display: flex; align-items: center; justify-content: center; background: #07080d; }
+        #game-box { position: relative; flex: 1; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #07080d; }
         body.online-mode #banner-ad { display: none !important; pointer-events: none !important; }
         body.online-mode #game-box { height: 100%; }
         body.online-mode iframe,
@@ -52,6 +52,10 @@
         .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
         #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
         #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        @media (max-width: 500px) {
+            #touch-controller { width: 130px; height: 130px; bottom: 18px; }
+            #stick { width: 42px; height: 42px; }
+        }
     </style>
     <link rel="stylesheet" href="neon-style.css">
     <style>
@@ -581,6 +585,7 @@
         let modeTime = 0;
         let modeElapsedMs = 0;
         let modeLastTick = 0;
+        let lastPhysicsTime = 0;
         let modeScore = 0;
         let modeSpawnTimer = 0;
         let modeEliminations = 0;
@@ -690,7 +695,7 @@
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
             modeTime = ARCADE_MODES[mode]?.duration || 0;
-            modeElapsedMs = 0; modeLastTick = performance.now(); modeScore = 0;
+            modeElapsedMs = 0; modeLastTick = performance.now(); lastPhysicsTime = performance.now(); modeScore = 0;
             modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
             document.getElementById('hud-left').innerText = mode === 'chaos' ? '🌀 CHAOS ARENA' : mode === 'timeAttack' ? '⏱️ TIME ATTACK' : '🔻 SHRINKING ARENA';
             updateDisplays(); applyEquippedSkin();
@@ -838,9 +843,9 @@
             stageEnded = false;
             stageReady = false;
             offlineArenaRadius = config.arenaRadius;
-            // Boss stages get a much wider arena — give room to fight
-            if (config.isBoss) offlineArenaRadius = Math.min(380, offlineArenaRadius + 130);
-            else if (config.isMiniBoss) offlineArenaRadius = Math.min(320, offlineArenaRadius + 70);
+            // Boss stages get a much wider arena — but keep inside the 800×600 canvas
+            if (config.isBoss) offlineArenaRadius = Math.min(260, offlineArenaRadius + 100);
+            else if (config.isMiniBoss) offlineArenaRadius = Math.min(240, offlineArenaRadius + 60);
             player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
             player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
             bots = [];
@@ -960,9 +965,15 @@
 
         function updatePhysics() {
             if (gameMode === 'none') return;
+            const now = performance.now();
+            const dt = Math.min(0.05, Math.max(0, (now - lastPhysicsTime) / 1000));
+            lastPhysicsTime = now;
+            const dt60 = 60 * dt;
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy *= 0.9; p.a -= 0.06;
+                p.x += p.vx * dt60; p.y += p.vy * dt60;
+                p.vx *= Math.pow(0.001, dt); p.vy *= Math.pow(0.001, dt);
+                p.a -= 3.6 * dt;
                 if (p.a <= 0) particles.splice(i, 1);
             }
             let dx = 0, dy = 0;
@@ -993,11 +1004,10 @@
                     offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
                     document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
                 }
-                const momentum = 1.6 + upgrades.neonMomentum * 0.12;
-                player.vx += dx * momentum; player.vy += dy * momentum;
-                player.vx *= 0.88; player.vy *= 0.88;
-                const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
-                player.vx *= recovery; player.vy *= recovery;
+                const acc = (120 + upgrades.neonMomentum * 7.2) * dt;
+                player.vx += dx * acc; player.vy += dy * acc;
+                const damp = Math.pow(0.10, dt);
+                player.vx *= damp; player.vy *= damp;
                 // Cap velocity to prevent instant ejection from boss slams
                 const maxVel = 8 + upgrades.weight * 0.3;
                 const spd = Math.hypot(player.vx, player.vy);
@@ -1016,8 +1026,8 @@
                 let active = bots.filter(bot => bot.alive);
                 for (let bot of active) {
                     let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-                    bot.cd = (bot.cd || 0) + 1;
-                    if (bot.hurtCd > 0) bot.hurtCd -= 1;
+                    bot.cd = (bot.cd || 0) + dt60;
+                    if (bot.hurtCd > 0) bot.hurtCd -= dt60;
                     let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
                     let critical = bot.isBoss && bot.hp <= bot.maxHp * 0.25;
                     if (raging && bot.phase === 1) {
@@ -1030,31 +1040,32 @@
                         spawnImpact(bot.x, bot.y, '#ffbb00');
                     }
                     if (bot.isBoss) {
-                        if (bot.shieldCooldown > 0) bot.shieldCooldown -= 1;
+                        if (bot.shieldCooldown > 0) bot.shieldCooldown -= dt60;
                         if (bot.shield <= 0 && bot.shieldCooldown === 0 && bot.hp > 0) {
-                            bot.shield = Math.min(bot.maxShield, bot.shield + 0.02);
+                            bot.shield = Math.min(bot.maxShield, bot.shield + 1.2 * dt);
                         }
-                        bot.minionCooldown -= 1;
+                        bot.minionCooldown -= dt60;
                         const minionCount = bots.filter(candidate => candidate.alive && candidate.bossMinion).length;
                         if (bot.minionCooldown <= 0 && minionCount < 2 && bot.hp > 0) {
                             addBossMinion(bot);
                             bot.minionCooldown = Math.max(260, 420 - bot.tier * 35);
                         }
-                        bot.attackCooldown -= 1;
+                        bot.attackCooldown -= dt60;
                         if (bot.telegraph > 0) {
-                            bot.telegraph -= 1;
-                            if (bot.telegraph === 0) {
+                            bot.telegraph -= dt60;
+                            if (bot.telegraph <= 0) {
+                                bot.telegraph = 0;
                                 if (bot.attackType === 'wave') {
                                     bot.pulseRadius = 12;
                                     if (distanceToPlayer(bot) < 190) {
-                                        const waveForce = raging ? 9.5 : 7.5;
+                                        const waveForce = (raging ? 9.5 : 7.5) * dt60;
                                         player.vx += Math.cos(angle) * waveForce;
                                         player.vy += Math.sin(angle) * waveForce;
                                     }
                                 } else {
-                                    bot.dashTimer = raging ? 20 : 16;
-                                    bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2);
-                                    bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2);
+                                    bot.dashTimer = (raging ? 20 : 16) / dt60;
+                                    bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2) * dt60;
+                                    bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2) * dt60;
                                 }
                                 bot.attackType = null;
                                 bot.attackCooldown = Math.max(68, (critical ? 78 : raging ? 92 : 118) - bot.tier * 6);
@@ -1064,7 +1075,7 @@
                             bot.attackCycle = (bot.attackCycle || 0) + 1;
                             bot.telegraph = 42 + bot.tier * 3;
                         }
-                        if (bot.pulseRadius > 0) bot.pulseRadius += 10;
+                        if (bot.pulseRadius > 0) bot.pulseRadius += 600 * dt;
                         if (bot.pulseRadius > 210) bot.pulseRadius = 0;
                     }
                     let speed = bot.speed * (critical ? 1.5 : raging ? 1.35 : 1);
@@ -1076,13 +1087,13 @@
                     if (bot.isBoss && bot.dashTimer > 0) {
                         bot.vx = bot.dashVx;
                         bot.vy = bot.dashVy;
-                        bot.dashTimer -= 1;
+                        bot.dashTimer -= dt60;
                     } else {
-                        bot.vx += Math.cos(angle) * speed;
-                        bot.vy += Math.sin(angle) * speed;
+                        bot.vx += Math.cos(angle) * speed * dt60;
+                        bot.vy += Math.sin(angle) * speed * dt60;
                     }
-                    bot.vx *= bot.isBoss ? 0.92 : 0.9;
-                    bot.vy *= bot.isBoss ? 0.92 : 0.9;
+                    const botDamp = Math.pow(bot.isBoss ? 0.055 : 0.027, dt);
+                    bot.vx *= botDamp; bot.vy *= botDamp;
                     bot.x += bot.vx; bot.y += bot.vy;
                     let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
                     if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
@@ -1090,16 +1101,16 @@
                         let ny = (bot.y - 300) / fromCenter;
                         bot.x = 400 + nx * (offlineArenaRadius - 12);
                         bot.y = 300 + ny * (offlineArenaRadius - 12);
-                        bot.vx *= 0.25; bot.vy *= 0.25;
+                        bot.vx *= Math.pow(0.001, dt); bot.vy *= Math.pow(0.001, dt);
                     } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
                         // Bot dies only when its full circle exits the arena edge
                         bot.alive = false;
                     }
                     let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
                     if (bot.isBoss) {
-                        bot.slamCd = (bot.slamCd || 0) + 1;
+                        bot.slamCd = (bot.slamCd || 0) + dt60;
                         if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
-                            let slam = (raging ? 12 : 8) + bot.power * 0.15;
+                            let slam = ((raging ? 12 : 8) + bot.power * 0.15) * dt60;
                             player.vx -= Math.cos(angle) * slam;
                             player.vy -= Math.sin(angle) * slam;
                             bot.slamCd = 0;
@@ -1116,22 +1127,22 @@
                         let playerMass = 1.0 + upgrades.weight * 0.25;
                         let playerPower = 6.0 + upgrades.power * 1.5;
                         const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
-                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor;
-                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor;
+                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor * dt60;
+                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor * dt60;
                         let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
                         if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
                             let damage = 1;
                             if (bot.shield > 0) {
                                 bot.shield = Math.max(0, bot.shield - damage);
-                                bot.shieldCooldown = 180;
+                                bot.shieldCooldown = 180 / dt60;
                             } else {
                                 bot.hp = Math.max(0, bot.hp - damage);
-                                bot.hurtCd = 22;
+                                bot.hurtCd = 22 / dt60;
                                 if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); }
                             }
                         }
-                        bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor;
-                        bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor;
+                        bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor * dt60;
+                        bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor * dt60;
                         spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
                     }
                 }
