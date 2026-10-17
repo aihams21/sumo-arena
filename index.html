@@ -1,1543 +1,232 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#00e5ff">
-    <title>Neon Sumo Arena</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="https://img.icons8.com/isometric/512/sumo.png">
-    
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-        html, body { width: 100%; height: 100%; background: #08090f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #banner-ad { display: none !important; }
-        #game-box { position: relative; flex: 1; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #07080d; }
-        body.online-mode #banner-ad { display: none !important; pointer-events: none !important; }
-        body.online-mode #game-box { height: 100%; }
-        body.online-mode iframe,
-        body.online-mode [id*="ad-"],
-        body.online-mode [class*="adsbox"] {
-            display: none !important;
-            pointer-events: none !important;
-            visibility: hidden !important;
-        }
-        canvas { display: block; width: 100%; height: 100%; max-width: 800px; max-height: 600px; aspect-ratio: 4 / 3; object-fit: contain; }
-        .overlay { position: absolute; inset: 0; background: rgba(6, 7, 12, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); padding: 15px; text-align: center; }
-        .hidden { display: none !important; }
-        h1 { font-size: clamp(22px, 5vw, 34px); margin-bottom: 8px; color: #00e5ff; }
-        h2 { font-size: clamp(16px, 4vw, 20px); margin-bottom: 12px; }
-        .btn { padding: 11px 18px; font-size: clamp(13px, 3.5vw, 15px); font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin: 4px; width: min(280px, 85vw); }
-        .btn:active { transform: scale(0.96); }
-        .btn-cyan { background: #00e5ff; color: #000; }
-        .btn-gold { background: #ffbb00; color: #000; }
-        .btn-magenta { background: #ff3366; color: #fff; }
-        .btn-green { background: #00ff66; color: #000; }
-        .btn-gray { background: #1c2030; color: #aaa; }
-        .btn-whatsapp { background: #25D366; color: #fff; }
-        input { padding: 10px 15px; font-size: 16px; border-radius: 8px; border: 2px solid #00e5ff; background: #111420; color: #fff; text-align: center; letter-spacing: 2px; margin: 8px 0; outline: none; width: 240px; }
-        #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 5; }
-        .hud-card { background: rgba(15, 18, 30, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 20px; font-size: clamp(10px, 3vw, 13px); font-weight: bold; display: flex; align-items: center; gap: 8px; }
-        .btn-exit { pointer-events: auto; background: #ff3366; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
-        #stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 8px; max-height: 50vh; overflow-y: auto; padding: 10px; width: min(480px, 90vw); background: #0f121d; border-radius: 12px; border: 1px solid #20263a; }
-        .stage-card { background: #171b2a; border: 2px solid #23293d; border-radius: 8px; padding: 10px 4px; text-align: center; font-weight: bold; font-size: 12px; cursor: pointer; }
-        .stage-card.unlocked { border-color: #00e5ff; color: #fff; }
-        .stage-card.current { border-color: #ffbb00; color: #ffbb00; }
-        .stage-card.boss { border-color: #ff0055; color: #ff0055; }
-        .stage-card.locked { opacity: 0.3; }
-        .shop-container { display: flex; flex-direction: column; gap: 10px; width: min(450px, 90vw); margin: 10px 0; }
-        .stats-panel { background: #0f121d; border: 1px solid #20263a; border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-around; }
-        .stat-val { font-weight: bold; color: #00e5ff; }
-        .shop-card { background: #0f121d; border: 1px solid #20263a; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
-        .shop-btn { background: #ffbb00; color: #000; font-weight: bold; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        #touch-controller { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: 150px; height: 150px; background: rgba(255, 255, 255, 0.08); border: 2px solid rgba(0, 229, 255, 0.55); border-radius: 50%; touch-action: none; z-index: 40; display: none; pointer-events: auto; }
-        #stick { position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-        @media (max-width: 500px) {
-            #touch-controller { width: 130px; height: 130px; bottom: 18px; }
-            #stick { width: 42px; height: 42px; }
-        }
-    </style>
-    <link rel="stylesheet" href="neon-style.css">
-    <style>
-    :root {
-      --neon-cyan: #00f3ff;
-      --neon-pink: #ff0055;
-      --bg-dark: #05050a;
-    }
-    body, html {
-      background-color: var(--bg-dark) !important;
-      color: #ffffff !important;
-    }
-    .neon-btn-cyan, button {
-      border: 2px solid var(--neon-cyan) !important;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.4) !important;
-      transition: all 0.3s ease !important;
-    }
-    .neon-btn-cyan:hover {
-      background: var(--neon-cyan) !important;
-      color: #05050a !important;
-      box-shadow: 0 0 30px var(--neon-cyan) !important;
-    }
-    </style>
-    <link rel="stylesheet" href="neon-style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#090D16">
+<title>Nexus Corp — Empire &amp; Arcade</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23090D16'/%3E%3Cpath d='M20 46V18l24 28V18' stroke='%2310B981' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="banner-ad" aria-hidden="true"></div>
-    <div id="game-box">
-        <canvas id="c" width="800" height="600"></canvas>
-        <div id="touch-controller"><div id="stick"></div></div>
 
-        <div id="hud" class="hidden">
-            <div class="hud-card" id="hud-left">STAGE: 1</div>
-            <div class="hud-card" id="hud-coins-card" style="color:#ffbb00;">🪙 <span id="hud-coins">0</span></div>
-            <div class="hud-card"><button class="btn-exit" onclick="exitToMenu()">EXIT ✕</button></div>
-        </div>
+<div id="boot" class="boot">
+  <div class="boot-logo">NEXUS</div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-text" data-i18n="loading">Booting corporate mainframe…</div>
+</div>
 
-        <div id="menu-main" class="overlay">
-            <h1>NEON SUMO ARENA</h1>
-            <div class="menu-metrics">
-                <div><span>COINS</span><strong id="menu-coins">0</strong></div>
-                <div><span>WIN STREAK</span><strong id="menu-streak">0 🔥</strong></div>
-                <div><span>RANK</span><strong id="menu-rank">--</strong></div>
-            </div>
-            <div id="daily-mission" class="daily-mission">
-                <div class="mission-heading"><span>⚡ DAILY RUSH</span><b id="mission-status">0 / 3 wins</b></div>
-                <div class="mission-track"><i id="mission-progress"></i></div>
-                <small id="mission-copy">Win 3 stages today for +25 coins</small>
-                <button id="mission-claim" class="mission-claim hidden" onclick="claimDailyMission()">Claim +25 🪙</button>
-            </div>
-            <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
-            <div class="mode-title">NEON GAME MODES</div>
-            <div class="mode-grid">
-                <button class="mode-btn chaos" onclick="startGameMode('chaos')"><span class="mode-icon">🌀</span><span class="mode-name">CHAOS ARENA</span><small>6 bots • 185 radius</small></button>
-                <button class="mode-btn time" onclick="startGameMode('timeAttack')"><span class="mode-icon">⏱️</span><span class="mode-name">TIME ATTACK</span><small>60 seconds • score rush</small></button>
-                <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
-            </div>
-            <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
-            <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
-            <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
-            <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
-        </div>
+<!-- ══════════ HUD ══════════ -->
+<header class="hud" id="hud">
+  <div class="hud-brand">
+    <div class="hud-logo">NEXUS</div>
+    <div class="hud-tag" data-i18n="app_sub">Empire &amp; Arcade</div>
+  </div>
 
-        <div id="modal-install-guide" class="overlay hidden install-overlay">
-            <div class="install-card">
-                <span class="install-kicker">NEON SUMO ARENA / PWA</span>
-                <h2 id="guide-device-title">خذ الساحة معك 📱</h2>
-                <p id="guide-device-body">ثبّت اللعبة لتفتحها بسرعة، تلعب بملء الشاشة، وتحصل على تجربة لمس أكثر سلاسة.</p>
-                <div id="install-system-status" class="install-system-status">جاري فحص النظام وحالة التثبيت...</div>
-                <div class="install-benefits"><span>⚡ تشغيل سريع</span><span>◈ ملء الشاشة</span><span>◎ لعب دون تبويب</span></div>
-                <details class="install-features">
-                    <summary>استكشف 99 ميزة لتجربة التطبيق</summary>
-                    <ol id="elite-features-list"></ol>
-                </details>
-                <button id="install-main-button" class="btn btn-cyan install-main-button" onclick="handleSmartInstall()">تثبيت التطبيق الآن 📱</button>
-                <span class="install-dismiss" onclick="closeInstallGuide()">ليس الآن</span>
-            </div>
-        </div>
+  <div class="hud-stats">
+    <div class="stat stat-cash">
+      <span class="stat-label" data-i18n="cash">Cash</span>
+      <b class="stat-value" id="stCash">$0</b>
+    </div>
+    <div class="stat">
+      <span class="stat-label" data-i18n="per_sec">Income</span>
+      <b class="stat-value sm" id="stRate">$0/s</b>
+    </div>
+    <div class="stat">
+      <span class="stat-label" data-i18n="net_worth">Net Worth</span>
+      <b class="stat-value sm" id="stWorth">$0</b>
+    </div>
+    <div class="stat">
+      <span class="stat-label" data-i18n="click_power">Click Power</span>
+      <b class="stat-value sm" id="stClick">$1</b>
+    </div>
+    <div class="stat stat-shares">
+      <span class="stat-label" data-i18n="shares">Exec Shares</span>
+      <b class="stat-value sm" id="stShares">0</b>
+    </div>
+  </div>
 
-        <div id="menu-stages" class="overlay hidden">
-            <h2>SELECT STAGE (<span id="unlocked-count">1</span> / 1000)</h2>
-            <div id="stage-grid"></div>
-            <button class="btn btn-gray" style="margin-top: 10px;" onclick="showMainMenu()">⬅ Back</button>
-        </div>
+  <div class="hud-actions">
+    <div class="oc-pill" id="ocPill" hidden>
+      <span data-i18n="overclock_active">OVERCLOCKED</span>
+      <b id="ocTime">5:00</b>
+    </div>
+    <button class="icon-btn" id="btnLang" title="Language / اللغة">EN / ع</button>
+    <button class="icon-btn" id="btnSound" title="SFX">♪</button>
+    <button class="icon-btn" id="btnMusic" title="Music">♫</button>
+  </div>
+</header>
 
-        <div id="menu-shop" class="overlay hidden">
-            <h2>SUMO STATS</h2>
-            <div style="font-size: 13px; color:#ffbb00; margin-bottom: 8px; font-weight:bold;">🪙 Coins: <span id="shop-coins">0</span></div>
-            <div class="shop-container">
-                <div class="stats-panel">
-                    <div>Weight: <span class="stat-val" id="stat-weight">Lvl 1</span></div>
-                    <div>Power: <span class="stat-val" id="stat-power">Lvl 1</span></div>
-                </div>
-                <div class="shop-card">
-                    <div><b>🏋️ Weight (الوزن)</b></div>
-                    <button class="shop-btn" id="buy-weight" data-upgrade="weight" type="button">Buy</button>
-                </div>
-                <div class="shop-card">
-                    <div><b>💥 Power (القوة)</b></div>
-                    <button class="shop-btn" id="buy-power" data-upgrade="power" type="button">Buy</button>
-                </div>
-                <div class="shop-section-title"><span>BODY EVOLUTION</span><small>Story-linked modules</small></div>
-                <div id="body-upgrade-grid" class="body-upgrade-grid"></div>
-                <div class="shop-section-title"><span>NEON SKINS</span><small>Own it once. Equip forever.</small></div>
-                <div id="skin-grid" class="skin-grid"></div>
-                <button id="coin-reward-button" class="btn btn-green" style="width:100%; margin: 5px 0;" onclick="handleAdClickWithCounter('free_coins')">GET 50 COINS: VISIT (0/10)</button>
-            </div>
-            <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
-        </div>
+<!-- ══════════ TABS ══════════ -->
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="tycoon"><span data-i18n="nav_tycoon">Tycoon HQ</span></button>
+  <button class="tab" data-tab="arcade"><span data-i18n="nav_arcade">Arcade Work Hub</span></button>
+  <button class="tab" data-tab="ledger"><span data-i18n="nav_ledger">Ledger</span></button>
+  <button class="tab" data-tab="settings"><span data-i18n="nav_settings">Settings</span></button>
+</nav>
 
-        <div id="menu-multi" class="overlay hidden">
-            <h2>ONLINE 1v1 (FRANKFURT EU)</h2>
-            <p style="font-size: 11px; color: #00e5ff; margin-bottom: 10px;">Ultra Low Latency | Dedicated Relay</p>
-            
-            <p style="margin: 8px 0; color: #888;">--- OR ---</p>
-            <input type="text" id="room-input" placeholder="4-DIGIT CODE" maxlength="4">
-            
-            <button class="btn btn-gray" onclick="showMainMenu()">⬅ Back</button>
-        </div>
+<main id="main">
 
-        <div id="menu-lobby" class="overlay hidden">
-            <h2>ROOM CODE: <span id="lobby-code" style="color:#00e5ff; letter-spacing:2px;">Connecting...</span></h2>
-            <p style="color:#aaa; margin: 10px 0;">Share link with your friend to join:</p>
-            <button class="btn btn-whatsapp" onclick="shareRoomWhatsApp()">💬 Invite on WhatsApp</button>
-            <button class="btn btn-cyan" onclick="copyRoomLink()">📋 Copy Direct Invite Link</button>
-            <button class="btn btn-gray" style="margin-top:8px;" onclick="exitToMenu()">Cancel</button>
-        </div>
+  <!-- ══════════ TYCOON ══════════ -->
+  <section class="view active" id="view-tycoon">
 
-        <div id="modal-round" class="overlay hidden">
-            <h1 id="round-title">ROUND FINISHED</h1>
-            <h2 id="round-score">0 - 0</h2>
-            
-            <button class="btn btn-gray" onclick="exitToMenu()">Leave Room</button>
-        </div>
-
-        <div id="modal-death" class="overlay hidden">
-            <h1 style="color:#ff3366;">RING OUT!</h1>
-            <p id="death-count-copy" class="death-count-copy"></p>
-            <button id="revive-button" class="btn btn-green" onclick="handleAdClickWithCounter('revive')">REVIVE: VISIT (0/5)</button>
-            <button class="btn btn-cyan" onclick="retryStageDirectly()">🔄 Retry Stage</button>
-            <button class="btn btn-gray" onclick="exitToMenu()">🏠 Main Menu</button>
-        </div>
-
-        <div id="modal-win-stage" class="overlay hidden">
-            <h1 style="color:#00ff66;">STAGE CLEARED!</h1>
-            <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
-            <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
-        </div>
+    <div class="command">
+      <h1 class="view-title" data-i18n="tycoon_title">Corporate Command Center</h1>
+      <button class="terminal" id="terminal">
+        <span class="term-grid" aria-hidden="true"></span>
+        <span class="term-prompt">&gt;_</span>
+        <span class="term-label" data-i18n="terminal_click">Write Code / Close Deal</span>
+        <span class="term-click">$1</span>
+        <div class="term-fx" id="termFx"></div>
+      </button>
+      <div class="combo-bar" id="comboBar"><i id="comboFill"></i><b id="comboTxt">x1.0</b></div>
     </div>
 
-    <script>
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-        let deferredPrompt = null;
-        const installModal = document.getElementById('modal-install-guide');
-        const installButton = document.getElementById('install-main-button');
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        let isInstalled = isStandalone || localStorage.getItem('neon_sumo_pwa_installed') === '1';
-        const featureList = [
-            'تشغيل مستقل دون تبويب', 'ملء الشاشة', 'بدء تشغيل أسرع', 'اختصار من الشاشة الرئيسية', 'دعم الوضع الأفقي', 'واجهة لمس محسنة', 'استجابة فورية للأزرار', 'حفظ التقدم محلياً', 'حفظ العملات', 'حفظ الترقيات',
-            'حفظ السكن المختار', 'هوية لاعب ثابتة', 'مزامنة الصدارة عند الاتصال', 'عمل دون إنترنت بعد التخزين', 'تحميل موارد اللعبة مرة واحدة', 'تقليل زمن الانتظار', 'استعادة آخر جلسة', 'حالة تثبيت موثوقة', 'إشعارات تثبيت واضحة', 'تعليمات حسب النظام',
-            'دعم Android', 'دعم iOS', 'دعم Windows', 'دعم macOS', 'دعم Linux', 'كشف Kali Linux', 'دعم Chrome', 'دعم Edge', 'دعم Safari', 'دعم Firefox',
-            'تحكم بلوحة المفاتيح', 'عصا تحكم لمسية', 'تخطيط متجاوب', 'أزرار كبيرة للمس', 'تباعد آمن للنوتش', 'تمرير سلس للقوائم', 'حماية من النقر المكرر', 'مؤشر حالة حي', 'عدادات دقيقة', 'نظام إحياء سريع',
-            'متجر سكنات', 'معاينة السكن', 'تبديل السكن فوراً', 'خريطة مراحل', 'مراحل زعيم', 'هجمات نيون', 'تحذيرات بصرية', 'أنماط لعب متعددة', 'ساحة فوضى', 'تحدي الوقت',
-            'حلبة متقلصة', 'مؤقت الجولة', 'نظام نقاط', 'مكافآت العملات', 'مهمة يومية', 'سلسلة انتصارات', 'إحصاءات اللاعب', 'لوحة صدارة عالمية', 'فرز حسب المراحل', 'فرز حسب العملات',
-            'بحث عن اللاعبين', 'بروفايل اللاعب', 'شارة المركز الأول', 'شارة المركز الثاني', 'شارة المركز الثالث', 'هالة ذهبية', 'هالة فضية', 'هالة برونزية', 'تنظيف الذاكرة المؤقتة', 'تقليل مؤثرات الهاتف',
-            'رسم Canvas سريع', 'حلقة لعب مستقرة', 'تحديث فيزيائي مستقل', 'حماية بيانات الحساب', 'تنظيف الإدخالات', 'ترميز أسماء اللاعبين', 'معالجة فشل الشبكة', 'بيانات احتياطية مفيدة', 'مزامنة غير حاجبة', 'استمرار اللعب عند انقطاع الشبكة',
-            'توافق PWA', 'توافق Service Worker', 'كاش قابل للتحديث', 'حالة standalone', 'رصد appinstalled', 'رصد beforeinstallprompt', 'تجربة بدء نظيفة', 'زر تثبيت واحد', 'إرشاد سريع',
-            'تباين عالي', 'قراءة واضحة', 'تغذية بصرية للنقر', 'تغذية بصرية للفوز', 'تغذية بصرية للخسارة', 'تجربة خفيفة البطارية', 'دعم الشاشات الصغيرة', 'دعم الشاشات الكبيرة', 'جاهزية اللعب السريع', 'هوية Neon Sumo Arena'
-        ];
-        const innovationGroups = [
-            ['Combat Systems', ['Momentum Banking', 'Counter-Impact Windows', 'Ring Edge Recovery', 'Perfect Dodge Pulse', 'Combo Pressure Meter', 'Directional Guard', 'Impact Prediction Arc', 'Stamina Breakpoints', 'Clutch Overdrive', 'Arena Rhythm Scoring']],
-            ['Physics Lab', ['Mass Transfer Model', 'Surface Friction Profiles', 'Adaptive Bounce Solver', 'Impulse Dampening', 'Corner Deflection', 'Soft-Lock Collision Guard', 'Substep Simulation', 'Velocity Clamp', 'Weight-Class Balance', 'Physics Replay Frames']],
-            ['Bot Intelligence', ['Threat Priority AI', 'Edge Avoidance Memory', 'Boss Phase Director', 'Team Flank Logic', 'Counter-Move Planner', 'Learning Aggression Curve', 'Retreat Confidence', 'Spawn Fairness Grid', 'Target Handoff', 'Bot Personality Seeds']],
-            ['Arena Worlds', ['Foundry Hazard Layer', 'Abyss Current Zone', 'Void Gravity Ring', 'Neon Gate Events', 'Boss Telegraph Language', 'Stage Weather Cycle', 'Dynamic Safe Zones', 'Wave Modifier Deck', 'Lore Relic Spawns', 'Arena Mutation Rules']],
-            ['Progression', ['Milestone Mastery', 'Boss Research Log', 'Relic Collection Book', 'Branching Upgrade Paths', 'Prestige Circuit', 'Seasonal Rank Track', 'Challenge Stamps', 'Victory Grade', 'Comeback Bonus', 'New Game Plus Rules']],
-            ['Interface Systems', ['Mode Rule Cards', 'Live Objective Strip', 'Compact Mobile HUD', 'Input Calibration Panel', 'Reduced Motion Switch', 'Colorblind Signal Set', 'Touch Dead-Zone Tuner', 'Keyboard Shortcut Map', 'Victory Summary Sheet', 'Feature Index Search']],
-            ['Commerce', ['Upgrade Preview Stats', 'Bundle Value Guard', 'Purchase Confirmation', 'Skin Loadout Slots', 'Daily Shop Rotation', 'Earned Currency Ledger', 'Reward Claim Lock', 'Price Formatting Rules', 'Inventory Filter', 'Cosmetic Rarity Tags']],
-            ['Safety and Save', ['Versioned Save Schema', 'Atomic Save Commit', 'Corrupt Save Recovery', 'Local Backup Slot', 'Progress Export Token', 'Offline Queue', 'Storage Quota Monitor', 'Input Sanitizer', 'Session Watchdog', 'Privacy Reset Center']],
-            ['Challenges', ['Daily Seeded Trial', 'Weekly Boss Contract', 'No-Upgrade Gauntlet', 'Speedrun Medal', 'Perfect Ring Challenge', 'Survival Streak', 'Chaos Scoreboard', 'Shrinking Distance Goal', 'Time Attack Personal Best', 'Challenge Reward Ladder']],
-            ['Audio and Visuals', ['Impact Sound Layer', 'Boss Warning Stinger', 'Adaptive Arena Glow', 'Elimination Burst', 'Victory Chime Set', 'Low-Power Effects Mode', 'Particle Budgeter', 'Screen Shake Slider', 'Color Accent Themes', 'Accessibility Captions']]
-        ];
-        const innovationDetails = {
-            'Combat Systems': ['تضيف قرارًا قتاليًا واضحًا أثناء الاشتباك', 'لرفع عمق المواجهة وجعل الانتصار نتيجة مهارة لا عشوائية'],
-            'Physics Lab': ['تضبط حركة الاصطدام والطاقة بين اللاعب والبوت', 'لمنح الساحة سلوكًا متوقعًا وعادلًا على كل الأجهزة'],
-            'Bot Intelligence': ['تمنح البوتات سلوكًا سياقيًا يتغير حسب الخطر والمرحلة', 'لجعل الزعماء والمواجهات المتكررة أكثر تحديًا وتنوعًا'],
-            'Arena Worlds': ['تضيف طبقة عالمية أو حدثًا جديدًا إلى الساحة', 'لربط اللعب بقصة Neon Sumo وتجنب تكرار الحلبة'],
-            'Progression': ['تسجل إنجازًا أو مسار تطور طويل الأمد', 'لتحويل كل مرحلة إلى تقدم ملموس يتجاوز المكافأة الفورية'],
-            'Interface Systems': ['تقدم حالة أو تحكمًا أو تقريرًا أوضح للاعب', 'لخفض الالتباس وتحسين القراءة باللمس ولوحة المفاتيح'],
-            'Commerce': ['تنظم الشراء والمخزون والمكافآت مع معاينة أثرها', 'لمنع الإنفاق غير المقصود وجعل الاقتصاد قابلًا للفهم'],
-            'Safety and Save': ['تحمي التقدم المحلي وتتعامل مع الانقطاع أو البيانات التالفة', 'لمنع فقدان المراحل والعملات وترقية اللاعب'],
-            'Challenges': ['تنشئ هدفًا قابلًا للقياس مع نتيجة ومكافأة', 'لإضافة سبب يومي وأسبوعي للعودة إلى اللعبة'],
-            'Audio and Visuals': ['تضيف إشارة بصرية أو صوتية قابلة للضبط', 'لتحسين الإحساس بالضربة والفوز مع احترام الأداء وإتاحة الوصول']
-        };
-        const eliteFeatureCatalog = featureList.map((name, index) => ({ id: index + 1, name, category: 'Existing Experience', what: 'ميزة موجودة في منظومة Neon Sumo وتعمل ضمن تجربة اللعبة الحالية.', why: 'لرفع الاعتمادية والوضوح وتكامل تجربة اللاعب.' }));
-        innovationGroups.forEach(([category, names]) => names.forEach(name => {
-            const [what, why] = innovationDetails[category];
-            eliteFeatureCatalog.push({ id: eliteFeatureCatalog.length + 1, name, category, what: `${what}: ${name}.`, why });
-        }));
-        document.getElementById('elite-features-list').innerHTML = featureList.map((feature, index) => `<li>${index + 1}. ${feature}</li>`).join('');
-        function detectOperatingSystem() {
-            const ua = navigator.userAgent || '';
-            const platform = navigator.userAgentData?.platform || navigator.platform || '';
-            if (/Android/i.test(ua)) return 'Android';
-            if (/iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iOS';
-            if (/CrOS/i.test(ua)) return 'ChromeOS';
-            if (/Windows/i.test(ua)) return 'Windows';
-            if (/Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform)) return 'macOS';
-            if (/Linux/i.test(ua) || /Linux/i.test(platform)) return /Kali/i.test(ua) ? 'Kali Linux' : 'Linux';
-            return 'Unknown OS';
-        }
-        function detectBrowser() {
-            const ua = navigator.userAgent || '';
-            if (/Firefox\//i.test(ua)) return 'Firefox';
-            if (/Edg\//i.test(ua)) return 'Edge';
-            if (/Chrome\//i.test(ua)) return 'Chrome';
-            if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'Safari';
-            return 'Browser';
-        }
-        function updateInstallStatus(message) {
-            const status = document.getElementById('install-system-status');
-            if (status) status.innerText = message;
-        }
-        function refreshInstallStatus() {
-            const system = detectOperatingSystem();
-            updateInstallStatus(isInstalled ? `النظام: ${system} • ${detectBrowser()} • التطبيق مثبت ويعمل كوضع مستقل ✓` : `اكتشاف نظامك: ${system} • المتصفح: ${detectBrowser()} • جاهز للتثبيت الفعلي`);
-        }
-        refreshInstallStatus();
-        if (isInstalled) {
-            installModal.classList.add('hidden');
-            document.getElementById('menu-install-button')?.classList.add('hidden');
-        }
-        window.addEventListener('beforeinstallprompt', e => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installButton.innerText = 'تثبيت التطبيق الآن 📱';
-            refreshInstallStatus();
-        });
-        window.addEventListener('appinstalled', () => {
-            deferredPrompt = null;
-            isInstalled = true;
-            installModal.classList.add('hidden');
-            localStorage.setItem('neon_sumo_pwa_installed', '1');
-            document.getElementById('menu-install-button')?.classList.add('hidden');
-            refreshInstallStatus();
-        });
-
-        function handleSmartInstall() {
-            if (isInstalled) return;
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.finally(() => { deferredPrompt = null; });
-                return;
-            }
-            let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent), isAndroid = /Android/.test(navigator.userAgent);
-            const title = document.getElementById('guide-device-title');
-            const body = document.getElementById('guide-device-body');
-            if (isIOS) { title.innerText = 'أضف الساحة إلى جهازك 🍏'; body.innerText = 'اضغط مشاركة ثم إضافة إلى الشاشة الرئيسية.'; }
-            else if (isAndroid) { title.innerText = 'ثبّت الساحة على أندرويد 🤖'; body.innerText = 'افتح قائمة المتصفح ثم اختر تثبيت التطبيق.'; }
-            else {
-                title.innerText = `اختصار Neon Sumo Arena على ${detectOperatingSystem()} 💻`;
-                body.innerText = detectBrowser() === 'Firefox' ? 'تم تنزيل ملف الاختصار. افتحه ثم وافق على إضافته إلى سطح المكتب أو المفضلة.' : 'تم تنزيل ملف الاختصار. افتحه للوصول إلى اللعبة بسرعة من سطح المكتب.';
-                downloadDesktopShortcut();
-            }
-            installModal.classList.remove('hidden');
-        }
-
-        function downloadDesktopShortcut() {
-            const system = detectOperatingSystem();
-            const target = window.location.href;
-            let fileName = 'Neon-Sumo-Arena.url';
-            let content = `[InternetShortcut]\nURL=${target}\nIconIndex=0\n`;
-            let type = 'application/internet-shortcut';
-            if (system === 'Linux' || system === 'Kali Linux') {
-                fileName = 'neon-sumo-arena.desktop';
-                content = `[Desktop Entry]\nType=Application\nName=Neon Sumo Arena\nComment=Launch Neon Sumo Arena\nExec=xdg-open ${target}\nTerminal=false\nCategories=Game;\n`;
-                type = 'application/x-desktop';
-            } else if (system === 'macOS') {
-                fileName = 'Neon-Sumo-Arena.webloc';
-                content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>URL</key><string>${target}</string></dict></plist>`;
-                type = 'application/xml';
-            }
-            const blob = new Blob([content], { type });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = fileName;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-            updateInstallStatus(`النظام: ${system} • ${detectBrowser()} • تم تنزيل اختصار ${fileName} ✓`);
-        }
-        function closeInstallGuide() {
-            installModal.classList.add('hidden');
-        }
-
-        function isOnlineSession() {
-            return document.body.classList.contains('online-mode') || gameMode === 'p2p';
-        }
-
-        function setOnlineAdsOff(off) {
-            document.body.classList.toggle('online-mode', !!off);
-            if (bannerAd) {
-                bannerAd.style.display = off ? 'none' : 'flex';
-                bannerAd.style.pointerEvents = off ? 'none' : 'auto';
-            }
-            document.querySelectorAll('iframe').forEach(frame => {
-                if (!off) return;
-                frame.style.display = 'none';
-                frame.style.pointerEvents = 'none';
-            });
-        }
-
-        function handleAdClickWithCounter(type) {
-            if (isOnlineSession()) return;
-            if (type === 'free_coins') {
-                coins += 50;
-                saveData();
-                showShop();
-                alert("🎉 +50 Coins added!");
-            } else if (type === 'revive' && !player.alive) {
-                reviveInPlaceOffline();
-            }
-            updateRewardButtons();
-        }
-
-        function updateRewardButtons() {
-            const coinButton = document.getElementById('coin-reward-button');
-            const reviveButton = document.getElementById('revive-button');
-            if (coinButton) coinButton.innerText = '+50 COINS';
-            if (reviveButton) reviveButton.innerText = 'REVIVE NOW';
-        }
-        updateRewardButtons();
-        function triggerSmartlinkDirect() {
-            return false;
-        }
-
-        const canvas = document.getElementById('c'), ctx = canvas.getContext('2d', { alpha: false });
-        const mobilePerformance = window.matchMedia('(max-width: 600px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (mobilePerformance) ctx.imageSmoothingEnabled = false;
-        const gameBox = document.getElementById('game-box');
-        const touchBox = document.getElementById('touch-controller'), stick = document.getElementById('stick'), bannerAd = document.getElementById('banner-ad');
-        let touchVec = { x: 0, y: 0 }, activeTouchId = null, startX = 0, startY = 0, pointerActive = false;
-
-        function applyMoveVector(dx, dy) {
-            const m = 45;
-            const dist = Math.hypot(dx, dy);
-            if (dist > m) {
-                dx = (dx / dist) * m;
-                dy = (dy / dist) * m;
-            }
-            stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-            touchVec.x = dx / m;
-            touchVec.y = dy / m;
-            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
-                setP2PInput(touchVec.x, touchVec.y);
-            }
-        }
-
-        function clearMoveVector() {
-            activeTouchId = null;
-            pointerActive = false;
-            touchVec = { x: 0, y: 0 };
-            stick.style.transform = 'translate(-50%, -50%)';
-            if (gameMode === 'p2p' && typeof setP2PInput === 'function') {
-                setP2PInput(0, 0);
-            }
-        }
-
-        function isPlayTouchTarget(target) {
-            return !target.closest('button') && !target.closest('.overlay:not(.hidden)');
-        }
-
-        function isPlayingNow() {
-            return gameMode === 'p2p' || gameMode === 'offline';
-        }
-
-        touchBox.addEventListener('touchstart', e => {
-            if (window.PointerEvent) return;
-            const t = e.changedTouches[0];
-            activeTouchId = t.identifier;
-            const r = touchBox.getBoundingClientRect();
-            startX = r.left + r.width / 2;
-            startY = r.top + r.height / 2;
-        }, { passive: true });
-
-        gameBox.addEventListener('pointerdown', e => {
-            if (!isPlayingNow() || !isPlayTouchTarget(e.target)) return;
-            pointerActive = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            try { gameBox.setPointerCapture(e.pointerId); } catch (_error) {}
-            applyMoveVector(0, 0);
-        });
-
-        gameBox.addEventListener('pointermove', e => {
-            if (!pointerActive) return;
-            applyMoveVector(e.clientX - startX, e.clientY - startY);
-        });
-
-        gameBox.addEventListener('pointerup', clearMoveVector);
-        gameBox.addEventListener('pointercancel', clearMoveVector);
-
-        window.addEventListener('touchmove', e => {
-            if (pointerActive || activeTouchId === null) return;
-            for (const t of e.changedTouches) {
-                if (t.identifier === activeTouchId) {
-                    applyMoveVector(t.clientX - startX, t.clientY - startY);
-                }
-            }
-        }, { passive: true });
-
-        const resetTouch = e => {
-            for (const t of e.changedTouches) {
-                if (t.identifier === activeTouchId) {
-                    clearMoveVector();
-                }
-            }
-        };
-
-        window.addEventListener('touchend', resetTouch, { passive: true });
-        window.addEventListener('touchcancel', resetTouch, { passive: true });
-
-        let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
-        let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
-        let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}');
-        upgrades = { weight: 1, power: 1, coreDensity: 0, neonMomentum: 0, hydroPusher: 0, voidArmor: 0, ...upgrades };
-        const bodyUpgrades = [
-            { id: 'coreDensity', name: 'Core Density', icon: '◈', unlock: 10, lore: 'Recovered from the Foundry. Adds mass against heavy bosses.', max: 3, cost: level => (level + 1) * 45 },
-            { id: 'neonMomentum', name: 'Neon Momentum', icon: '⚡', unlock: 12, lore: 'Charged in Wave 12. Builds faster movement and impact power.', max: 3, cost: level => (level + 1) * 55 },
-            { id: 'hydroPusher', name: 'Hydro-Pusher', icon: '◇', unlock: 25, lore: 'Abyssal coolant from Wave 25. Improves recovery after collisions.', max: 3, cost: level => (level + 1) * 65 },
-            { id: 'voidArmor', name: 'Void Armor', icon: '⬡', unlock: 50, lore: 'Boss-core plating from Wave 50. Reduces ring-out force.', max: 3, cost: level => (level + 1) * 80 }
-        ];
-        const skinCatalog = [
-            { id: 'cyan', name: 'Pulse Core', color: '#00e5ff', accent: '#ffffff', price: 0, shape: 'orb' },
-            { id: 'ember', name: 'Ember Ring', color: '#ff6b00', accent: '#ffd166', price: 35, shape: 'orb' },
-            { id: 'toxic', name: 'Toxic Fang', color: '#7dff00', accent: '#eaffb0', price: 60, shape: 'diamond' },
-            { id: 'void', name: 'Void Samurai', color: '#ff2bd6', accent: '#ffe4fb', price: 90, shape: 'hex' }
-        ];
-        let skinState = JSON.parse(localStorage.getItem('sumo_skins') || '{"owned":["cyan"],"equipped":"cyan"}');
-        let dailyMission = JSON.parse(localStorage.getItem('sumo_daily_mission') || '{}');
-
-        function renderSkinShop() {
-            const grid = document.getElementById('skin-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-            skinCatalog.forEach(skin => {
-                const owned = skinState.owned.includes(skin.id);
-                const equipped = skinState.equipped === skin.id;
-                const card = document.createElement('div');
-                card.className = `skin-card ${equipped ? 'equipped' : ''}`;
-                card.innerHTML = `<div class="skin-preview ${skin.shape}" style="--skin-color:${skin.color};--skin-accent:${skin.accent}"></div><div class="skin-info"><b>${skin.name}</b><small>${equipped ? 'EQUIPPED' : owned ? 'READY TO EQUIP' : `${skin.price} 🪙`}</small></div><button class="shop-btn" onclick="buyOrEquipSkin('${skin.id}')">${equipped ? 'Active' : owned ? 'Equip' : 'Buy'}</button>`;
-                grid.appendChild(card);
-            });
-        }
-
-        function buyOrEquipSkin(id) {
-            const skin = skinCatalog.find(item => item.id === id);
-            if (!skin) return;
-            if (!skinState.owned.includes(id)) {
-                if (coins < skin.price) { alert('الكوينز غير كافية!'); return; }
-                coins -= skin.price;
-                skinState.owned.push(id);
-            }
-            skinState.equipped = id;
-            localStorage.setItem('sumo_skins', JSON.stringify(skinState));
-            applyEquippedSkin();
-            saveData();
-            renderSkinShop();
-        }
-
-        function applyEquippedSkin() {
-            const skin = skinCatalog.find(item => item.id === skinState.equipped) || skinCatalog[0];
-            player.color = skin.color;
-            player.skinShape = skin.shape;
-            player.skinAccent = skin.accent;
-        }
-
-        function resetDailyMissionIfNeeded() {
-            const today = new Date().toISOString().slice(0, 10);
-            if (dailyMission.date !== today) dailyMission = { date: today, wins: 0, claimed: false };
-        }
-
-        function updateDailyMission() {
-            resetDailyMissionIfNeeded();
-            const wins = Math.min(3, dailyMission.wins || 0);
-            document.getElementById('mission-status').innerText = `${wins} / 3 wins`;
-            document.getElementById('mission-progress').style.width = `${wins / 3 * 100}%`;
-            const claim = document.getElementById('mission-claim');
-            claim.classList.toggle('hidden', wins < 3 || dailyMission.claimed);
-            document.getElementById('mission-copy').innerText = dailyMission.claimed ? 'Mission complete. Return tomorrow for a new rush.' : 'Win 3 stages today for +25 coins';
-            document.getElementById('menu-streak').innerText = `${parseInt(localStorage.getItem('sumo_streak') || '0')} 🔥`;
-            localStorage.setItem('sumo_daily_mission', JSON.stringify(dailyMission));
-        }
-
-        function claimDailyMission() {
-            resetDailyMissionIfNeeded();
-            if (dailyMission.wins < 3 || dailyMission.claimed) return;
-            dailyMission.claimed = true;
-            coins += 25;
-            saveData();
-            updateDailyMission();
-        }
-
-        function saveData() {
-            localStorage.setItem('sumo_coins', coins);
-            localStorage.setItem('sumo_stage', maxUnlockedStage);
-            localStorage.setItem('sumo_upgrades', JSON.stringify(upgrades));
-            if (window.NeonSystems?.storage) window.NeonSystems.storage.transaction(state => { state.coins = coins; state.stage = maxUnlockedStage; state.upgrades = upgrades; });
-            updateDisplays();
-            if (typeof refreshLeaderboardWithLocalPlayer === 'function') refreshLeaderboardWithLocalPlayer();
-        }
-
-        function updateDisplays() {
-            document.getElementById('menu-coins').innerText = coins;
-            document.getElementById('hud-coins').innerText = coins;
-            document.getElementById('shop-coins').innerText = coins;
-            if (document.getElementById('menu-streak')) updateDailyMission();
-        }
-
-        updateDisplays();
-
-        let gameMode = 'none';
-        let activeMode = 'stage';
-        const ARCADE_MODES = {
-            chaos: { radius: 185, bots: 6, botScale: 6, reward: 20 },
-            timeAttack: { radius: 235, bots: 2, botScale: 1, duration: 60, spawnEvery: 1.75, reward: 10 },
-            shrinking: { radius: 250, minRadius: 125, bots: 3, botScale: 2, shrinkPerSecond: 2, reward: 10 }
-        };
-        let modeTime = 0;
-        let modeElapsedMs = 0;
-        let modeLastTick = 0;
-        let lastPhysicsTime = 0;
-        let modeScore = 0;
-        let modeSpawnTimer = 0;
-        let modeEliminations = 0;
-        let modeRewarded = false;
-        let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
-        let reviveSnapshot = { x: 400, y: 300, radius: 240 };
-        let currentPlayingStage = 1;
-        let offlineArenaRadius = 240;
-        let stageEnded = false;
-        let stageReady = false;
-
-        let player = {
-            x: 400,
-            y: 300,
-            vx: 0,
-            vy: 0,
-            radius: 24,
-            color: '#00e5ff',
-            alive: true
-        };
-        applyEquippedSkin();
-
-        let bots = [];
-        let particles = [];
-        let keys = {};
-
-        window.onkeydown = e => {
-            const key = e.key.toLowerCase();
-            keys[key] = true;
-            if (key === 'q' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('dash', player, touchVec, bots);
-            if (key === 'e' && window.NeonSystems?.abilities) window.NeonSystems.abilities.use('pulse', player, touchVec, bots);
-        };
-        window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
-
-        function hideAllMenus() {
-            document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-            document.getElementById('hud').classList.add('hidden');
-            touchBox.style.display = 'none';
-            bannerAd.style.display = document.body.classList.contains('online-mode') ? 'none' : 'flex';
-        }
-
-        function stopPlaySession() {
-            gameMode = 'none';
-            stageEnded = false;
-            stageReady = false;
-            bots = [];
-            particles = [];
-            player.alive = true;
-            player.vx = 0;
-            player.vy = 0;
-            if (typeof clearMoveVector === 'function') clearMoveVector();
-            if (typeof disconnectWS === 'function') { try { disconnectWS(); } catch (_error) {} }
-            if (typeof netInterval !== 'undefined' && netInterval) { clearInterval(netInterval); netInterval = null; }
-            if (typeof ws !== 'undefined' && ws) { try { ws.close(); } catch (_error) {} ws = null; }
-        }
-
-        function showMainMenu() {
-            try {
-                stopPlaySession();
-                if (typeof setOnlineAdsOff === 'function') setOnlineAdsOff(false);
-            } catch (_error) { gameMode = 'none'; }
-            hideAllMenus();
-            bannerAd.style.display = 'flex';
-            updateDisplays();
-            document.getElementById('menu-main').classList.remove('hidden');
-        }
-
-        function showStageSelect() {
-            hideAllMenus();
-            document.getElementById('unlocked-count').innerText = maxUnlockedStage;
-            const grid = document.getElementById('stage-grid');
-            grid.innerHTML = '';
-            for (let i = 1; i <= Math.min(1000, maxUnlockedStage + 12); i++) {
-                let stage = document.createElement('div');
-                stage.className = 'stage-card';
-                if (i % 5 === 0) stage.classList.add('boss');
-                if (i <= maxUnlockedStage) {
-                    stage.classList.add('unlocked');
-                    if (i === maxUnlockedStage) stage.classList.add('current');
-                    stage.innerText = i % 5 === 0 ? `👑 ${i}` : `${i}`;
-                    stage.dataset.stage = i;
-                    stage.addEventListener('click', event => {
-                        event.preventDefault();
-                        startOfflineStage(Number(event.currentTarget.dataset.stage));
-                    });
-                } else {
-                    stage.classList.add('locked');
-                    stage.innerText = '🔒';
-                }
-                grid.appendChild(stage);
-            }
-            document.getElementById('menu-stages').classList.remove('hidden');
-        }
-
-        function startGameMode(mode) {
-            activeMode = mode;
-            if (mode === 'chaos') startChaosArena();
-            else if (mode === 'timeAttack') startTimeAttack();
-            else startShrinkingArena();
-        }
-
-        function startModeBase(mode, radius) {
-            gameMode = 'offline'; activeMode = mode; stageEnded = false;
-            stageReady = false;
-            hideAllMenus(); document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block'; offlineArenaRadius = radius;
-            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8); bots = []; particles = [];
-            modeTime = ARCADE_MODES[mode]?.duration || 0;
-            modeElapsedMs = 0; modeLastTick = performance.now(); lastPhysicsTime = performance.now(); modeScore = 0;
-            modeSpawnTimer = 0; modeEliminations = 0; modeRewarded = false;
-            document.getElementById('hud-left').innerText = mode === 'chaos' ? '🌀 CHAOS ARENA' : mode === 'timeAttack' ? '⏱️ TIME ATTACK' : '🔻 SHRINKING ARENA';
-            updateDisplays(); applyEquippedSkin();
-        }
-
-        function startChaosArena() {
-            const config = ARCADE_MODES.chaos;
-            startModeBase('chaos', config.radius);
-            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, '#ff3366');
-            stageReady = bots.some(bot => bot.alive);
-        }
-
-        function startTimeAttack() {
-            const config = ARCADE_MODES.timeAttack;
-            startModeBase('timeAttack', config.radius);
-            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, i % 2 ? '#ff3366' : '#ffaa00');
-            stageReady = bots.some(bot => bot.alive);
-        }
-
-        function startShrinkingArena() {
-            const config = ARCADE_MODES.shrinking;
-            startModeBase('shrinking', config.radius);
-            for (let i = 0; i < config.bots; i++) addModeBot(i, config.botScale, ['#ff0055', '#ffaa00', '#7dff00'][i]);
-            stageReady = bots.some(bot => bot.alive);
-        }
-
-        function addModeBot(index, scale, color) {
-            const angle = index * 2.399;
-            bots.push({ x: 400 + Math.cos(angle) * 120, y: 300 + Math.sin(angle) * 120, vx: 0, vy: 0,
-                radius: 18 + scale * 2, mass: 1 + scale * .12, speed: .45 + scale * .03, power: 5 + scale,
-                color, isBoss: false, alive: true, cd: 0 });
-        }
-
-        function addBossMinion(boss) {
-            const angle = (boss.attackCycle + bots.length) * 2.399;
-            bots.push({ x: boss.x + Math.cos(angle) * (boss.radius + 18), y: boss.y + Math.sin(angle) * (boss.radius + 18), vx: 0, vy: 0,
-                radius: 16, mass: 1.05, speed: .38, power: 5.5, color: '#ffbb00', isBoss: false, alive: true, cd: 0, bossMinion: true });
-        }
-
-        function getActiveBoss() {
-            return bots.find(bot => bot.isBoss && bot.alive);
-        }
-
-        function showShop() {
-            hideAllMenus();
-            updateDisplays();
-            document.getElementById('stat-weight').innerText = `Lvl ${upgrades.weight} (${100 + upgrades.weight * 20} KG)`;
-            document.getElementById('stat-power').innerText = `Lvl ${upgrades.power} (${100 + upgrades.power * 25} N)`;
-            document.getElementById('buy-weight').innerText = `Buy (${upgrades.weight * 20}🪙)`;
-            document.getElementById('buy-power').innerText = `Buy (${upgrades.power * 20}🪙)`;
-            renderBodyUpgrades();
-            renderSkinShop();
-            document.getElementById('menu-shop').classList.remove('hidden');
-        }
-
-        function renderBodyUpgrades() {
-            const grid = document.getElementById('body-upgrade-grid');
-            if (!grid) return;
-            grid.innerHTML = bodyUpgrades.map(item => {
-                const level = Number(upgrades[item.id]) || 0;
-                const unlocked = maxUnlockedStage >= item.unlock;
-                const cost = item.cost(level);
-                return `<div class="body-upgrade-card ${unlocked ? '' : 'locked'}"><div class="body-upgrade-heading"><b>${item.icon} ${item.name}</b><strong>LVL ${level}/${item.max}</strong></div><small>${item.lore}</small><button class="shop-btn" type="button" onclick="buyBodyUpgrade('${item.id}')" ${!unlocked || level >= item.max ? 'disabled' : ''}>${level >= item.max ? 'MAXED' : unlocked ? `Upgrade ${cost}🪙` : `Unlocks at Wave ${item.unlock}`}</button></div>`;
-            }).join('');
-        }
-
-        function buyBodyUpgrade(id) {
-            const item = bodyUpgrades.find(entry => entry.id === id);
-            if (!item) return;
-            const level = Number(upgrades[id]) || 0;
-            const cost = item.cost(level);
-            if (maxUnlockedStage < item.unlock || level >= item.max || coins < cost) return;
-            coins -= cost;
-            upgrades[id] = level + 1;
-            saveData();
-            showShop();
-        }
-
-        function buyUpgrade(type) {
-            if (type !== 'weight' && type !== 'power') return;
-            const level = Number(upgrades[type]) || 1;
-            const cost = level * 20;
-            if (coins >= cost) {
-                coins -= cost;
-                upgrades[type] = level + 1;
-                saveData();
-                showShop();
-            } else {
-                alert(`الكوينز غير كافية! تحتاج ${cost} 🪙`);
-            }
-        }
-
-        document.querySelectorAll('[data-upgrade]').forEach(button => {
-            button.addEventListener('click', () => buyUpgrade(button.dataset.upgrade));
-        });
-
-        function showMultiMenu() {
-            setOnlineAdsOff(true);
-            hideAllMenus();
-            document.getElementById('menu-multi').classList.remove('hidden');
-        }
-
-        function exitToMenu() { showMainMenu(); }
-
-        function offlineEnemyCount(level) {
-            if (level < 8) return 1;
-            if (level < 22) return 2;
-            return 3;
-        }
-
-        function offlineBotStats(level) {
-            const curve = Math.sqrt(level);
-            return {
-                radius: 18 + Math.min(7, curve * 0.85),
-                mass: 0.85 + Math.min(1.4, level * 0.011),
-                speed: 0.30 + Math.min(0.16, curve * 0.016),
-                power: 4.2 + Math.min(8.5, curve * 0.9)
-            };
-        }
-
-        function offlineBossStats(level, playerRadius) {
-            if (window.NeonSystems?.bosses) return window.NeonSystems.bosses.profile(level, playerRadius);
-            const curve = Math.sqrt(level);
-            const wave = Math.max(1, Math.floor(level / 5));
-            const tier = Math.min(3, Math.floor(wave / 10));
-            return {
-                radius: Math.max(38, playerRadius * 1.38 + Math.min(6, curve * .8)),
-                mass: 9 + Math.min(5, curve * 0.45),
-                speed: 0.34 + Math.min(0.13, curve * 0.011),
-                power: 9.5 + Math.min(8, curve * 0.8),
-                maxHp: 8 + Math.min(8, Math.floor(wave * 0.4)),
-                shield: 3 + Math.min(5, Math.floor(wave * 0.2)),
-                tier
-            };
-        }
-
-        function startOfflineStage(level) {
-            // Calculate player power factor based on upgrades
-            const totalUpgrades = upgrades.weight + upgrades.power + upgrades.neonMomentum + upgrades.voidArmor + upgrades.hydroPusher + upgrades.coreDensity;
-            const maxPossible = 60; // ~10 levels each × 6 stats
-            const playerPowerFactor = 0.7 + (totalUpgrades / maxPossible) * 0.9; // 0.7 → 1.6
-
-            const config = window.NeonSystems.progression.getStageConfig(level, playerPowerFactor);
-            gameMode = 'offline';
-            activeMode = 'stage';
-            currentPlayingStage = level;
-            hideAllMenus();
-            document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block';
-            stageEnded = false;
-            stageReady = false;
-            offlineArenaRadius = config.arenaRadius;
-            // Boss stages get a much wider arena — but keep inside the 800×600 canvas
-            if (config.isBoss) offlineArenaRadius = Math.min(260, offlineArenaRadius + 100);
-            else if (config.isMiniBoss) offlineArenaRadius = Math.min(240, offlineArenaRadius + 60);
-            player.x = 400; player.y = 300; player.vx = 0; player.vy = 0; player.alive = true;
-            player.radius = 22 + (upgrades.weight * 1.5) + (upgrades.coreDensity * 1.8);
-            bots = [];
-
-            if (config.isBoss || config.isMiniBoss) {
-                const stats = offlineBossStats(level, player.radius);
-                // Scale boss stats by player power
-                stats.mass *= playerPowerFactor;
-                stats.speed *= Math.pow(playerPowerFactor, 0.3);
-                stats.power *= playerPowerFactor;
-                stats.maxHp = Math.floor(stats.maxHp * Math.pow(playerPowerFactor, 0.5));
-                // Boss arena is wider — scale boss spawn distance accordingly
-                const bossDistance = Math.max(0, Math.min(offlineArenaRadius - stats.radius - 20, offlineArenaRadius * 0.55));
-                bots.push({
-                    x: 400, y: 300 - bossDistance, vx: 0, vy: 0, radius: stats.radius, mass: stats.mass,
-                    speed: stats.speed, power: stats.power, color: config.isBoss ? '#ff0055' : '#ffaa00',
-                    isBoss: true, isMiniBoss: config.isMiniBoss,
-                    alive: true, cd: 0, slamCd: 90, phase: 1, hp: stats.maxHp, maxHp: stats.maxHp,
-                    shield: stats.shield, maxShield: stats.shield, shieldCooldown: 0, hurtCd: 0,
-                    attackCooldown: 120, attackType: null, attackCycle: 0, telegraph: 0, dashTimer: 0, pulseRadius: 0,
-                    minionCooldown: 360, tier: stats.tier, abilities: stats.abilities
-                });
-            } else {
-                const count = config.botCount;
-                const stats = config.botStats;
-                const spawnDistance = Math.max(0, Math.min(140, offlineArenaRadius - stats.radius - 12));
-                for (let i = 0; i < count; i++) {
-                    let angle = (i / count) * Math.PI * 2 + Math.PI / 4;
-                    bots.push({
-                        x: 400 + Math.cos(angle) * spawnDistance, y: 300 + Math.sin(angle) * spawnDistance,
-                        vx: 0, vy: 0, radius: stats.radius, mass: stats.mass, speed: stats.speed,
-                        power: stats.power, color: '#ffaa00', isBoss: false, alive: true, cd: 0
-                    });
-                }
-            }
-            stageReady = bots.some(bot => bot.alive);
-            document.getElementById('hud-left').innerText = config.isBoss ? `👑 BOSS: ${level}` : config.isMiniBoss ? `💀 MINI-BOSS: ${level}` : `STAGE: ${level}`;
-            updateDisplays();
-            applyEquippedSkin();
-        }
-
-        function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
-        function nextStageOffline() { startOfflineStage(Math.min(1000, currentPlayingStage + 1)); }
-
-        function finishOfflineStage() {
-            if (stageEnded) return;
-            stageEnded = true;
-            const clearedStage = currentPlayingStage;
-            if (clearedStage >= maxUnlockedStage && maxUnlockedStage < 1000) {
-                maxUnlockedStage = clearedStage + 1;
-                localStorage.setItem('sumo_stage', maxUnlockedStage);
-            }
-            
-            // Scaled coin rewards
-            let coinReward = 5;
-            if (clearedStage % 10 === 0) coinReward = 50; // Mega Boss
-            else if (clearedStage % 5 === 0) coinReward = 20; // Mini Boss
-            else if (clearedStage > 500) coinReward = 15;
-            else if (clearedStage > 100) coinReward = 10;
-            
-            coins += coinReward;
-            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
-            localStorage.setItem('sumo_streak', streak);
-            resetDailyMissionIfNeeded();
-            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
-            saveData();
-            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: clearedStage % 5 === 0 ? 1 : 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
-            hideAllMenus();
-            document.getElementById('modal-win-stage').classList.remove('hidden');
-        }
-
-        function endArcadeMode(title, score) {
-            if (modeRewarded) return;
-            modeRewarded = true;
-            stageEnded = true;
-            const reward = Math.max(5, ARCADE_MODES[activeMode]?.reward || 5) + Math.floor(score / 10);
-            coins += reward;
-            const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
-            localStorage.setItem('sumo_streak', streak);
-            resetDailyMissionIfNeeded();
-            dailyMission.wins = Math.min(3, (dailyMission.wins || 0) + 1);
-            saveData(); hideAllMenus();
-            if (window.NeonSystems?.achievements) window.NeonSystems.achievements.evaluate({ wins: Number(localStorage.getItem('sumo_wins') || 0) + 1, bosses: 0, stage: maxUnlockedStage, maxCombo: 0, bestSurvival: 0, skins: skinState.owned.length });
-            document.getElementById('round-title').innerText = title;
-            document.getElementById('round-score').innerText = `${score} PTS • +${reward} 🪙`;
-            document.getElementById('modal-round').classList.remove('hidden');
-        }
-
-        function registerPlayerDeath() {
-            totalDeaths += 1;
-            localStorage.setItem('sumo_total_deaths', totalDeaths);
-            document.getElementById('death-count-copy').innerText = `Total ring-outs: ${totalDeaths}`;
-            updateRewardButtons();
-        }
-
-        function reviveInPlaceOffline() {
-            stageEnded = false;
-            const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
-            const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
-            const scale = distance > safeDistance ? safeDistance / distance : 1;
-            player.x = 400 + (reviveSnapshot.x - 400) * scale;
-            player.y = 300 + (reviveSnapshot.y - 300) * scale;
-            player.vx = 0; player.vy = 0; player.alive = true;
-            hideAllMenus();
-            document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block';
-        }
-
-        function spawnImpact(x, y, color) {
-            for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
-                let angle = Math.random() * Math.PI * 2;
-                let speed = 3 + Math.random() * 4;
-                particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, a: 1, c: color });
-            }
-            if (particles.length > (mobilePerformance ? 45 : 120)) particles.splice(0, particles.length - (mobilePerformance ? 45 : 120));
-            if (window.NeonSystems?.audio) window.NeonSystems.audio.tone(color === '#ff0055' ? 110 : 220, .045, 'triangle');
-        }
-
-        function distanceToPlayer(bot) {
-            return Math.hypot(bot.x - player.x, bot.y - player.y);
-        }
-
-        function updatePhysics() {
-            if (gameMode === 'none') return;
-            const now = performance.now();
-            const dt = Math.min(0.05, Math.max(0, (now - lastPhysicsTime) / 1000));
-            lastPhysicsTime = now;
-            const dt60 = 60 * dt;
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx * dt60; p.y += p.vy * dt60;
-                p.vx *= Math.pow(0.001, dt); p.vy *= Math.pow(0.001, dt);
-                p.a -= 3.6 * dt;
-                if (p.a <= 0) particles.splice(i, 1);
-            }
-            let dx = 0, dy = 0;
-            if (keys['arrowup'] || keys['w']) dy -= 1;
-            if (keys['arrowdown'] || keys['s']) dy += 1;
-            if (keys['arrowleft'] || keys['a']) dx -= 1;
-            if (keys['arrowright'] || keys['d']) dx += 1;
-            if (touchVec.x || touchVec.y) { dx = touchVec.x; dy = touchVec.y; }
-            let magnitude = Math.hypot(dx, dy);
-            if (magnitude > 1) { dx /= magnitude; dy /= magnitude; }
-
-            if (gameMode === 'offline' && player.alive && !stageEnded) {
-                const now = performance.now();
-                const deltaSeconds = Math.min(0.1, Math.max(0, (now - modeLastTick) / 1000));
-                modeLastTick = now;
-                if (activeMode === 'timeAttack') {
-                    modeElapsedMs += deltaSeconds * 1000;
-                    modeTime = Math.max(0, ARCADE_MODES.timeAttack.duration - modeElapsedMs / 1000);
-                    if (modeTime <= 0) { endArcadeMode('TIME UP', modeScore); return; }
-                    modeSpawnTimer += deltaSeconds;
-                    if (modeSpawnTimer >= ARCADE_MODES.timeAttack.spawnEvery) {
-                        modeSpawnTimer = 0;
-                        addModeBot(bots.length, 1, Math.random() > .5 ? '#ffaa00' : '#ff3366');
-                    }
-                    document.getElementById('hud-left').innerText = `⏱️ ${Math.ceil(modeTime)}s • ${modeScore} PTS`;
-                } else if (activeMode === 'shrinking') {
-                    modeElapsedMs += deltaSeconds * 1000;
-                    offlineArenaRadius = Math.max(ARCADE_MODES.shrinking.minRadius, offlineArenaRadius - ARCADE_MODES.shrinking.shrinkPerSecond * deltaSeconds);
-                    document.getElementById('hud-left').innerText = `🔻 RADIUS ${Math.round(offlineArenaRadius)}`;
-                }
-                const acc = (120 + upgrades.neonMomentum * 7.2) * dt;
-                player.vx += dx * acc; player.vy += dy * acc;
-                const damp = Math.pow(0.10, dt);
-                player.vx *= damp; player.vy *= damp;
-                // Cap velocity to prevent instant ejection from boss slams
-                const maxVel = 8 + upgrades.weight * 0.3;
-                const spd = Math.hypot(player.vx, player.vy);
-                if (spd > maxVel) { player.vx *= maxVel / spd; player.vy *= maxVel / spd; }
-                player.x += player.vx; player.y += player.vy;
-                // Death only when the entire player circle has left the arena
-                // (center distance > arena radius + player radius = fully outside)
-                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius + player.radius) {
-                    reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
-                    player.alive = false; stageEnded = true;
-                    registerPlayerDeath();
-                    hideAllMenus();
-                    document.getElementById('modal-death').classList.remove('hidden');
-                    return;
-                }
-                let active = bots.filter(bot => bot.alive);
-                for (let bot of active) {
-                    let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-                    bot.cd = (bot.cd || 0) + dt60;
-                    if (bot.hurtCd > 0) bot.hurtCd -= dt60;
-                    let raging = bot.isBoss && bot.hp <= bot.maxHp * 0.5;
-                    let critical = bot.isBoss && bot.hp <= bot.maxHp * 0.25;
-                    if (raging && bot.phase === 1) {
-                        bot.phase = 2; bot.color = '#ff3366';
-                        spawnImpact(bot.x, bot.y, '#ff3366');
-                    }
-                    if (critical && bot.phase === 2) {
-                        bot.phase = 3; bot.color = '#ffbb00'; bot.shield = bot.maxShield;
-                        bot.shieldCooldown = 240; bot.minionCooldown = 1;
-                        spawnImpact(bot.x, bot.y, '#ffbb00');
-                    }
-                    if (bot.isBoss) {
-                        if (bot.shieldCooldown > 0) bot.shieldCooldown -= dt60;
-                        if (bot.shield <= 0 && bot.shieldCooldown === 0 && bot.hp > 0) {
-                            bot.shield = Math.min(bot.maxShield, bot.shield + 1.2 * dt);
-                        }
-                        bot.minionCooldown -= dt60;
-                        const minionCount = bots.filter(candidate => candidate.alive && candidate.bossMinion).length;
-                        if (bot.minionCooldown <= 0 && minionCount < 2 && bot.hp > 0) {
-                            addBossMinion(bot);
-                            bot.minionCooldown = Math.max(260, 420 - bot.tier * 35);
-                        }
-                        bot.attackCooldown -= dt60;
-                        if (bot.telegraph > 0) {
-                            bot.telegraph -= dt60;
-                            if (bot.telegraph <= 0) {
-                                bot.telegraph = 0;
-                                if (bot.attackType === 'wave') {
-                                    bot.pulseRadius = 12;
-                                    if (distanceToPlayer(bot) < 190) {
-                                        const waveForce = (raging ? 9.5 : 7.5) * dt60;
-                                        player.vx += Math.cos(angle) * waveForce;
-                                        player.vy += Math.sin(angle) * waveForce;
-                                    }
-                                } else {
-                                    bot.dashTimer = (raging ? 20 : 16) / dt60;
-                                    bot.dashVx = Math.cos(angle) * (raging ? 7.2 : 6.2) * dt60;
-                                    bot.dashVy = Math.sin(angle) * (raging ? 7.2 : 6.2) * dt60;
-                                }
-                                bot.attackType = null;
-                                bot.attackCooldown = Math.max(68, (critical ? 78 : raging ? 92 : 118) - bot.tier * 6);
-                            }
-                        } else if (bot.attackCooldown <= 0) {
-                            bot.attackType = bot.attackCycle % 2 === 0 ? 'wave' : 'dash';
-                            bot.attackCycle = (bot.attackCycle || 0) + 1;
-                            bot.telegraph = 42 + bot.tier * 3;
-                        }
-                        if (bot.pulseRadius > 0) bot.pulseRadius += 600 * dt;
-                        if (bot.pulseRadius > 210) bot.pulseRadius = 0;
-                    }
-                    let speed = bot.speed * (critical ? 1.5 : raging ? 1.35 : 1);
-                    let dashAt = bot.isBoss ? (raging ? 48 : 68) : 80;
-                    let dashEnd = dashAt + (bot.isBoss ? 22 : 28);
-                    let dashMul = bot.isBoss ? (raging ? 3.1 : 2.35) : 1.85;
-                    if (bot.cd > dashAt) speed *= dashMul;
-                    if (bot.cd > dashEnd) bot.cd = 0;
-                    if (bot.isBoss && bot.dashTimer > 0) {
-                        bot.vx = bot.dashVx;
-                        bot.vy = bot.dashVy;
-                        bot.dashTimer -= dt60;
-                    } else {
-                        bot.vx += Math.cos(angle) * speed * dt60;
-                        bot.vy += Math.sin(angle) * speed * dt60;
-                    }
-                    const botDamp = Math.pow(bot.isBoss ? 0.055 : 0.027, dt);
-                    bot.vx *= botDamp; bot.vy *= botDamp;
-                    bot.x += bot.vx; bot.y += bot.vy;
-                    let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
-                    if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
-                        let nx = (bot.x - 400) / fromCenter;
-                        let ny = (bot.y - 300) / fromCenter;
-                        bot.x = 400 + nx * (offlineArenaRadius - 12);
-                        bot.y = 300 + ny * (offlineArenaRadius - 12);
-                        bot.vx *= Math.pow(0.001, dt); bot.vy *= Math.pow(0.001, dt);
-                    } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
-                        // Bot dies only when its full circle exits the arena edge
-                        bot.alive = false;
-                    }
-                    let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
-                    if (bot.isBoss) {
-                        bot.slamCd = (bot.slamCd || 0) + dt60;
-                        if (bot.slamCd > (raging ? 110 : 150) && distance < bot.radius + player.radius + 55) {
-                            let slam = ((raging ? 12 : 8) + bot.power * 0.15) * dt60;
-                            player.vx -= Math.cos(angle) * slam;
-                            player.vy -= Math.sin(angle) * slam;
-                            bot.slamCd = 0;
-                            spawnImpact(player.x, player.y, '#ff0055');
-                        }
-                    }
-                    if (distance < player.radius + bot.radius && player.alive) {
-                        let overlap = player.radius + bot.radius - distance;
-                        let collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
-                        player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
-                        player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
-                        bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
-                        bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
-                        let playerMass = 1.0 + upgrades.weight * 0.25;
-                        let playerPower = 6.0 + upgrades.power * 1.5;
-                        const armorFactor = Math.max(0.55, 1 - upgrades.voidArmor * 0.12);
-                        player.vx -= Math.cos(collisionAngle) * (bot.power / playerMass) * armorFactor * dt60;
-                        player.vy -= Math.sin(collisionAngle) * (bot.power / playerMass) * armorFactor * dt60;
-                        let armor = bot.isBoss && bot.hp > 0 ? 0.22 : 1;
-                        if (bot.isBoss && bot.hp > 0 && (bot.hurtCd || 0) <= 0 && Math.hypot(player.vx, player.vy) > 3.5) {
-                            let damage = 1;
-                            if (bot.shield > 0) {
-                                bot.shield = Math.max(0, bot.shield - damage);
-                                bot.shieldCooldown = 180 / dt60;
-                            } else {
-                                bot.hp = Math.max(0, bot.hp - damage);
-                                bot.hurtCd = 22 / dt60;
-                                if (bot.hp <= 0) { bot.alive = false; spawnImpact(bot.x, bot.y, '#00ff66'); }
-                            }
-                        }
-                        bot.vx += Math.cos(collisionAngle) * (playerPower / bot.mass) * armor * dt60;
-                        bot.vy += Math.sin(collisionAngle) * (playerPower / bot.mass) * armor * dt60;
-                        spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
-                    }
-                }
-                if (activeMode === 'timeAttack') {
-                    const aliveCount = bots.filter(bot => bot.alive).length;
-                    modeEliminations += active.length - aliveCount;
-                    modeScore = modeEliminations * 10;
-                    if (aliveCount === 0 && modeTime > 0) addModeBot(bots.length, 1, '#ffaa00');
-                }
-                const activeBoss = getActiveBoss();
-                const remainingBots = bots.filter(bot => bot.alive).length;
-                const bossDefeated = activeMode === 'stage' && bots.some(bot => bot.isBoss && bot.hp <= 0);
-                const playerInArena = Math.hypot(player.x - 400, player.y - 300) <= offlineArenaRadius;
-                const stageVictory = player.alive && playerInArena && activeMode === 'stage' && (bossDefeated ? !activeBoss : remainingBots === 0);
-                const arcadeVictory = player.alive && playerInArena && activeMode !== 'stage' && remainingBots === 0;
-                if (stageReady && (stageVictory || arcadeVictory) && !stageEnded) {
-                    if (activeMode === 'stage') { finishOfflineStage(); return; }
-                    modeScore = activeMode === 'timeAttack' ? modeEliminations * 10 : bots.length * 10;
-                    endArcadeMode(activeMode === 'chaos' ? 'CHAOS CLEARED' : 'SHRINKING CLEARED', modeScore);
-                    return;
-                }
-            }
-        }
-
-        function render() {
-            ctx.fillStyle = '#08090f';
-            ctx.fillRect(0, 0, 800, 600);
-            if (gameMode !== 'none') {
-                let radius = offlineArenaRadius;
-                const bossPresent = bots.some(b => b.isBoss && b.alive);
-
-                // Arena background
-                ctx.beginPath();
-                ctx.arc(400, 300, radius, 0, Math.PI * 2);
-                ctx.fillStyle = bossPresent ? '#12040a' : '#0f121d';
-                ctx.fill();
-
-                if (bossPresent) {
-                    // Boss arena: pulsing glow ring
-                    const t = Date.now() / 1000;
-                    const pulse = 0.5 + 0.5 * Math.sin(t * 2.5);
-                    // Outer glow layers
-                    for (let i = 3; i >= 0; i--) {
-                        const glowR = radius + 8 + i * 5 + pulse * 4;
-                        ctx.beginPath();
-                        ctx.arc(400, 300, glowR, 0, Math.PI * 2);
-                        ctx.lineWidth = 3 + i * 2;
-                        ctx.strokeStyle = `rgba(255,0,85,${0.06 + pulse * 0.06})`;
-                        ctx.stroke();
-                    }
-                    // Main border
-                    ctx.beginPath();
-                    ctx.arc(400, 300, radius, 0, Math.PI * 2);
-                    ctx.lineWidth = 5;
-                    ctx.strokeStyle = '#ff0055';
-                    ctx.shadowColor = '#ff0055';
-                    ctx.shadowBlur = 18 + pulse * 10;
-                    ctx.stroke();
-                    ctx.shadowBlur = 0;
-                    // Inner danger marks (radial dashes)
-                    ctx.save();
-                    ctx.translate(400, 300);
-                    const dashCount = 12;
-                    for (let i = 0; i < dashCount; i++) {
-                        const a = (i / dashCount) * Math.PI * 2 + t * 0.4;
-                        const inner = radius - 14;
-                        const outer = radius - 4;
-                        ctx.beginPath();
-                        ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
-                        ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = `rgba(255,0,85,${0.3 + pulse * 0.25})`;
-                        ctx.stroke();
-                    }
-                    ctx.restore();
-                } else {
-                    // Normal arena border
-                    ctx.beginPath();
-                    ctx.arc(400, 300, radius, 0, Math.PI * 2);
-                    ctx.lineWidth = 4;
-                    ctx.strokeStyle = radius < 170 ? '#ff0055' : '#00e5ff';
-                    ctx.stroke();
-                }
-
-                for (let p of particles) {
-                    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-                    ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
-                }
-                for (let bot of bots) {
-                    if (!bot.alive) continue;
-                    ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = bot.color; ctx.fill();
-                    ctx.lineWidth = bot.isBoss ? 4 : 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-                    if (bot.isBoss) {
-                        if (bot.telegraph > 0) {
-                            const warningRadius = bot.attackType === 'wave' ? 190 : 64;
-                            ctx.beginPath(); ctx.arc(bot.x, bot.y, warningRadius, 0, Math.PI * 2);
-                            ctx.lineWidth = 3; ctx.strokeStyle = bot.attackType === 'wave' ? '#ffbb00' : '#ff0055';
-                            ctx.globalAlpha = 0.35 + (bot.telegraph % 10) / 20;
-                            ctx.stroke(); ctx.globalAlpha = 1;
-                        }
-                        if (bot.pulseRadius > 0) {
-                            ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.pulseRadius, 0, Math.PI * 2);
-                            ctx.lineWidth = 5; ctx.strokeStyle = '#ffbb00';
-                            ctx.globalAlpha = Math.max(0, 1 - bot.pulseRadius / 220);
-                            ctx.stroke(); ctx.globalAlpha = 1;
-                        }
-                        const barWidth = bot.radius * 2.2;
-                        ctx.fillStyle = '#351323'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth, 5);
-                        ctx.fillStyle = '#00ff66'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 16, barWidth * Math.max(0, bot.hp / bot.maxHp), 5);
-                        ctx.fillStyle = '#172d48'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 9, barWidth, 3);
-                        ctx.fillStyle = '#00e5ff'; ctx.fillRect(bot.x - barWidth / 2, bot.y - bot.radius - 9, barWidth * Math.max(0, bot.shield / bot.maxShield), 3);
-                    }
-                }
-                if (player.alive) {
-                    ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = player.color; ctx.fill();
-                    ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
-                }
-            }
-        }
-
-        function gameLoop() {
-            if (window.NeonSystems?.performance) window.NeonSystems.performance.tick();
-            try { updatePhysics(); render(); } catch (_error) {}
-            requestAnimationFrame(gameLoop);
-        }
-        requestAnimationFrame(gameLoop);
-    </script>
-
-    <!-- زر القائمة الجانبية النيون -->
-    <div id="neon-menu-btn" onclick="toggleNeonMenu()" style="position: fixed; top: 110px; right: 30px; z-index: 9999; cursor: pointer; background: rgba(5,5,15,0.95); border: 2px solid #00f3ff; border-radius: 12px; padding: 12px 18px; box-shadow: 0 0 20px rgba(0,243,255,0.5); transition: 0.3s;">
-    <span style="color: #00f3ff; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 14px;">☰ منيو</span>
+    <div class="cols">
+      <section class="panel">
+        <h2 class="panel-title"><span class="dot dot-em"></span><span data-i18n="departments">Departments</span></h2>
+        <div class="dept-grid" id="deptGrid"></div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title"><span class="dot dot-in"></span><span data-i18n="upgrades">Active Upgrades</span></h2>
+        <div class="up-list" id="upList"></div>
+
+        <h2 class="panel-title mt"><span class="dot dot-cr"></span><span data-i18n="managers">Executive Managers</span></h2>
+        <div class="mgr-list" id="mgrList"></div>
+
+        <h2 class="panel-title mt"><span class="dot dot-em"></span><span data-i18n="prestige_title">IPO — Go Public</span></h2>
+        <div class="prestige-box">
+          <p data-i18n="prestige_desc">Reset the company and issue Executive Shares.</p>
+          <div class="prestige-row">
+            <div class="prestige-meta">
+              <span data-i18n="shares">Exec Shares</span>: <b id="pgShares">0</b> &nbsp;·&nbsp;
+              <span data-i18n="prestige_bonus">Prestige Bonus</span>: <b id="pgBonus">×1.00</b>
+            </div>
+            <button class="btn btn-prestige" id="btnPrestige" data-i18n="prestige_go">File IPO &amp; Reset</button>
+          </div>
+          <div class="prestige-prog"><i id="pgFill"></i></div>
+          <div class="prestige-hint" id="pgHint" data-i18n="prestige_req">Requires $1.00M net worth</div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ══════════ ARCADE ══════════ -->
+  <section class="view" id="view-arcade">
+    <h1 class="view-title" data-i18n="arcade_title">Arcade Work Hub</h1>
+    <p class="view-sub" data-i18n="arcade_sub">Play a mini-game → score becomes instant cash + 5 min Overclock boost</p>
+
+    <div class="arcade-lock glass" id="arcadeLock">
+      <span class="lock-icon">🔒</span>
+      <p data-i18n="arcade_locked">Reach $10K cash to unlock the Arcade Hub</p>
+      <div class="lock-prog"><i id="lockFill"></i></div>
     </div>
 
-    <!-- القائمة الجانبية المتقدمة -->
-    <div id="neon-sidebar" style="position: fixed; top: 0; right: -320px; width: 300px; height: 100vh; background: rgba(3, 3, 8, 0.98); border-left: 2px solid #00f3ff; box-shadow: -15px 0 40px rgba(0, 243, 255, 0.4); z-index: 10000; transition: right 0.4s ease; padding: 30px 20px; backdrop-filter: blur(20px); font-family: 'Orbitron', sans-serif; color: #fff; box-sizing: border-box; overflow-y: auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid rgba(0,243,255,0.2); padding-bottom: 15px;">
-        <h2 style="color: #00f3ff; font-size: 18px; text-shadow: 0 0 10px #00f3ff; margin: 0;">CYBER MENU</h2>
-        <span onclick="toggleNeonMenu()" style="color: #ff0055; font-size: 26px; cursor: pointer; text-shadow: 0 0 10px #ff0055;">&times;</span>
+    <div class="arc-grid" id="arcGrid"></div>
+
+    <div class="play-stage" id="playStage" hidden>
+      <div class="stage-bar glass">
+        <div class="stage-title">
+          <b id="stageName">—</b>
+          <small id="stageHow" data-i18n="how_to">Controls</small>
+        </div>
+        <div class="stage-score">
+          <span data-i18n="score">Score</span>: <b id="stageScore">0</b>
+          &nbsp;·&nbsp;
+          <span data-i18n="high_score">Best</span>: <b id="stageBest">0</b>
+        </div>
+        <div class="stage-btns">
+          <button class="btn btn-ghost" id="btnRestart" data-i18n="restart">Restart</button>
+          <button class="btn btn-danger" id="btnExit" data-i18n="exit_game">Exit</button>
+        </div>
       </div>
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+        <div class="stage-over glass" id="stageOver" hidden>
+          <h3 data-i18n="game_over">Game Over</h3>
+          <div class="over-rows">
+            <div><span data-i18n="score">Score</span><b id="ovScore">0</b></div>
+            <div><span data-i18n="high_score">Best</span><b id="ovBest">0</b></div>
+            <div class="ov-cash"><span data-i18n="cash_earned">Cash Earned</span><b id="ovCash">$0</b></div>
+          </div>
+          <div class="over-btns">
+            <button class="btn" id="ovRetry" data-i18n="restart">Restart</button>
+            <button class="btn btn-ghost" id="ovBack" data-i18n="back">Back to HQ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-      <!-- صورة وحساب اللاعب -->
-      <div style="text-align: center; margin-bottom: 25px;">
-        <label for="avatar-input" style="cursor: pointer;">
-          <img id="sidebar-avatar" src="https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff" style="width: 70px; height: 70px; border-radius: 50%; border: 2px solid #00f3ff; object-fit: cover; box-shadow: 0 0 15px rgba(0,243,255,0.4); margin-bottom: 8px;" title="اضغط لتغيير الصورة">
+  <!-- ══════════ LEDGER ══════════ -->
+  <section class="view" id="view-ledger">
+    <h1 class="view-title" data-i18n="nav_ledger">Ledger</h1>
+    <div class="cols">
+      <section class="panel">
+        <h2 class="panel-title"><span class="dot dot-em"></span>Games Played</h2>
+        <div class="tbl" id="ledgerGames"></div>
+      </section>
+      <section class="panel">
+        <h2 class="panel-title"><span class="dot dot-in"></span>Corporate</h2>
+        <div class="tbl" id="ledgerCorp"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ══════════ SETTINGS ══════════ -->
+  <section class="view" id="view-settings">
+    <h1 class="view-title" data-i18n="settings_title">Settings</h1>
+    <section class="panel">
+      <div class="set-list">
+        <label class="set-row">
+          <span data-i18n="sound">Sound Effects</span>
+          <input type="checkbox" id="setSfx" checked>
         </label>
-        <input type="file" id="avatar-input" accept="image/*" style="display: none;" onchange="loadAvatar(event)">
-        <div id="sidebar-name" style="font-size: 16px; font-weight: bold; color: #00f3ff; text-shadow: 0 0 8px #00f3ff;">RASHID</div>
-        <div id="sidebar-flag" style="font-size: 14px; color: #aaa; margin-top: 4px;">🇯🇴 Jordan</div>
+        <label class="set-row">
+          <span data-i18n="music">Music</span>
+          <input type="checkbox" id="setMusic">
+        </label>
+        <label class="set-row">
+          <span data-i18n="language">Language</span>
+          <select id="setLang">
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+          </select>
+        </label>
+        <div class="set-row">
+          <span data-i18n="offline_cap">Offline cap</span>
+          <b>8h · 50%</b>
+        </div>
       </div>
+      <div class="set-btns">
+        <button class="btn btn-ghost" id="btnExport" data-i18n="export_save">Export Save</button>
+        <button class="btn btn-ghost" id="btnImport" data-i18n="import_save">Import Save</button>
+        <button class="btn btn-danger" id="btnReset" data-i18n="reset_save">Hard Reset</button>
+      </div>
+      <textarea id="saveBox" class="save-box" spellcheck="false" rows="4"
+        placeholder="Paste save string here, then press Import Save…"></textarea>
+    </section>
+  </section>
+</main>
 
-      <!-- أزرار التنقل -->
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <button onclick="openHome()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏠 الشاشة الرئيسية (Home)</button>
-        <button onclick="openAccountModal()" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #00f3ff; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">⚙️ تعديل الحساب (My Account)</button>
-        <button onclick="openLeaderboardModalSafe()" style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; color: #ffd700; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">🏆 لوحة الصدارة (Leaderboard)</button>
-        <a href="https://www.instagram.com/nn1v4/" target="_blank" style="text-decoration: none;">
-          <button style="width: 100%; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: left; transition: 0.3s;">💬 الدعم الفني (Instagram)</button>
-        </a>
-      </div>
+<!-- ══════════ MODALS ══════════ -->
+<div class="modal-back hidden" id="modalBack">
+  <div class="modal glass" id="modal">
+    <h3 id="modalTitle">—</h3>
+    <p id="modalBody">—</p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" id="modalNo" data-i18n="cancel">Cancel</button>
+      <button class="btn" id="modalYes" data-i18n="confirm">Confirm</button>
     </div>
+  </div>
+</div>
 
-    <!-- ACCOUNT MODAL -->
-    <div id="account-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif;">
-      <div style="background: #060612; border: 2px solid #00f3ff; padding: 25px; border-radius: 14px; width: 380px; box-shadow: 0 0 40px rgba(0,243,255,0.3); color: #fff;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0,243,255,0.3); padding-bottom: 10px;">
-          <h3 style="color: #00f3ff; margin: 0; font-size: 15px;">EDIT ACCOUNT</h3>
-          <span onclick="closeAccountModal()" style="color: #ff0055; font-size: 24px; cursor: pointer;">&times;</span>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12px;">
-          <label>اسم اللاعب:</label>
-          <input type="text" id="input-name" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-          <label>علم الدولة / الايموجي:</label>
-          <input type="text" id="input-flag" style="background: rgba(0,243,255,0.1); border: 1px solid #00f3ff; color: #fff; padding: 10px; border-radius: 6px; outline: none;">
-        </div>
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-          <button onclick="saveAccount()" style="flex: 1; background: rgba(0,243,255,0.2); border: 1px solid #00f3ff; color: #00f3ff; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">حفظ</button>
-          <button onclick="closeAccountModal()" style="flex: 1; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">إغلاق</button>
-        </div>
-      </div>
-    </div>
+<div class="toast" id="toast" hidden></div>
 
-    <!-- LEADERBOARD MODAL -->
-    <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 99999; justify-content: center; align-items: center; font-family: 'Orbitron', sans-serif; backdrop-filter: blur(15px);">
-      <div style="background: #050510; border: 2px solid #ffd700; padding: 25px; border-radius: 16px; width: 450px; max-height: 85vh; box-shadow: 0 0 60px rgba(255,215,0,0.5); color: #fff; display: flex; flex-direction: column; box-sizing: border-box;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 12px; margin-bottom: 15px;">
-          <div>
-            <h2 style="color: #ffd700; font-size: 16px; text-shadow: 0 0 10px #ffd700; margin: 0;">🏆 CYBER HALL OF FAME</h2>
-            <span style="font-size: 10px; color: #00f3ff;">Ultimate Global Rankings</span>
-          </div>
-          <span onclick="document.getElementById('leaderboard-modal').style.display='none'" style="color: #ff0055; font-size: 28px; cursor: pointer; text-shadow: 0 0 10px #ff0055; line-height: 1;">&times;</span>
-        </div>
-                <div class="leaderboard-tools">
-                    <button class="lb-tab active" data-sort="stage" onclick="setLeaderboardSort('stage', this)">🌊 Waves</button>
-                    <button class="lb-tab" data-sort="coins" onclick="setLeaderboardSort('coins', this)">🪙 Coins</button>
-                    <input id="leaderboard-search" type="search" placeholder="Search fighter" oninput="filterLeaderboard(this.value)">
-                </div>
-                <div id="leaderboard-self" class="leaderboard-self"></div>
-        <div id="modal-players-list" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 52vh; padding-right: 5px;"></div>
-        <button onclick="document.getElementById('leaderboard-modal').style.display='none'" style="margin-top: 15px; background: rgba(255,0,85,0.2); border: 1px solid #ff0055; color: #ff0055; padding: 10px; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 12px;">إغلاق القائمة</button>
-      </div>
-    </div>
-
-        <div id="profile-modal" class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name" style="display:none;">
-            <div class="profile-panel">
-                <button class="profile-close" onclick="closePlayerProfile()" aria-label="Close profile">&times;</button>
-                <div id="profile-avatar" class="profile-avatar"></div>
-                <h2 id="profile-name">Fighter</h2>
-                <p id="profile-title" class="profile-title"></p>
-                <div id="profile-stats" class="profile-stats"></div>
-            </div>
-        </div>
-
-    <!-- خلفية الماتريكس -->
-    <canvas id="matrix-bg" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vw; z-index: -2; pointer-events: none; opacity: 0.25;"></canvas>
-
-    <script>
-    function toggleNeonMenu() {
-      const sb = document.getElementById('neon-sidebar');
-      sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
-    }
-
-    function openHome() {
-      toggleNeonMenu();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function openAccountModal() {
-      toggleNeonMenu();
-      document.getElementById('leaderboard-modal').style.display = 'none';
-      document.getElementById('account-modal').style.display = 'flex';
-      document.getElementById('input-name').value = localStorage.getItem('sumo_name') || 'aiham';
-      document.getElementById('input-flag').value = localStorage.getItem('sumo_flag') || '🇯🇴 Jordan';
-    }
-
-    function closeAccountModal() {
-      document.getElementById('account-modal').style.display = 'none';
-    }
-
-    function saveAccount() {
-      const name = document.getElementById('input-name').value;
-      const flag = document.getElementById('input-flag').value;
-      if(name) localStorage.setItem('sumo_name', name);
-      if(flag) localStorage.setItem('sumo_flag', flag);
-      updateAccountUI();
-      closeAccountModal();
-      location.reload();
-    }
-
-    function loadAvatar(event) {
-      const reader = new FileReader();
-      reader.onload = function(){
-        localStorage.setItem('sumo_avatar', reader.result);
-        updateAccountUI();
-      };
-      reader.readAsDataURL(event.target.files[0]);
-    }
-
-    function updateAccountUI() {
-      const savedName = localStorage.getItem('sumo_name');
-      const savedFlag = localStorage.getItem('sumo_flag');
-      const savedAvatar = localStorage.getItem('sumo_avatar');
-      if(savedName) document.getElementById('sidebar-name').innerText = savedName;
-      if(savedFlag) document.getElementById('sidebar-flag').innerText = savedFlag;
-      if(savedAvatar) document.getElementById('sidebar-avatar').src = savedAvatar;
-    }
-
-    window.onload = updateAccountUI;
-
-    function openLeaderboardModalSafe() {
-      toggleNeonMenu();
-      document.getElementById('account-modal').style.display = 'none';
-      document.getElementById('leaderboard-modal').style.display = 'flex';
-      renderFullLeaderboard();
-    }
-
-    function renderFullLeaderboard() {
-      const currentName = localStorage.getItem('sumo_name') || 'aiham';
-      const currentAvatar = localStorage.getItem('sumo_avatar') || 'https://api.iconify.design/lucide:user-cog.svg?color=%2300f3ff';
-      let players = JSON.parse(localStorage.getItem('sumo_global_players') || '[]');
-      let existingIndex = players.findIndex(p => p.name === currentName);
-      let currentCoins = parseInt(localStorage.getItem('sumo_coins') || '280');
-      
-      if (existingIndex >= 0) {
-        players[existingIndex].coins = currentCoins;
-        players[existingIndex].avatar = currentAvatar;
-      } else {
-        players.push({ name: currentName, coins: currentCoins, avatar: currentAvatar });
-      }
-      
-      players.sort((a, b) => b.coins - a.coins);
-      localStorage.setItem('sumo_global_players', JSON.stringify(players));
-      
-      const container = document.getElementById('modal-players-list');
-      if(!container) return;
-      container.innerHTML = '';
-      
-      players.forEach((player, index) => {
-        let rank = index + 1;
-        let rankStyle = 'border: 1px solid rgba(0,243,255,0.2); background: rgba(10,10,25,0.6);';
-        let rankBadge = '#' + rank;
-        let title = 'NetRunner 💻';
-        let trend = '🟢';
-        
-        if (rank === 1) {
-          rankStyle = 'background: rgba(255,215,0,0.15); border: 2px solid #ffd700; box-shadow: 0 0 15px rgba(255,215,0,0.4);';
-          rankBadge = '👑 1';
-          title = 'Cyber Overlord 👑';
-          trend = '🔥';
-        } else if (rank === 2 || rank === 3) {
-          rankStyle = 'background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0;';
-          rankBadge = rank === 2 ? '🥈 2' : '🥉 3';
-          title = 'Neon Elite ⚡';
-          trend = '🚀';
-        }
-        
-        const row = document.createElement('div');
-        row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; " + rankStyle;
-        
-        row.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-weight: bold; font-size: 13px; width: 32px; color: ${rank <= 3 ? '#ffd700' : '#00f3ff'};">${rankBadge} ${trend}</span>
-            <img src="${player.avatar}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #00f3ff;">
-            <div>
-              <div style="color: #fff; font-weight: bold; font-size: 13px;">${player.name}</div>
-              <div style="color: ${rank === 1 ? '#ffd700' : '#00f3ff'}; font-size: 9px; opacity: 0.8;">${title}</div>
-            </div>
-          </div>
-          <div style="color: #ffd700; font-weight: bold; font-size: 13px;">🪙 ${player.coins}</div>
-        `;
-        container.appendChild(row);
-      });
-    }
-
-    // تشغيل خلفية الماتريكس
-    const matrixCanvas = document.getElementById('matrix-bg');
-    const matrixCtx = matrixCanvas.getContext('2d');
-    function resizeCanvas() { matrixCanvas.width = window.innerWidth; matrixCanvas.height = window.innerHeight; }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ01010101KAILINUXCYBER';
-    const fontSize = 16;
-    let columns = matrixCanvas.width / fontSize;
-    const drops = [];
-    for (let i = 0; i < columns; i++) { drops[i] = 1; }
-    function drawMatrix() {
-            if (window.matchMedia('(max-width: 600px)').matches) return;
-    matrixCtx.fillStyle = 'rgba(2, 2, 5, 0.1)';
-    matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
-    matrixCtx.fillStyle = '#00f3ff';
-    matrixCtx.font = fontSize + 'px monospace';
-      for (let i = 0; i < drops.length; i++) {
-        const text = chars.charAt(Math.floor(Math.random() * chars.length));
-        matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
-        if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) { drops[i] = 0; }
-        drops[i]++;
-      }
-    }
-    setInterval(drawMatrix, 50);
-    </script>
-    <script src="modules/storage.js"></script>
-    <script src="modules/progression.js"></script>
-    <script src="modules/physics.js"></script>
-    <script src="modules/abilities.js"></script>
-    <script src="modules/bosses.js"></script>
-    <script src="modules/achievements.js"></script>
-    <script src="modules/performance.js"></script>
-    <script src="modules/audio.js"></script>
-
-<script>
-function toggleNeonMenu() {
-  const sb = document.getElementById('neon-sidebar');
-  if (sb) {
-    sb.style.right = (sb.style.right === '0px') ? '-320px' : '0px';
-  }
-}
-
-function openHome() {
-  toggleNeonMenu();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-</script>
-<script src="account-manager.js"></script>
-<script src="leaderboard.js"></script>
+<script type="module" src="src/main.js"></script>
 </body>
-
 </html>
