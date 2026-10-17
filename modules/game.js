@@ -35,6 +35,24 @@ function playerPower() {
 function dampStep(v, factor, n) { return v * Math.pow(Math.max(0, factor), Math.max(0, n)); }
 function clampNum(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+/* ---------------------------------------------------------------- *
+ *  TUNING CONSTANTS — single source of truth (were magic numbers
+ *  duplicated across movement, collisions and the swipe dash).
+ * ---------------------------------------------------------------- */
+const PLAYER_SPEED_CAP = 30;      // world units per reference frame (60fps)
+const BOT_SPEED_CAP = 34;         // bots may be flung a little faster than the player
+const SWIPE_DASH_IMPULSE = 9;     // additive dash, no longer overwrites momentum
+const PLAYER_RESTITUTION = 0.35;  // bounce when a body is hit
+const HAZARD_RESTITUTION = 0.55;  // hazards shove harder than a rival body
+const WALL_RESTITUTION = 0.6;     // ring edge: slide along it, never stick
+/** Single source of truth for the world-space arena centre (canvas is 800x600). */
+const ARENA_CENTER = { x: 400, y: 300 };
+/** Hazards are heavy furniture, not pebbles: they shove bodies rather than get shoved. */
+const HAZARD_MASS = 40;
+
+/** Physics engine (modules/physics.js, loaded before this file). */
+const PHY = window.NeonSystems.physics;
+
 /**
  * Camera fit: pick a render scale so the whole arena (incl. enlarged boss
  * arenas) always fits the viewport with margin — edges never clipped/black.
@@ -221,7 +239,8 @@ function spawnHazards(level) {
             type: 'plasma', alive: true,
             x: cx + Math.cos(ang) * dist, y: cy + Math.sin(ang) * dist,
             vx: Math.cos(dir) * spd, vy: Math.sin(dir) * spd,
-            radius: hc.radius, pulse: Math.random() * Math.PI * 2, seed: Math.random() * 100
+            radius: hc.radius, pulse: Math.random() * Math.PI * 2, seed: Math.random() * 100,
+            mass: HAZARD_MASS
         });
     }
     for (let i = 0; i < hc.mines; i++) {
@@ -231,7 +250,8 @@ function spawnHazards(level) {
             type: 'mine', alive: true,
             x: cx + Math.cos(ang) * dist, y: cy + Math.sin(ang) * dist,
             vx: 0, vy: 0, radius: hc.mineRadius, pulse: (i / Math.max(1, hc.mines)) * Math.PI * 2,
-            seed: Math.random() * 100, wobble: 2 + Math.random() * 2
+            seed: Math.random() * 100, wobble: 2 + Math.random() * 2,
+            mass: HAZARD_MASS
         });
     }
 }
@@ -561,14 +581,13 @@ function updatePhysics() {
                 // mine: subtle radial wobble
                 hz.x += Math.cos(hz.pulse / hz.wobble) * 0.12 * n;
                 hz.y += Math.sin(hz.pulse / hz.wobble) * 0.12 * n;
-                const dm = Math.hypot(hz.x - hub, hz.y - hud);
-                if (dm > hR - hz.radius) {
-                    const nx = (hz.x - hub) / dm, ny = (hz.y - hud) / dm;
-                    hz.x = hub + nx * (hR - hz.radius);
-                    hz.y = hud + ny * (hR - hz.radius);
-                }
+                // A mine shoved into the rim must slide along it, not weld to it.
+                PHY.reflectCircleFromWall(hz, ARENA_CENTER, hR, WALL_RESTITUTION);
             }
-            // Hazard ↔ bodies: mild nudge, never lethal on its own.
+            // Hazard ↔ bodies: spatial pressure, never lethal on its own. The
+            // contact is mass-weighted so the heavy hazard barely moves while the
+            // body takes the shove — previously every overlapping frame added a
+            // raw velocity, which compounded into unbounded energy.
             const targets = [];
             if (player.alive && !stageEnded && gameMode === 'offline') targets.push(player);
             for (const b of bots) if (b.alive) targets.push(b);
@@ -577,11 +596,13 @@ function updatePhysics() {
                 const rr = hz.radius + t.radius;
                 const dist = Math.hypot(ex, ey);
                 if (dist < rr && dist > 0.001) {
-                    const nx = ex / dist, ny = ey / dist;
-                    const push = hz.type === 'mine' ? 1.4 : 2.2;
-                    const k = 1 - rr / (rr + Math.max(0, 16 - hz.radius)) * 0.5;
-                    t.vx += nx * push * k * n;
-                    t.vy += ny * push * k * n;
+                    // Bigger hazards press harder; small ones barely nudge.
+                    const punch = hz.type === 'mine' ? 0.35 : 0.75;
+                    PHY.resolveCirclePair(hz, t, {
+                        restitution: HAZARD_RESTITUTION,
+                        push: punch
+                    });
+                    spawnImpact(t.x, t.y, hz.type === 'mine' ? '#ff5a6e' : '#00e5ff');
                 }
             }
         }
@@ -625,14 +646,15 @@ function updatePhysics() {
             player.spawnGrace -= n;
             player.vx *= 0.55; player.vy *= 0.55;
         }
-        const recovery = Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
-        player.vx = dampStep(player.vx, 0.88, n); player.vy = dampStep(player.vy, 0.88, n);
-        player.vx = dampStep(player.vx, recovery, n); player.vy = dampStep(player.vy, recovery, n);
+        // Single framerate-correct damping term. Two compounding dampStep()
+        // calls per axis used to run here (0.88 then `recovery`); their product
+        // is what actually applied, so folding them is a pure refactor.
+        const friction = 0.88 * Math.max(0.82, 0.88 - upgrades.hydroPusher * 0.015);
+        player.vx = dampStep(player.vx, friction, n); player.vy = dampStep(player.vy, friction, n);
         // Velocity cap: a single frame can never launch the player across the
         // arena (stacked boss knockback on a high-dt/lag frame previously killed
         // from mid-arena in one frame — the "death out of nowhere").
-        const pSpd = Math.hypot(player.vx, player.vy);
-        if (pSpd > 30) { player.vx = (player.vx / pSpd) * 30; player.vy = (player.vy / pSpd) * 30; }
+        PHY.capSpeed(player, PLAYER_SPEED_CAP);
         player.x += player.vx * n; player.y += player.vy * n;
         // Legitimate ring-out ONLY: the player dies when their whole body has
         // been pushed past the arena bounds (center + radius beyond the line).
@@ -789,18 +811,17 @@ function updatePhysics() {
             }
 
             bot.x += bot.vx * n; bot.y += bot.vy * n;
+            PHY.capSpeed(bot, BOT_SPEED_CAP);
 
             // ---- Boundary (real sumo: only a physical ring-out eliminates) ----
-            const fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
+            const fromCenter = Math.hypot(bot.x - ARENA_CENTER.x, bot.y - ARENA_CENTER.y);
             if (bot.isBoss) {
                 const ringEdge = offlineArenaRadius - bot.radius;        // center must stay inside this
                 if (fromCenter > ringEdge) {
                     if (bot.hp > 0) {
-                        // Armor intact => cannot be ringed out; clamp back inside.
-                        const nx = (bot.x - 400) / fromCenter, ny = (bot.y - 300) / fromCenter;
-                        const rest = Math.max(0, ringEdge - 4);
-                        bot.x = 400 + nx * rest; bot.y = 300 + ny * rest;
-                        bot.vx *= 0.25; bot.vy *= 0.25;
+                        // Armor intact => cannot be ringed out; slide back inside
+                        // along the rim instead of teleporting and losing all speed.
+                        PHY.reflectCircleFromWall(bot, ARENA_CENTER, offlineArenaRadius, WALL_RESTITUTION);
                     } else if (fromCenter > offlineArenaRadius - bot.radius + 6) {
                         // Armor broken => boss can finally be physically thrown out.
                         bot.alive = false;
@@ -815,12 +836,10 @@ function updatePhysics() {
             // ---- Collision / push (dt-normalized) ----
             const distance = Math.hypot(bot.x - player.x, bot.y - player.y);
             if (distance < player.radius + bot.radius) {
-                const overlap = player.radius + bot.radius - distance;
                 const collisionAngle = Math.atan2(bot.y - player.y, bot.x - player.x);
-                player.x -= Math.cos(collisionAngle) * (overlap * 0.45);
-                player.y -= Math.sin(collisionAngle) * (overlap * 0.45);
-                bot.x += Math.cos(collisionAngle) * (overlap * 0.55);
-                bot.y += Math.sin(collisionAngle) * (overlap * 0.55);
+                // Inverse-mass positional split + restitution instead of the old
+                // fixed 0.45/0.55 nudge that ignored mass entirely.
+                PHY.resolveCirclePair(player, bot, { restitution: PLAYER_RESTITUTION });
 
                 const armorFactor = Math.max(0.55, (1 - upgrades.voidArmor * 0.12) * (bot.isBoss && bossHas(bot, 'voidArmor') ? 0.7 : 1));
                 player.vx -= Math.cos(collisionAngle) * (bot.power / selfMass) * armorFactor * n;
@@ -855,6 +874,12 @@ function updatePhysics() {
                 spawnImpact((player.x + bot.x) / 2, (player.y + bot.y) / 2, bot.color);
             }
         }
+
+        // Boss attacks, grabs, slams and the collision pass above all land on
+        // the player AFTER the per-frame cap inside the movement block, so the
+        // cap has to be re-applied once the whole bot loop is done. Without
+        // this, stacked knockback could exceed the cap within a single frame.
+        PHY.capSpeed(player, PLAYER_SPEED_CAP);
 
         if (activeMode === 'timeAttack') {
             const aliveCount = bots.filter(bot => bot.alive).length;
@@ -892,6 +917,11 @@ function render() {
         // always visible with margin — never clipped into "black" edges.
         const scale = arenaFitScale(canvas.width, canvas.height, radius);
         const rScaled = radius * scale;
+        // Anchor every body to the arena centre before scaling. Scaling raw
+        // world coordinates about the top-left origin dragged all bodies into
+        // the corner as soon as a big boss arena made arenaFitScale() < 1.
+        const sx = wx => PHY.worldToScreen(wx, 300, cx, cy, scale)[0];
+        const sy = wy => PHY.worldToScreen(400, wy, cx, cy, scale)[1];
 
         // --- Arena floor (rich, scaled) ---
         const grad = ctx.createRadialGradient(cx, cy, rScaled * 0.15, cx, cy, rScaled);
@@ -942,7 +972,7 @@ function render() {
         // --- Hazards (dt-based plasma orbs + pulsing mines) ---
         for (let hz of hazards) {
             if (!hz.alive) continue;
-            const hx = hz.x * scale, hy = hz.y * scale;
+            const hx = sx(hz.x), hy = sy(hz.y);
             if (hz.type === 'mine') {
                 const mR = hz.radius * scale;
                 const pulseAlpha = 0.5 + 0.4 * Math.sin(hz.pulse);
@@ -963,13 +993,13 @@ function render() {
         }
 
         for (let p of particles) {
-            ctx.beginPath(); ctx.arc(p.x * scale, p.y * scale, Math.max(1, 3 * scale), 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), Math.max(1, 3 * scale), 0, Math.PI * 2);
             ctx.fillStyle = p.c; ctx.globalAlpha = p.a; ctx.fill(); ctx.globalAlpha = 1;
         }
         for (let bot of bots) {
             if (!bot.alive) continue;
             const br = bot.radius * scale;
-            ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), br, 0, Math.PI * 2);
             ctx.fillStyle = bot.color; ctx.fill();
             ctx.lineWidth = (bot.isBoss ? 4 : 2) * scale; ctx.strokeStyle = bot.visual?.accent || '#fff'; ctx.stroke();
             if (bot.isBoss) {
@@ -982,15 +1012,15 @@ function render() {
                 for (let si = 0; si < spokeCount; si++) {
                     const sa = (si / spokeCount) * Math.PI * 2 + (performance.now() % 4000) / 4000 * 0.3;
                     ctx.beginPath();
-                    ctx.moveTo(bot.x * scale + Math.cos(sa) * (br - 2 * scale), bot.y * scale + Math.sin(sa) * (br - 2 * scale));
-                    ctx.lineTo(bot.x * scale + Math.cos(sa) * (br + spokeLen), bot.y * scale + Math.sin(sa) * (br + spokeLen));
+                    ctx.moveTo(sx(bot.x) + Math.cos(sa) * (br - 2 * scale), sy(bot.y) + Math.sin(sa) * (br - 2 * scale));
+                    ctx.lineTo(sx(bot.x) + Math.cos(sa) * (br + spokeLen), sy(bot.y) + Math.sin(sa) * (br + spokeLen));
                     ctx.stroke();
                 }
                 // Tier name tag
                 ctx.font = `bold ${Math.max(10, 12 * scale)}px monospace`;
                 ctx.textAlign = 'center';
                 ctx.fillStyle = vis.accent || '#fff';
-                ctx.fillText(vis.label || 'TITAN', bot.x * scale, bot.y * scale - br - 36 * scale);
+                ctx.fillText(vis.label || 'TITAN', sx(bot.x), sy(bot.y) - br - 36 * scale);
                 // telegraph cue ring (per ability)
                 if (bot.curAttack && bot.telegraph > 0) {
                     const meta = window.NeonSystems?.bosses?.ABILITY_META || {};
@@ -1005,7 +1035,7 @@ function render() {
                     };
                     const cfg = cueCfg[bot.curAttack] || { r: 190, c: '#ffbb00' };
                     const wrScaled = cfg.r * scale;
-                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, wrScaled, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), wrScaled, 0, Math.PI * 2);
                     ctx.lineWidth = (3 + Math.floor(bot.telegraph / 6) % 3) * scale;
                     ctx.strokeStyle = cfg.c;
                     ctx.globalAlpha = 0.3 + (bot.telegraph % 8) / 16;
@@ -1016,20 +1046,20 @@ function render() {
                     ctx.textAlign = 'center';
                     ctx.fillStyle = cfg.c;
                     ctx.globalAlpha = 0.85;
-                    ctx.fillText(label.toUpperCase(), bot.x * scale, bot.y * scale - br - 22 * scale);
+                    ctx.fillText(label.toUpperCase(), sx(bot.x), sy(bot.y) - br - 22 * scale);
                     ctx.globalAlpha = 1;
                 }
                 // shockwave / berserk pulse
                 if (bot.pulseR > 0) {
                     const prScaled = bot.pulseR * scale;
-                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, prScaled, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), prScaled, 0, Math.PI * 2);
                     ctx.lineWidth = 5 * scale; ctx.strokeStyle = vis.aura || '#ffbb00';
                     ctx.globalAlpha = Math.max(0, 1 - bot.pulseR / 230);
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
                 // phase flash ring
                 if (bot.phaseFlash && bot.phaseFlash > 0) {
-                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + 8 * scale, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), br + 8 * scale, 0, Math.PI * 2);
                     ctx.lineWidth = 3 * scale; ctx.strokeStyle = vis.aura || bot.color;
                     ctx.globalAlpha = Math.min(1, bot.phaseFlash / 30) * 0.8;
                     ctx.stroke(); ctx.globalAlpha = 1;
@@ -1037,25 +1067,25 @@ function render() {
                 // Berserk rage aura (enraged / critical) — tined by tier palette
                 if (bot.phaseName === 'enraged' || bot.phaseName === 'critical') {
                     const pulse = (performance.now() % 800) / 800;
-                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + (10 + pulse * 8) * scale, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), br + (10 + pulse * 8) * scale, 0, Math.PI * 2);
                     ctx.lineWidth = 6 * scale; ctx.strokeStyle = bot.phaseName === 'critical' ? '#ffbb00' : (vis.aura || '#ff3366');
                     ctx.globalAlpha = 0.35 + 0.3 * (1 - pulse);
                     ctx.stroke(); ctx.globalAlpha = 1;
                 }
                 // Broken (armor shattered): the boss is now shove-able to a ring-out.
                 if (bot.broken) {
-                    ctx.beginPath(); ctx.arc(bot.x * scale, bot.y * scale, br + 5 * scale, 0, Math.PI * 2);
+                    ctx.beginPath(); ctx.arc(sx(bot.x), sy(bot.y), br + 5 * scale, 0, Math.PI * 2);
                     ctx.lineWidth = 3 * scale; ctx.strokeStyle = '#ff6600';
                     ctx.globalAlpha = 0.5 + 0.4 * Math.abs(Math.sin(bot.brokenFlash / 8));
                     ctx.stroke(); ctx.globalAlpha = 1;
                     ctx.font = `bold ${Math.max(10, 13 * scale)}px monospace`;
                     ctx.textAlign = 'center';
                     ctx.fillStyle = '#ff6600';
-                    ctx.fillText('ARMOR BROKEN', bot.x * scale, bot.y * scale - br - 30 * scale);
+                    ctx.fillText('ARMOR BROKEN', sx(bot.x), sy(bot.y) - br - 30 * scale);
                 }
                 const bw = bot.radius * 2.2 * scale;
-                const bx = bot.x * scale - bw / 2;
-                const by = bot.y * scale - bot.radius * scale - (bot.broken ? 58 : 46) * scale;
+                const bx = sx(bot.x) - bw / 2;
+                const by = sy(bot.y) - bot.radius * scale - (bot.broken ? 58 : 46) * scale;
                 // Shield (top bar, cyan) — layered with HP
                 ctx.fillStyle = '#172d48'; ctx.fillRect(bx, by - 8 * scale, bw, 5 * scale);
                 ctx.fillStyle = bot.broken ? '#ff6600' : '#00e5ff';
@@ -1077,16 +1107,44 @@ function render() {
         }
         if (player.alive) {
             const pr = player.radius * scale;
-            ctx.beginPath(); ctx.arc(player.x * scale, player.y * scale, pr, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(sx(player.x), sy(player.y), pr, 0, Math.PI * 2);
             ctx.fillStyle = player.color; ctx.fill();
             ctx.lineWidth = 2.5 * scale; ctx.strokeStyle = '#fff'; ctx.stroke();
         }
     }
 }
 
+/* ---------------------------------------------------------------- *
+ *  ERROR REPORTING — a broken frame must be visible, not swallowed.
+ * ---------------------------------------------------------------- */
+const __errorLog = { seen: new Map(), overlay: null };
+const DEBUG_ON = /[?&]debug=1/.test(location.search);
+
+function reportGameError(context, error) {
+    const key = context + '|' + (error && error.message);
+    const count = (__errorLog.seen.get(key) || 0) + 1;
+    __errorLog.seen.set(key, count);
+    // Log the first few occurrences, then once a minute of noise — never spam.
+    if (count <= 3 || count % 3600 === 0) console.error('[sumo-arena]', context, error);
+    if (!DEBUG_ON) return;
+    if (!__errorLog.overlay) {
+        const el = document.createElement('pre');
+        el.id = 'game-error-overlay';
+        el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow:auto;' +
+            'z-index:9999;margin:0;padding:8px;background:#2b0008;color:#ffb4c0;' +
+            'border-top:2px solid #ff3366;font:12px/1.4 monospace;white-space:pre-wrap';
+        document.body.appendChild(el);
+        __errorLog.overlay = el;
+    }
+    const line = new Date().toISOString().slice(11, 19) + ' ' + context + ': ' +
+        ((error && error.stack) || error) + ' (x' + count + ')\n';
+    __errorLog.overlay.textContent = (line + __errorLog.overlay.textContent).slice(0, 8000);
+}
+
 function gameLoop() {
     if (window.NeonSystems?.performance) window.NeonSystems.performance.tick();
-    try { updatePhysics(); render(); } catch (_error) {}
+    try { updatePhysics(); render(); }
+    catch (_error) { reportGameError('updatePhysics/render', _error); }
     requestAnimationFrame(gameLoop);
 }
 requestAnimationFrame(gameLoop);
@@ -1096,8 +1154,11 @@ requestAnimationFrame(gameLoop);
  * ---------------------------------------------------------------- */
 function handleSwipe(angle) {
     const rad = angle * Math.PI / 180;
-    player.vx = Math.cos(rad) * 5;
-    player.vy = Math.sin(rad) * 5;
+    // Dash ADDS momentum. It used to overwrite vx/vy, so a swipe cancelled any
+    // speed you had built up — and 5 was far below the 30 cap, so dashing felt
+    // like being braked.
+    PHY.resolveImpulse(player, SWIPE_DASH_IMPULSE, { x: Math.cos(rad), y: Math.sin(rad) });
+    PHY.capSpeed(player, PLAYER_SPEED_CAP);
     spawnImpact(player.x, player.y, player.color || '#00e5ff');
 }
 

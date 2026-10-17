@@ -3,13 +3,11 @@ const LEADERBOARD_API = '/api/leaderboard';
 let leaderboardSort = 'stage';
 let leaderboardPlayers = [];
 let leaderboardAllPlayers = [];
-
-const leaderboardFallback = [
-  { name: 'NOVA JACKAL', level: 42, stage: 86, coins: 1280, skin: 'Void Samurai' },
-  { name: 'CYBER RIKISHI', level: 35, stage: 71, coins: 1045, skin: 'Toxic Fang' },
-  { name: 'MANGO TITAN', level: 28, stage: 54, coins: 790, skin: 'Ember Ring' },
-  { name: 'AIHAM AM', level: 12, stage: 24, coins: 420, skin: 'Pulse Core' }
-];
+/**
+ * True when the last fetch actually reached the leaderboard API. Being offline
+ * is a normal state, not an error — the UI says so instead of hiding it.
+ */
+let leaderboardOnline = false;
 
 function getStablePlayerId() {
   let playerId = localStorage.getItem('sumo_player_id');
@@ -38,7 +36,8 @@ function getLocalLeaderboardPlayer() {
 
 function refreshLeaderboardWithLocalPlayer() {
   const localPlayer = getLocalLeaderboardPlayer();
-  if (!leaderboardAllPlayers.length) return;
+  // Your own profile is always real: it is read from THIS browser, never from a
+  // server, so it belongs on the board even when the server has no rows yet.
   const existingIndex = leaderboardAllPlayers.findIndex(player => player.id === localPlayer.id || player.name === localPlayer.name);
   if (existingIndex >= 0) leaderboardAllPlayers[existingIndex] = { ...leaderboardAllPlayers[existingIndex], ...localPlayer };
   else leaderboardAllPlayers.push(localPlayer);
@@ -93,16 +92,19 @@ async function fetchRealLeaderboard() {
   try {
     const response = await fetch(LEADERBOARD_API, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`);
-      const payload = await response.json();
-      const players = Array.isArray(payload) ? payload : payload.players;
-    if (!Array.isArray(players) || players.length === 0) throw new Error('Empty leaderboard');
+    const payload = await response.json();
+    const players = Array.isArray(payload) ? payload : payload.players;
+    // An empty array is a VALID answer: nobody has scored yet. Inventing
+    // players to fill it was the old behaviour, and it was a lie.
+    if (!Array.isArray(players)) throw new Error('Malformed leaderboard payload');
     leaderboardAllPlayers = players;
-    refreshLeaderboardWithLocalPlayer();
+    leaderboardOnline = true;
   } catch (_error) {
-    const current = getLocalLeaderboardPlayer();
-    leaderboardAllPlayers = leaderboardFallback.filter(player => player.name !== current.name && player.name !== 'AIHAM AM');
-    leaderboardAllPlayers.push(current);
+    // Offline or the API is down: show only what is actually true — you.
+    leaderboardAllPlayers = [];
+    leaderboardOnline = false;
   }
+  refreshLeaderboardWithLocalPlayer();
   renderPlayersList(leaderboardAllPlayers);
 }
 
@@ -112,6 +114,18 @@ function renderPlayersList(players) {
   leaderboardPlayers = players || [];
     const ranked = sortLeaderboardPlayers(leaderboardPlayers);
   container.innerHTML = '';
+  // Honest status line: describe what the board actually holds instead of
+  // padding it with names nobody earned.
+  const note = document.createElement('div');
+  note.className = 'leaderboard-loading leaderboard-note';
+  if (!leaderboardOnline) {
+    note.textContent = 'OFFLINE — showing your local profile only. No scores were loaded from a server.';
+  } else if (ranked.length <= 1) {
+    note.textContent = 'No scores yet — you are the first fighter on the board.';
+  } else {
+    note.textContent = `${ranked.length} fighters, all from real scores.`;
+  }
+  container.appendChild(note);
   const currentName = localStorage.getItem('sumo_name') || 'aiham';
   const currentId = getStablePlayerId();
   const currentRank = ranked.findIndex(player => player.id === currentId || player.name === currentName) + 1;

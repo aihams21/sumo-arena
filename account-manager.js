@@ -1,4 +1,6 @@
-// ملف إدارة الحساب، تعديل الاسم، علم الدولة، ورفع الصورة الشخصية المستقل 100%
+// Player account: display name, country flag and avatar image.
+// Everything is stored locally in this browser; nothing leaves the device
+// unless the leaderboard sync explicitly posts the public profile row.
 function openAccountModal() {
   const sidebar = document.getElementById('neon-sidebar');
   if (sidebar) sidebar.style.right = '-320px';
@@ -26,7 +28,16 @@ function saveAccount() {
   if(flag) localStorage.setItem('sumo_flag', flag);
   updateAccountUI();
   closeAccountModal();
-  location.reload();
+  // No location.reload(): reloading threw away a run in progress and re-ran
+  // every boot script just to redraw three labels. updateAccountUI already
+  // repaints them, and the leaderboard row has to be re-ranked under the new
+  // name, so ask it to refresh instead.
+  if (typeof refreshLeaderboardWithLocalPlayer === 'function') {
+    refreshLeaderboardWithLocalPlayer();
+  }
+  if (typeof fetchRealLeaderboard === 'function') {
+    fetchRealLeaderboard();
+  }
 }
 
 function loadAvatar(event) {

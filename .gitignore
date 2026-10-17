@@ -1,0 +1,10 @@
+# Runtime leaderboard store — real scores only, never committed.
+data/
+
+# Node (the game itself needs no dependencies; this is only here in case
+# someone adds tooling).
+node_modules/
+
+# OS / editor noise
+.DS_Store
+*.swp

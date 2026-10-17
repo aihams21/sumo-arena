@@ -1,13 +1,15 @@
 {
   "name": "neon-sumo-arena",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "description": "A browser sumo ring-out arcade game. Runs from a single static folder.",
   "private": true,
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/physics.test.mjs"
   },
-  "dependencies": {
-    "express": "^4.22.2",
-    "ws": "^8.21.3"
-  }
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
 }
