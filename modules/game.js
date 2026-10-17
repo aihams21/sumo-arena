@@ -656,11 +656,11 @@ function updatePhysics() {
         // from mid-arena in one frame — the "death out of nowhere").
         PHY.capSpeed(player, PLAYER_SPEED_CAP);
         player.x += player.vx * n; player.y += player.vy * n;
-        // Legitimate ring-out ONLY: the player dies when their whole body has
-        // been pushed past the arena bounds (center + radius beyond the line).
-        // A single clipped frame right at the rim never counts as a death.
-        if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius + player.radius && !((player.spawnGrace || 0) > 0)) {
-            reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
+        // Strict ring-out: the whole body has to stay inside the dohyō. The old
+        // rule (centre + radius past the line) forgave a whole body-width of
+        // overlap, so brushing the rim looked fair but was not. Now the body's
+        // edge reaching the line is enough — half a pixel over is out.
+        if (PHY.isBodyOutsideRing(player.x, player.y, player.radius, offlineArenaRadius) && !((player.spawnGrace || 0) > 0)) {
             player.alive = false; stageEnded = true;
             registerPlayerDeath();
             hideAllMenus();
@@ -822,14 +822,20 @@ function updatePhysics() {
                         // Armor intact => cannot be ringed out; slide back inside
                         // along the rim instead of teleporting and losing all speed.
                         PHY.reflectCircleFromWall(bot, ARENA_CENTER, offlineArenaRadius, WALL_RESTITUTION);
-                    } else if (fromCenter > offlineArenaRadius - bot.radius + 6) {
+                    } else if (fromCenter >= Math.max(0, offlineArenaRadius - bot.radius)) {
                         // Armor broken => boss can finally be physically thrown out.
+                        // Reaching the ringEdge guard above already means the edge
+                        // is past the line, so no extra slack is allowed here.
                         bot.alive = false;
                         spawnImpact(bot.x, bot.y, '#ff6600');
                         bossRungOut = true;
                     }
                 }
-            } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
+            } else if (fromCenter >= Math.max(0, offlineArenaRadius - bot.radius)) {
+                // Strict ring-out, same rule as the player: the body's edge
+                // reaching the dohyō is enough. The old rule killed a bot eight
+                // pixels BEFORE its edge got there, which let a fighter shove a
+                // rival that was still safely inside.
                 bot.alive = false;
             }
 

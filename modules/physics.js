@@ -175,6 +175,24 @@
     }
 
     /**
+     * True when any part of a body has crossed the arena line.
+     *
+     * The old rule forgave a full body-width of overlap (centre + radius past
+     * the boundary), which let a fighter lean on the rim and survive. Real sumo
+     * has no such mercy: the moment the body's edge reaches the dohyō, that
+     * fighter is out.
+     *
+     * There is deliberately no epsilon here. An earlier draft subtracted one to
+     * "absorb float noise", which actually moved the line INWARD and killed
+     * bodies that were still safely inside — the opposite of the intent. The
+     * rule is exact: edge on the line, out.
+     */
+    function isBodyOutsideRing(bodyX, bodyY, bodyRadius, arenaRadius) {
+        const distance = Math.hypot(bodyX - 400, bodyY - 300);
+        return distance + (bodyRadius || 0) >= arenaRadius;
+    }
+
+    /**
      * Map a world point to screen pixels.
      *
      * The arena centre is always pinned to the canvas centre, whatever the
@@ -197,6 +215,7 @@
         damp,
         dampSeconds,
         capSpeed,
+        isBodyOutsideRing,
         worldToScreen
     };
 })();

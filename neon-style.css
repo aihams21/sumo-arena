@@ -1177,8 +1177,6 @@ input,
 
 #death-count-copy { color: var(--ts); }
 
-#revive-button { width: min(280px, 85vw); }
-
 .elite-features-list { gap: 8px; }
 
 /* Menu entries are quiet rows; the accent marks where you are. */

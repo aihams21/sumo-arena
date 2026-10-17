@@ -35,6 +35,40 @@
         },
 
         /**
+         * Difficulty curve position, 0..1, in three bands.
+         *
+         * The old curve used `p = level / 1000` directly, which made the whole
+         * opening almost flat: the first 100 stages all sit below p = 0.1, so a
+         * new player met essentially the same fight for a long time and nothing
+         * felt like it was getting harder. Remapping the 1000-stage ladder into
+         * three explicit bands gives each stretch its own slope — easy, then
+         * medium, then hard — and every stat below is driven by this value, so
+         * the whole difficulty read changes from one number.
+         */
+        curveFor(level) {
+            const L = Math.min(this.MAX_LEVEL, Math.max(1, level));
+            const BANDS = [
+                { from: 1,   to: 100,  lo: 0.00, hi: 0.30 },  // easy
+                { from: 101, to: 300,  lo: 0.30, hi: 0.65 },  // medium
+                { from: 301, to: 1000, lo: 0.65, hi: 1.00 }   // hard
+            ];
+            for (const band of BANDS) {
+                if (L <= band.to) {
+                    const t = (L - band.from) / (band.to - band.from);
+                    return band.lo + (band.hi - band.lo) * Math.max(0, Math.min(1, t));
+                }
+            }
+            return 1;
+        },
+
+        /** Which of the three difficulty bands a stage belongs to. */
+        bandFor(level) {
+            if (level <= 100) return 'easy';
+            if (level <= 300) return 'medium';
+            return 'hard';
+        },
+
+        /**
          * Smooth difficulty curves normalized to progressRatio = level/1000.
          * All speed values are per-second (frame-rate independent).
          */
@@ -42,7 +76,7 @@
             level = Math.min(this.MAX_LEVEL, Math.max(1, level));
             const isBoss = level % this.BOSS_INTERVAL === 0;
             const isMiniBoss = !isBoss && (level % this.MINI_BOSS_INTERVAL === 0);
-            const p = level / this.MAX_LEVEL;              // 0..1
+            const p = this.curveFor(level);                   // 0..1, three-band curve
             const tierIdx = this.tierIndex(level);
 
             // Bot count: aggressive rise 1 -> 12 (steeper, sub-linear but fast)
@@ -94,7 +128,7 @@
          * NOT lethal — the sumo ring-out remains the win condition.
          */
         getHazardConfig(level, body = { radius: 22, mass: 1 }) {
-            const p = level / this.MAX_LEVEL;
+            const p = this.curveFor(level);
             const tierIdx = this.tierIndex(level);
             const isBoss = level % this.BOSS_INTERVAL === 0;
             const isMiniBoss = !isBoss && (level % this.MINI_BOSS_INTERVAL === 0);
@@ -128,7 +162,7 @@
          * Returns full stats + the ability set for the given tier.
          */
         getBossConfig(level, playerRadius) {
-            const p = level / this.MAX_LEVEL;
+            const p = this.curveFor(level);
             const tier = Math.floor(level / 50); // 0..20
             const tierIdx = this.tierIndex(level);
 
@@ -148,24 +182,33 @@
                 shield: Math.floor(shieldBase),
                 tier,
                 tierIdx,
-                abilities: this.getBossAbilities(tier)
+                abilities: this.getBossAbilities(p, level, tier)
             };
         },
 
         /**
-         * Ability ladder. Every boss has wave; higher tiers unlock distinct,
-         * powerful moves that each demand a different counter.
+         * Ability ladder. Every boss has wave; the rest unlock along the
+         * difficulty curve so a boss is a real fight from the first one.
+         *
+         * This used to key off `floor(level / 50)` alone, which meant a
+         * stage-10 boss had exactly one ability — no dash, no minions, no
+         * armour — so the first nine boss fights were the same shove with a
+         * bigger body. Keying the ladder to the curve fixes that, spreading
+         * the unlocks across all three bands so every boss brings something
+         * new and the late ones get the full arsenal.
          */
-        getBossAbilities(tier) {
+        getBossAbilities(curve, level, tier) {
+            const p = Number.isFinite(curve) ? curve : 0;
+            const unlock = threshold => p >= threshold;
             return {
-                hasWave: true,          // radial push (all)
-                hasDash: tier >= 1,     // telegraphed charge
-                hasMinions: tier >= 3,  // spawn peelers on phase gates
-                hasBerserk: tier >= 5,  // surge + periodic shockwave below 50%
-                hasVoidArmor: tier >= 8,// re-materializing shield + knockback resist
-                hasTeleport: tier >= 12,// blink to flank behind player
-                hasMultiWave: tier >= 16,// cascading multi-wave barrage
-                hasGrab: tier >= 14     // reverse pressure pull
+                hasWave: true,               // radial push (all)
+                hasDash: unlock(0.02),       // telegraphed charge
+                hasMinions: unlock(0.12),    // spawn peelers on phase gates
+                hasBerserk: unlock(0.22),    // surge + periodic shockwave below 50%
+                hasVoidArmor: unlock(0.34),  // re-materializing shield + knockback resist
+                hasGrab: unlock(0.46),       // reverse pressure pull
+                hasTeleport: unlock(0.56),   // blink to flank behind player
+                hasMultiWave: unlock(0.72)   // cascading multi-wave barrage
             };
         }
     };

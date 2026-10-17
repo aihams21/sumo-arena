@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -22,28 +22,29 @@
         </div>
 
         <div id="menu-main" class="overlay">
-            <h1>NEON SUMO ARENA</h1>
+            <h1 data-i18n="menu.title">NEON SUMO ARENA</h1>
             <div class="menu-metrics">
-                <div><span>COINS</span><strong id="menu-coins">0</strong></div>
-                <div><span>WIN STREAK</span><strong id="menu-streak">0 🔥</strong></div>
-                <div><span>RANK</span><strong id="menu-rank">--</strong></div>
+                <div><span data-i18n="menu.coins">COINS</span><strong id="menu-coins">0</strong></div>
+                <div><span data-i18n="menu.streak">WIN STREAK</span><strong id="menu-streak">0 🔥</strong></div>
+                <div><span data-i18n="menu.rank">RANK</span><strong id="menu-rank">--</strong></div>
             </div>
             <div id="daily-mission" class="daily-mission">
-                <div class="mission-heading"><span>⚡ DAILY RUSH</span><b id="mission-status">0 / 3 wins</b></div>
+                <div class="mission-heading"><span data-i18n="menu.dailyRush">⚡ DAILY RUSH</span><b id="mission-status">0 / 3 wins</b></div>
                 <div class="mission-track"><i id="mission-progress"></i></div>
                 <small id="mission-copy">Win 3 stages today for +25 coins</small>
                 <button id="mission-claim" class="mission-claim hidden" onclick="claimDailyMission()">Claim +25 🪙</button>
             </div>
-            <button class="btn btn-cyan" onclick="showStageSelect()">🗺️ Stage Map (1000 Waves)</button>
-            <div class="mode-title">NEON GAME MODES</div>
+            <button class="btn btn-cyan" onclick="showStageSelect()" data-i18n="menu.stageMap">🗺️ Stage Map (1000 Waves)</button>
+            <div class="mode-title" data-i18n="menu.gameModes">NEON GAME MODES</div>
             <div class="mode-grid">
-                <button class="mode-btn chaos" onclick="startGameMode('chaos')"><span class="mode-icon">🌀</span><span class="mode-name">CHAOS ARENA</span><small>6 bots • 185 radius</small></button>
-                <button class="mode-btn time" onclick="startGameMode('timeAttack')"><span class="mode-icon">⏱️</span><span class="mode-name">TIME ATTACK</span><small>60 seconds • score rush</small></button>
-                <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name">SHRINKING ARENA</span><small>250 → 125 • 2/sec</small></button>
+                <button class="mode-btn chaos" onclick="startGameMode('chaos')"><span class="mode-icon">🌀</span><span class="mode-name" data-i18n="mode.chaos">CHAOS ARENA</span><small data-i18n="mode.chaos.sub">6 bots • 185 radius</small></button>
+                <button class="mode-btn time" onclick="startGameMode('timeAttack')"><span class="mode-icon">⏱️</span><span class="mode-name" data-i18n="mode.time">TIME ATTACK</span><small data-i18n="mode.time.sub">60 seconds • score rush</small></button>
+                <button class="mode-btn shrink" onclick="startGameMode('shrinking')"><span class="mode-icon">🔻</span><span class="mode-name" data-i18n="mode.shrink">SHRINKING ARENA</span><small data-i18n="mode.shrink.sub">250 → 125 • 2/sec</small></button>
             </div>
-            <button class="btn btn-gold shop-entry-btn" onclick="showShop()">🛍️ السكنات والمتجر (Skins & Shop)</button>
-            <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()">🏆 Live Hall of Fame</button>
-            <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()">📲 Install App / تثبيت التطبيق</button>
+            <button class="btn btn-gold shop-entry-btn" onclick="showShop()" data-i18n="menu.skins">🛍️ السكنات والمتجر (Skins & Shop)</button>
+            <button class="btn btn-magenta" onclick="openLeaderboardModalSafe()" data-i18n="menu.leaderboard">🏆 Live Hall of Fame</button>
+            <button id="menu-install-button" class="btn btn-green" onclick="handleSmartInstall()" data-i18n="menu.install">📲 Install App / تثبيت التطبيق</button>
+            <button class="btn btn-gray" data-lang-toggle data-i18n="lang.toggle" data-i18n-title="lang.toggle.title" title="Switch language / تبديل اللغة">🌐 العربية</button>
             <div class="developer-credit"><span>CRAFTED BY</span><strong>AIHAM AM</strong><small>NEON SUMO SYSTEMS</small></div>
         </div>
 
@@ -122,7 +123,6 @@
         <div id="modal-death" class="overlay hidden">
             <h1 class="ringout-title">RING OUT!</h1>
             <p id="death-count-copy" class="death-count-copy"></p>
-            <button id="revive-button" class="btn btn-green" onclick="handleAdClickWithCounter('revive')">REVIVE: VISIT (0/5)</button>
             <button class="btn btn-cyan" onclick="retryStageDirectly()">🔄 Retry Stage</button>
             <button class="btn btn-gray" onclick="exitToMenu()">🏠 Main Menu</button>
         </div>
@@ -132,10 +132,32 @@
             <button class="btn btn-cyan" onclick="nextStageOffline()">Next Stage ➔</button>
             <button class="btn btn-gray" onclick="showStageSelect()">Stage Map</button>
         </div>
+
+        <!-- Stage upgrade gate: shown when a stage demands more upgrade points
+             than the player currently owns. Gives the exact shortfall and a
+             direct route to the shop instead of a dead click. -->
+        <div id="modal-upgrade-gate" class="overlay hidden">
+            <h1 class="ringout-title" id="upgrade-gate-title">UPGRADE REQUIRED</h1>
+            <p class="note-info" id="upgrade-gate-copy">You need more upgrade power for this stage.</p>
+            <button class="btn btn-gold" onclick="hideAllMenus(); showShop();">🪙 Go to Shop</button>
+            <button class="btn btn-gray" onclick="hideAllMenus(); showStageSelect();">Stage Map</button>
+        </div>
     </div>
 
     <script>
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+        /* ---- LANGUAGE ----
+         * i18n.js is loaded at the end of <head>'s sibling scripts, after this
+         * block is parsed, so the toggle can only be wired once the DOM and the
+         * module both exist. DOMContentLoaded covers both.
+         */
+        window.addEventListener('DOMContentLoaded', () => {
+            const i18n = window.NeonSystems?.i18n;
+            if (!i18n) return;
+            i18n.apply();
+            i18n.bindToggleButtons();
+        });
         let deferredPrompt = null;
         const installModal = document.getElementById('modal-install-guide');
         const installButton = document.getElementById('install-main-button');
@@ -297,17 +319,16 @@
                 saveData();
                 showShop();
                 alert("🎉 +50 Coins added!");
-            } else if (type === 'revive' && !player.alive) {
-                reviveInPlaceOffline();
+            } else if (type === 'revive') {
+                // Revive was removed on purpose: a ring-out is now final. The only
+                // way back into a stage is a clean retry.
             }
             updateRewardButtons();
         }
 
         function updateRewardButtons() {
             const coinButton = document.getElementById('coin-reward-button');
-            const reviveButton = document.getElementById('revive-button');
             if (coinButton) coinButton.innerText = '+50 COINS';
-            if (reviveButton) reviveButton.innerText = 'REVIVE NOW';
         }
         updateRewardButtons();
         function triggerSmartlinkDirect() {
@@ -400,10 +421,82 @@
         window.addEventListener('touchend', resetTouch, { passive: true });
         window.addEventListener('touchcancel', resetTouch, { passive: true });
 
+        /* ---- SAVE FORMAT RESET ----
+         * The rules changed: the ring-out is strict now, revive is gone, and
+         * every stage is upgrade-gated. A score earned under the old rules
+         * means nothing under the new ones, so the save is versioned and
+         * progression is wiped once, the first time a player loads this build.
+         *
+         * Identity is deliberately kept — a name, a flag and an avatar are not
+         * progression, and making everyone retype their name would punish them
+         * for a rules change. `sumo_player_id` IS cleared so the fresh run
+         * syncs as a new fighter instead of improving a stale leaderboard row.
+         */
+        const SAVE_VERSION = 2;
+        (function applySaveVersion() {
+            if (parseInt(localStorage.getItem('sumo_save_version') || '0') === SAVE_VERSION) return;
+            ['sumo_coins', 'sumo_stage', 'sumo_upgrades', 'sumo_skins', 'sumo_wins',
+             'sumo_streak', 'sumo_total_deaths', 'sumo_daily_mission',
+             'sumo_player_id', 'neon_sumo_player_profile_v1'
+            ].forEach(key => localStorage.removeItem(key));
+            localStorage.setItem('sumo_save_version', String(SAVE_VERSION));
+        })();
+
         let coins = parseInt(localStorage.getItem('sumo_coins') || '0');
         let maxUnlockedStage = parseInt(localStorage.getItem('sumo_stage') || '1');
         let upgrades = JSON.parse(localStorage.getItem('sumo_upgrades') || '{"weight":1,"power":1,"coreDensity":0,"neonMomentum":0,"hydroPusher":0,"voidArmor":0}');
         upgrades = { weight: 1, power: 1, coreDensity: 0, neonMomentum: 0, hydroPusher: 0, voidArmor: 0, ...upgrades };
+
+        /* ---- STAGE UPGRADE GATE ----
+         * Every stage demands a minimum number of upgrade points, so there is
+         * always a reason to farm coins between waves.
+         *
+         * The requirement is derived from the economy instead of invented, and
+         * that matters more than it looks. Upgrade costs escalate by
+         * `level * 20` while stage income stays roughly linear, so the number
+         * of points a player can afford only grows like the square root of
+         * income. Any hand-picked formula (stage * 0.16, a log curve, a
+         * per-tier table) therefore deadlocks: a stage asks for more points
+         * than the coins ever earned can buy, and the run is unwinnable.
+         * Deriving the gate from the same reward table that pays the player
+         * makes that impossible by construction — one point of slack is kept so
+         * the gate never nags on the exact stage you just earned it for.
+         */
+        function stageCoinReward(clearedStage) {
+            if (clearedStage % 10 === 0) return 50;   // Mega boss
+            if (clearedStage % 5 === 0) return 20;    // Mini boss
+            if (clearedStage > 500) return 15;
+            if (clearedStage > 100) return 10;
+            return 5;
+        }
+        function totalCoinsEarnedBeforeStage(level) {
+            let earned = 0;
+            for (let stage = 1; stage < level; stage++) earned += stageCoinReward(stage);
+            return earned;
+        }
+        /** Cheapest way to buy `points` upgrades: alternate weight and power. */
+        function cheapestCostForPoints(points) {
+            let cost = 0, bought = 0, weightLevel = 1, powerLevel = 1;
+            while (bought < points) {
+                const weightCost = weightLevel * 20;
+                const powerCost = powerLevel * 20;
+                if (weightCost <= powerCost) { cost += weightCost; weightLevel++; }
+                else { cost += powerCost; powerLevel++; }
+                bought++;
+            }
+            return cost;
+        }
+        function upgradePoints() {
+            return (Number(upgrades.weight) - 1) + (Number(upgrades.power) - 1)
+                + (Number(upgrades.coreDensity) || 0) + (Number(upgrades.neonMomentum) || 0)
+                + (Number(upgrades.hydroPusher) || 0) + (Number(upgrades.voidArmor) || 0);
+        }
+        function requiredUpgradeForStage(level) {
+            const income = totalCoinsEarnedBeforeStage(level);
+            let affordable = 0;
+            while (affordable < 400 && cheapestCostForPoints(affordable + 1) <= income) affordable++;
+            return Math.max(0, affordable - 1);
+        }
         const bodyUpgrades = [
             { id: 'coreDensity', name: 'Core Density', icon: '◈', unlock: 10, lore: 'Recovered from the Foundry. Adds mass against heavy bosses.', max: 3, cost: level => (level + 1) * 45 },
             { id: 'neonMomentum', name: 'Neon Momentum', icon: '⚡', unlock: 12, lore: 'Charged in Wave 12. Builds faster movement and impact power.', max: 3, cost: level => (level + 1) * 55 },
@@ -515,7 +608,6 @@
         let modeEliminations = 0;
         let modeRewarded = false;
         let totalDeaths = parseInt(localStorage.getItem('sumo_total_deaths') || '0');
-        let reviveSnapshot = { x: 400, y: 300, radius: 240 };
         let currentPlayingStage = 1;
         let offlineArenaRadius = 240;
         let stageEnded = false;
@@ -755,6 +847,23 @@
         }
 
         function startOfflineStage(level) {
+            // ---- Mandatory upgrade gate ----
+            // Every stage demands a minimum number of upgrade points, so there
+            // is always a reason to go back to the shop and farm coins. The
+            // gate is checked before anything else happens, so a blocked stage
+            // never half-starts and never leaves the player inside the arena.
+            const requiredPoints = requiredUpgradeForStage(level);
+            const ownedPoints = upgradePoints();
+            if (ownedPoints < requiredPoints) {
+                const shortfall = requiredPoints - ownedPoints;
+                if (typeof showUpgradeGateModal === 'function') {
+                    showUpgradeGateModal(level, requiredPoints, ownedPoints, shortfall);
+                } else {
+                    alert(`Stage ${level} needs ${requiredPoints} upgrade points. You have ${ownedPoints}.`);
+                }
+                return;
+            }
+
             // Calculate player power factor based on upgrades
             const totalUpgrades = upgrades.weight + upgrades.power + upgrades.neonMomentum + upgrades.voidArmor + upgrades.hydroPusher + upgrades.coreDensity;
             const maxPossible = 60; // ~10 levels each × 6 stats
@@ -814,6 +923,27 @@
             applyEquippedSkin();
         }
 
+        /**
+         * Explain why a stage is locked instead of silently doing nothing.
+         * Shows the exact number of upgrade points required, how many the
+         * player has, and how many are still missing, then routes straight to
+         * the shop — the whole point of the gate is that there is always a
+         * next action to take.
+         */
+        function showUpgradeGateModal(level, required, owned, shortfall) {
+            hideAllMenus();
+            const title = document.getElementById('upgrade-gate-title');
+            const copy = document.getElementById('upgrade-gate-copy');
+            if (title) title.innerText = `STAGE ${level} — UPGRADE REQUIRED`;
+            if (copy) {
+                copy.innerText = `This stage needs ${required} upgrade points. `
+                    + `You have ${owned}. ${shortfall === 1 ? 'One point' : `${shortfall} points`} short — `
+                    + `farm coins in earlier stages and upgrade.`;
+            }
+            const modal = document.getElementById('modal-upgrade-gate');
+            if (modal) modal.classList.remove('hidden');
+        }
+
         function retryStageDirectly() { startOfflineStage(currentPlayingStage); }
         function nextStageOffline() { startOfflineStage(Math.min(1000, currentPlayingStage + 1)); }
 
@@ -826,12 +956,9 @@
                 localStorage.setItem('sumo_stage', maxUnlockedStage);
             }
             
-            // Scaled coin rewards
-            let coinReward = 5;
-            if (clearedStage % 10 === 0) coinReward = 50; // Mega Boss
-            else if (clearedStage % 5 === 0) coinReward = 20; // Mini Boss
-            else if (clearedStage > 500) coinReward = 15;
-            else if (clearedStage > 100) coinReward = 10;
+            // Scaled coin rewards — same table the upgrade gate is derived from,
+            // so the two can never drift apart.
+            const coinReward = stageCoinReward(clearedStage);
             
             coins += coinReward;
             const streak = parseInt(localStorage.getItem('sumo_streak') || '0') + 1;
@@ -868,19 +995,6 @@
             updateRewardButtons();
         }
 
-        function reviveInPlaceOffline() {
-            stageEnded = false;
-            const safeDistance = Math.max(30, reviveSnapshot.radius - player.radius - 8);
-            const distance = Math.hypot(reviveSnapshot.x - 400, reviveSnapshot.y - 300);
-            const scale = distance > safeDistance ? safeDistance / distance : 1;
-            player.x = 400 + (reviveSnapshot.x - 400) * scale;
-            player.y = 300 + (reviveSnapshot.y - 300) * scale;
-            player.vx = 0; player.vy = 0; player.alive = true;
-            hideAllMenus();
-            document.getElementById('hud').classList.remove('hidden');
-            touchBox.style.display = 'block';
-        }
-
         function spawnImpact(x, y, color) {
             for (let i = 0; i < (mobilePerformance ? 3 : 6); i++) {
                 let angle = Math.random() * Math.PI * 2;
@@ -897,6 +1011,12 @@
 
         function updatePhysics() {
             if (gameMode === 'none') return;
+            // modules/physics.js IS loaded by this page, so the ring-out rule has a
+            // single source of truth shared with the test suite. Resolved per call
+            // because this inline block is parsed before physics.js is fetched.
+            const ringOut = (window.NeonSystems?.physics?.isBodyOutsideRing) || function (bx, by, br, R) {
+                return Math.hypot(bx - 400, by - 300) + (br || 0) >= R;
+            };
             const now = performance.now();
             const dt = Math.min(0.05, Math.max(0, (now - lastPhysicsTime) / 1000));
             lastPhysicsTime = now;
@@ -945,10 +1065,12 @@
                 const spd = Math.hypot(player.vx, player.vy);
                 if (spd > maxVel) { player.vx *= maxVel / spd; player.vy *= maxVel / spd; }
                 player.x += player.vx; player.y += player.vy;
-                // Death only when the entire player circle has left the arena
-                // (center distance > arena radius + player radius = fully outside)
-                if (Math.hypot(player.x - 400, player.y - 300) > offlineArenaRadius + player.radius) {
-                    reviveSnapshot = { x: player.x, y: player.y, radius: offlineArenaRadius };
+                // Strict ring-out. The old rule only killed a fighter once their
+                // WHOLE body was past the line, which forgave a full body-width of
+                // overhang: leaning on the rim looked fair but it was not. Real
+                // sumo has no such mercy — the moment any part of you touches the
+                // dohyo edge, you are out. Half a pixel over is out.
+                if (ringOut(player.x, player.y, player.radius, offlineArenaRadius)) {
                     player.alive = false; stageEnded = true;
                     registerPlayerDeath();
                     hideAllMenus();
@@ -1029,13 +1151,19 @@
                     bot.x += bot.vx; bot.y += bot.vy;
                     let fromCenter = Math.hypot(bot.x - 400, bot.y - 300);
                     if (bot.isBoss && bot.hp > 0 && fromCenter > offlineArenaRadius - 10) {
+                        // Armour intact: the boss cannot be ringed out, it slides
+                        // back inside. Checked first, so it never reaches the rule
+                        // below.
                         let nx = (bot.x - 400) / fromCenter;
                         let ny = (bot.y - 300) / fromCenter;
                         bot.x = 400 + nx * (offlineArenaRadius - 12);
                         bot.y = 300 + ny * (offlineArenaRadius - 12);
                         bot.vx *= Math.pow(0.001, dt); bot.vy *= Math.pow(0.001, dt);
-                    } else if (fromCenter > Math.max(0, offlineArenaRadius - bot.radius - 8)) {
-                        // Bot dies only when its full circle exits the arena edge
+                    } else if (ringOut(bot.x, bot.y, bot.radius, offlineArenaRadius)) {
+                        // Strict ring-out, exactly the same rule the player obeys.
+                        // The old test waited until a bot was eight pixels PAST the
+                        // line with its body fully outside, which let bots hug the
+                        // rim for free.
                         bot.alive = false;
                     }
                     let distance = Math.hypot(bot.x - player.x, bot.y - player.y);
@@ -1337,6 +1465,7 @@
     <script src="modules/achievements.js"></script>
     <script src="modules/performance.js"></script>
     <script src="modules/audio.js"></script>
+<script src="modules/i18n.js"></script>
 
 <script>
 function toggleNeonMenu() {
